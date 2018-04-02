@@ -1,0 +1,219 @@
+#include "cnet.h"
+
+create_stru networkmenu[NM_MAX] = {0};
+create_stru *network_sel[NM_MAX] = {0};
+//void (*network_sel[NM_MAX])() = {0};
+
+// 网络菜单初始化
+void network_config_init()
+{
+	static int flag = 1;
+	if (flag) {
+		flag = 0;
+		add_item(networkmenu, "NIC numbers",	(char*)&new_vm.nics,		enter_vm_nics,		0,1, 0);
+		for (int n=0; n<NIC_NUM; n++) {
+			char desc[BUFFERSIZE];
+			sprintf(desc, "nic-%d mode", n);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].netmode, 	enter_vm_netmode_proc,  n,1, 0);
+			sprintf(desc, "nic-%d bind", n);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].bind, 	enter_vm_bind_proc,  	n,1, 0);
+			sprintf(desc, "nic-%d NAT", n);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].nat, 	enter_vm_nat_proc,  	n,1, 0);
+			sprintf(desc, "nic-%d ip", n);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].ip, 	enter_vm_ip_proc,  	n,1, 0);
+		}
+		add_item(networkmenu, "add a nic",	NULL,			add_nic,		0,1, 1);
+		add_item(networkmenu, "delete a nic", 	NULL,			delete_nic,		0,1, 1);
+		add_item(networkmenu, "go back",	NULL,			goback_mainmenu,	0,1, 1);
+	}
+}
+
+// 建立网络配置
+void create_network_config()
+{
+	if (atoi(new_vm.nics) == 0) {
+		int n = 0;
+		while (networkmenu[n].func && networkmenu[n].submenu == 0) {
+			networkmenu[n].func(networkmenu[n].arg);
+			n++;
+		}
+	}
+
+	edit_network_config();
+}
+
+// 编辑网络配置
+void edit_network_config()
+{
+	vm_node *p;
+	if ((p = find_vm_list(new_vm.name)) != NULL) {
+		set_network_edit(BVMNETWORK, 1);
+		set_network_edit(BVMNETWORKFUNC, 1);
+		networkmenu[0].edit = 0;
+	}
+	else {
+		set_network_edit(BVMNETWORK, 1);
+		set_network_edit(BVMNETWORKFUNC, -1);
+	}
+
+	char *msg = "Enter an number: ";
+	show_network_config();
+
+	int min = 0, max = 0;
+	char answer[8];
+	while (1) {
+		while (network_sel[max]) ++max;
+		--max;
+
+		printf("%s", msg);
+		fgets(answer, sizeof(answer), stdin);
+		answer[strlen(answer)-1] = '\0';
+
+		//int n = strtoint(answer);
+		int n = check_options(min, max, answer);
+		if (n < min || n > max) {
+			printf("\033[1A\033[K"); 
+			continue;
+		}
+
+		if (network_sel[n]->func == goback_mainmenu) {
+			if (check_network_enter_valid() == -1) { 
+				printf("\033[1A\033[K"); 
+				continue; 
+			}
+			break;
+		}
+		if (!is_edit_item(networkmenu, network_sel, n)) { 
+			printf("\033[1A\033[K"); 
+			continue; 
+		}
+		if (network_sel[n]) network_sel[n]->func(network_sel[n]->arg);
+		show_network_config();
+
+	}
+}
+
+// 设置网络菜单项的编辑属性
+void set_network_edit(int type, int edit)
+{
+	int n = NIC_NUM * 4 + 1;
+	if (type == BVMNETWORK)
+		for (int i=0; i<n; i++)
+			networkmenu[i].edit = edit;
+	if (type == BVMNETWORKFUNC)
+		for (int i=n; i<n+2; i++)
+			networkmenu[i].edit = edit;
+}
+
+// 检测网络输入有效性
+int check_network_enter_valid()
+{
+	for (int i=0; i<atoi(new_vm.nics); i++) {
+		if (strlen(new_vm.nic[i].netmode) == 0) return -1;
+		if (strlen(new_vm.nic[i].ip) == 0) return -1;
+		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0 && strlen(new_vm.nic[i].nat) == 0) return -1;
+		if (strcmp(new_vm.nic[i].netmode, "Bridged") == 0 && strlen(new_vm.nic[i].bind) == 0) return -1;
+	}
+	return 1;
+}
+
+// 显示网络配置
+void show_network_config()
+{
+	if (atoi(new_vm.nics) <= 1)
+		networkmenu[NIC_NUM * 4 + 2].edit = -1;
+
+	int n = 0;
+	int index = 0;
+	while (networkmenu[n].func) {
+		if ((networkmenu[n].func == enter_vm_netmode_proc && atoi(new_vm.nics) < networkmenu[n].arg + 1) ||
+		    (networkmenu[n].func == enter_vm_bind_proc && strcmp(new_vm.nic[networkmenu[n].arg].netmode, "Bridged") != 0) ||
+		    (networkmenu[n].func == enter_vm_nat_proc && strcmp(new_vm.nic[networkmenu[n].arg].netmode, "NAT") != 0) ||
+		    (networkmenu[n].func == enter_vm_ip_proc && strlen(new_vm.nic[networkmenu[n].arg].netmode) == 0) //atoi(new_vm.nics) < networkmenu[n].arg + 1)
+		   );
+		else {
+			if (networkmenu[n].edit != -1) {
+				network_sel[index] = &networkmenu[n];
+				//printf("[%2d]. %-13s", index, networkmenu[n].desc);
+				printf("[%c]. %-13s", options[index], networkmenu[n].desc);
+				if (networkmenu[n].value)
+					printf(": %s", networkmenu[n].value);
+				printf("\n");
+				++index;
+			}
+		}
+		++n;
+	}
+}
+
+// 增加网络
+void add_nic(int not_use)
+{
+	warn("... add nic ...\n");
+	if (atoi(new_vm.nics) == NIC_NUM) {
+		error("The number of network cards reached the limit\n");
+		err_exit();
+	}
+	sprintf(new_vm.nics, "%d", atoi(new_vm.nics) + 1);
+	//开启delete菜单
+	networkmenu[26].edit = 1;
+	//vm_add_nic(new_vm.name);
+	//load_vm_info(new_vm.name, &new_vm);
+}
+
+// 删除网卡
+void delete_nic(int not_use)
+{
+	warn("... delete nic ...\n");
+	vm_del_nic();
+	if (atoi(new_vm.nics) <= 1)
+		networkmenu[26].edit = -1;
+	//load_vm_info(new_vm.name, &new_vm);
+}
+
+// 删除一块网卡
+void vm_del_nic()
+{
+	//选择网卡
+	int n = select_nic();
+
+	//修改vm配置文件
+	for (int i=n+1; i<atoi(new_vm.nics); i++) {
+		new_vm.nic[i-1] = new_vm.nic[i];
+	}
+	int num = atoi(new_vm.nics) - 1;
+	strcpy(new_vm.nic[num].netmode, "");
+	strcpy(new_vm.nic[num].nat, "");
+	strcpy(new_vm.nic[num].bind, "");
+	sprintf(new_vm.nics, "%d", num);
+
+}
+
+
+// 选择网卡
+int select_nic()
+{
+	char *msg = "Which network card: ";
+	char *opts[NIC_NUM] = {"0", "1", "2", "3", "4", "5", "6", "7"};
+	char *desc[NIC_NUM] = {0};
+	int nic_num = atoi(new_vm.nics);
+	opts[nic_num] = NULL;
+	for(int n=0; n<nic_num; n++) {
+		desc[n] = (char*)malloc(BUFFERSIZE * sizeof(char));
+		memset(desc[n], 0, BUFFERSIZE * sizeof(char)); 
+		sprintf(desc[n], "nic_%d - %s", n, new_vm.nic[n].netmode);
+	}
+
+	char nic[32];
+	enter_options(msg, opts, desc, (char*)&nic);
+
+	int n = 0;
+	while (desc[n]) {
+		free(desc[n]);
+		++n;
+	}
+
+	return atoi(nic);
+}
+
+
