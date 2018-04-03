@@ -142,6 +142,7 @@ void load_ng_list();
 void save_ng_list();
 int  get_nic_list();
 void get_lo_name(char *name);
+void get_wlan_name(char *name);
 char *get_nat_info(char *nat_name);
 char *get_switch_info(char *switch_name);
 void get_members_in_bridge(char *bridge_name);
