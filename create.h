@@ -76,6 +76,8 @@ void enter_static_ipv4(char *value);
 int  get_filelist(char *dir, char **opt, char **opt_desc);
 int  check_numbers(char *value, char *unit);
 void enter_numbers(char *msg, char *unit, char *value);
+int  check_version(char *value);
+void enter_version(char *msg, char *value);
 int  check_options(int min, int max, char *value);
 void enter_options(char *msg, char **opt, char **opt_desc, char *value);
 void add_item(create_stru *table, char *desc, char *value, void (*func)(), int arg, int edit, int submenu);

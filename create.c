@@ -390,10 +390,13 @@ void enter_vm_version(int not_use)
 		"6.1",
 		"6.2",
 		"6.3",
+		"other",
 		NULL,
 	};
 
 	enter_options(msg, ver, NULL, (char*)&new_vm.version);
+	if (strcmp(new_vm.version, (char*)ver[4]) == 0)
+		enter_version("Enter other version: ", (char*)&new_vm.version);
 }
 
 // vm_zfs
@@ -984,6 +987,58 @@ int get_filelist(char *dir, char **opt, char **opt_desc)
 	closedir(dp);
 
 	return n;
+}
+
+// 用于操作系统版本号的输入处理
+//   msg： 输入提示 
+// value： 作用的数据
+void enter_version(char *msg, char *value)
+{
+	while (1) {
+		printf("%s", msg);
+		fgets(value, sizeof(value), stdin);
+		value[strlen(value)-1] = '\0';
+
+		if (check_version(value) == RET_SUCCESS) {
+			break;
+		}
+		else
+			warn("input invalid\n");
+	}
+	if (strchr(value, '.') == NULL) strcat(value, ".0");
+}
+
+// 检测版本号输入的有效性
+// 错误返回 RET_FAILURE
+int check_version(char *value)
+{
+	if (value == NULL) return RET_FAILURE;
+	if (strlen(value) == 0) return RET_FAILURE;
+
+	char str[16];
+	strcpy(str, value);
+
+	int n = 0;
+	char *p = str;
+	char ch = *p;
+	int point = 0;
+	while (ch) {
+		if (ch >= '0' && ch <= '9') {
+			n = n * 10 + ch - '0';
+			ch = *++p;
+		}
+		else if (ch == '.') {
+			++point;
+			ch = *++p;
+		}
+		else
+			return RET_FAILURE;
+	}
+
+	if (point > 1)
+		return RET_FAILURE;
+	else
+		return RET_SUCCESS;
 }
 
 
