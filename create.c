@@ -67,8 +67,8 @@ void create_init()
 	add_item(tbl, "uefi", 	      (char*)&new_vm.uefi,     		enter_vm_uefi, 		0,	0,	0);
 	add_item(tbl, "VNC", 	      (char*)&new_vm.vncstatus,  	enter_vm_vncstatus,	0,	1,	0);
 	add_item(tbl, "VNC port",     (char*)&new_vm.vncport,  		enter_vm_vncport,	0,	1,	0);
-	//add_item(tbl, "VNC display width", (char*)&new_vm.vncwidth, 	enter_vm_vncwidth, 	0,	1,	0);
-	//add_item(tbl, "VNC display height", (char*)&new_vm.vncheight,enter_vm_vncheight, 	0,	1,	0);
+	//add_item(tbl, "VNC width",  (char*)&new_vm.vncwidth, 		enter_vm_vncwidth, 	0,	1,	0);
+	//add_item(tbl, "VNC height", (char*)&new_vm.vncheight,		enter_vm_vncheight, 	0,	1,	0);
 	add_item(tbl, "hostbridge",   (char*)&new_vm.hostbridge, 	enter_vm_hostbridge,	0,	1,	0);
 	add_item(tbl, "auto boot",    (char*)&new_vm.autoboot, 		enter_vm_autoboot,	0,	1,	0);
 	add_item(tbl, "boot index",   (char*)&new_vm.bootindex, 	enter_vm_bootindex,	0,	1,	0);
@@ -389,6 +389,7 @@ void enter_vm_version(int not_use)
 		"6.0",
 		"6.1",
 		"6.2",
+		"6.3",
 		NULL,
 	};
 
