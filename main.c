@@ -2,7 +2,7 @@
 
 pro_stru program = {
 	"bvm", 
-	"1.1.1_20180402", 
+	"1.1.1_20180403", 
 	"GuoQiang",
 	"bigdragon@chinafreebsd.cn",
 	"http://bigdragon.chinafreebsd.cn/bvm/",
