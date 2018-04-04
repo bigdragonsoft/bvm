@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+
+# Add the following lines to /etc/rc.conf to enable `bvmd':
+#
+# bvmd_enable="YES"
+# PROVIDE: bvmd 
+# REQUIRE: sshd
+#
+
+. /etc/rc.subr
+
+name="bvmd"
+rcvar=bvmd_enable
+start_flag=" --autoboot"
+bvm="/usr/local/bin/bvm"
+
+start_cmd="start_bvm"
+
+load_rc_config "$name"
+: ${rsyncd_enable="NO"}
+
+start_bvm()
+{
+	echo "checking vms ...."
+	$bvm $start_flag
+}
+
+run_rc_command "$1"

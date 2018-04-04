@@ -1,0 +1,38 @@
+{
+        "name":"bvm",
+        "origin":"sysutils/bvm",
+        "version":"1.1.1_20180403",
+        "comment":"bhyve vm manager",
+        "maintainer":"bigdragon@chinafreebsd.cn",
+        "www":"http://bigdragon.chinafreebsd.cn/bvm/",
+        "abi":"FreeBSD:11:amd64",
+        "arch":"freebsd:11:x86:64",
+        "prefix":"/usr/local",
+        "flatsize":0,
+        "licenselogic":"single",
+        "desc":"bhyve vm manager",
+#        "deps":{
+#                "tmux":{
+#                        "origin":"sysutils/tmux",
+#                        "version":"2.5_1"
+#                },
+#                "grub2-bhyve":{
+#                        "origin":"sysutils/grub2-bhyve",
+#                        "version":"0.40_3"
+#                },
+#                "bhyve-firmware":{
+#                        "origin":"sysutils/bhyve-firmware",
+#                        "version":"1.0"
+#                }
+#
+#        },
+        "categories":["sysutils"],
+        "files":{
+                "/usr/local/bin/bvm":"",
+                "/usr/local/bin/bvmb":"",
+                "/usr/local/etc/rc.d/bvmd":"",
+                "/usr/local/etc/bvm/bvm.conf":"",
+                "/usr/local/etc/bvm/nat.conf":"",
+                "/usr/local/etc/bvm/switch.conf":""
+        }
+}

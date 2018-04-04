@@ -1,0 +1,6 @@
+#!/bin/sh
+
+./gen > ./+MANIFEST
+cd ..
+pkg create -m pkg
+

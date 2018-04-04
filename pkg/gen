@@ -1,0 +1,45 @@
+#!/bin/sh
+
+sha1=`sha256 /usr/local/bin/bvm | cut -d " " -f4`
+sha2=`sha256 /usr/local/bin/bvmb | cut -d " " -f4`
+sha3=`sha256 /usr/local/etc/rc.d/bvmd | cut -d " " -f4`
+sha4=`sha256 /usr/local/etc/bvm/bvm.conf | cut -d " " -f4`
+sha5=`sha256 /usr/local/etc/bvm/nat.conf | cut -d " " -f4`
+sha6=`sha256 /usr/local/etc/bvm/switch.conf | cut -d " " -f4`
+
+size1=`ls -l /usr/local/bin/bvm | awk '{print $5}'`
+size2=`ls -l /usr/local/bin/bvmb | awk '{print $5}'`
+size3=`ls -l /usr/local/etc/rc.d/bvmd | awk '{print $5}'`
+size4=`ls -l /usr/local/etc/bvm/bvm.conf | awk '{print $5}'`
+size5=`ls -l /usr/local/etc/bvm/nat.conf | awk '{print $5}'`
+size6=`ls -l /usr/local/etc/bvm/switch.conf | awk '{print $5}'`
+size=`echo "$size1 + $size2 + $size3 + $size4 + $size5 + $size6" | bc`
+#echo flatsize=$size
+
+awk -F: '{
+	if (index($0,"flatsize")>0) {
+		printf "%s:%s,\n", $1, size
+	}
+	else if (index($0,"/usr/local/bin/bvmb")>0) {
+		printf "%s:\"1$%s\",\n", $1, sha2
+	}
+	else if (index($0,"/usr/local/bin/bvm")>0) {
+		printf "%s:\"1$%s\",\n", $1, sha1
+	}
+	else if (index($0,"bvmd")>0) {
+		printf "%s:\"1$%s\",\n", $1, sha3
+	}
+	else if (index($0,"bvm.conf")>0) {
+		printf "%s:\"1$%s\",\n", $1, sha4
+	}
+	else if (index($0,"nat.conf")>0) {
+		printf "%s:\"1$%s\",\n", $1, sha5
+	}
+	else if (index($0,"switch.conf")>0) {
+		printf "%s:\"1$%s\"\n", $1, sha6
+	}
+	else {
+		print $0
+	}
+}' size="$size" sha1="$sha1" sha2="$sha2" sha3="$sha3" sha4="$sha4" sha5="$sha5" sha6="$sha6" MANIFEST
+
