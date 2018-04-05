@@ -1,0 +1,12 @@
+源码编译：
+
+ # mkdir /usr/local/etc/bvm/
+ # cp conf/*.conf /usr/local/etc/bvm/
+ # cp conf/bvmd /usr/local/etc/rc.d/
+ # cd src
+ # make
+
+生成安装包：
+
+ # cd pkg
+ # ./create
