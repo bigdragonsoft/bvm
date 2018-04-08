@@ -352,6 +352,7 @@ void vm_init()
 {
 	create_vm_list();
 	get_vm_name(vmdir);
+	sort_vm_list();
 }
 
 // 虚拟机列表销毁
@@ -1865,8 +1866,7 @@ void add_to_vm_list(char *vm_name)
 {
 	char filename[FN_MAX_LEN];
 	sprintf(filename, "%s%s/%s.conf", vmdir, vm_name, vm_name);	
-	if (access(filename, 0) == -1) 
-	{
+	if (access(filename, 0) == -1) {
 		error("%s not exist\n", filename);
 		return;
 	}
@@ -1890,6 +1890,19 @@ void add_to_vm_list(char *vm_name)
 	p->next = new;
 	load_vm_info(vm_name, &(new->vm));	
 	new->next = NULL;
+}
+
+// 将vm列表按名称排序
+void sort_vm_list()
+{
+	for (vm_node *p1=vms; p1!=NULL; p1=p1->next)
+		for (vm_node *p2=p1->next; p2!=NULL; p2=p2->next)
+			if (strcmp(p1->vm.name, p2->vm.name) > 0) {
+				vm_stru t;
+				t = p1->vm;
+				p1->vm = p2->vm;
+				p2->vm = t;
+			}
 }
 
 // 载入vm配置信息

@@ -197,6 +197,7 @@ int  copy_vm_disk(copy_stru *name);
 void create_vm_list();
 void destroy_vm_list();
 void add_to_vm_list(char *vm_name);
+void sort_vm_list();
 void load_vm_info(char *vm_name, vm_stru *vm);
 void save_vm_info(char *vm_name, vm_stru *vm);
 void show_vm_name(int status);
