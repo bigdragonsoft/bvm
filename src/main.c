@@ -2,7 +2,7 @@
 
 pro_stru program = {
 	"bvm", 
-	"1.1.1_20180408", 
+	"1.1.1_20180409", 
 	"GuoQiang",
 	"bigdragon@chinafreebsd.cn",
 	"http://bigdragon.chinafreebsd.cn/bvm/",
@@ -144,12 +144,10 @@ int main(int argc, char *argv[])
 	};
 
 	int option_index = 0;
-	while ((opt=getopt_long(argc, argv, short_options, long_options, &option_index))!=-1)
-	{
+	while ((opt=getopt_long(argc, argv, short_options, long_options, &option_index))!=-1) {
 		write_log("bvm --%s %s %s", long_options[option_index].name, optarg?optarg:"", argv[optind]?argv[optind]:"");
 		vm_init();
-		switch (opt)
-		{
+		switch (opt) {
 		case 0:
 			if (strcmp(long_options[option_index].name, "destroy-bridge") == 0) {
 				destroy_all_bridge();

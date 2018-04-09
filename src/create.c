@@ -952,15 +952,13 @@ int get_filelist(char *dir, char **opt, char **opt_desc)
 	DIR *dp;
 	struct dirent *dirp;
 
-	if ((dp = opendir(dir)) == NULL)
-	{
+	if ((dp = opendir(dir)) == NULL) {
 		error("can't open %s\n", dir);
 		return -1;
 	}
 
 	int n = 0;
-	while ((dirp = readdir(dp)) != NULL)
-	{
+	while ((dirp = readdir(dp)) != NULL) {
 		//目录不处理
 		if (dirp->d_type == DT_DIR)
 			continue;

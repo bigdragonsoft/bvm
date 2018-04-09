@@ -951,6 +951,11 @@ void vm_start(char *vm_name)
 		return;
 	}
 
+	if (strcmp(p->vm.cdstatus, "on") == 0 && access(p->vm.iso, 0) == -1) {
+		error("%s not found, can't run\n", p->vm.iso);
+		return;
+	}
+
 	int ret = create_networking(vm_name) == RET_SUCCESS && 
 		  gen_vm_start_code(vm_name) == RET_SUCCESS;
 
@@ -1338,14 +1343,12 @@ void get_vm_name(char *dir)
 	DIR *dp;
 	struct dirent *dirp;
 
-	if ((dp = opendir(dir)) == NULL)
-	{
+	if ((dp = opendir(dir)) == NULL) {
 		error("can't open %s\n", dir);
 		return;
 	}
 
-	while ((dirp = readdir(dp)) != NULL)
-	{
+	while ((dirp = readdir(dp)) != NULL) {
 		if (dirp->d_type == DT_DIR)
 			if (strcmp(dirp->d_name, ".") == 0 || strcmp(dirp->d_name, "..") == 0)
 				continue;
@@ -1544,8 +1547,7 @@ int vm_remove(char *vm_name)
 	char filename[FN_MAX_LEN];
 
 	//disk
-	for (int n=0; n<atoi(p->vm.disks); n++) 
-	{
+	for (int n=0; n<atoi(p->vm.disks); n++) {
 		char disk[32];
 		if (n == 0)
 			strcpy(disk, "/disk.img");

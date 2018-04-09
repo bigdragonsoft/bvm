@@ -1,7 +1,7 @@
 {
         "name":"bvm",
         "origin":"sysutils/bvm",
-        "version":"1.1.1_20180403",
+        "version":"1.1.1_20180409",
         "comment":"bhyve vm manager",
         "maintainer":"bigdragon@chinafreebsd.cn",
         "www":"http://bigdragon.chinafreebsd.cn/bvm/",
