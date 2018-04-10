@@ -72,6 +72,14 @@ char *strtolower(char *s)
 	return s;
 }
 
+// 字符串转换成大写
+char *strtoupper(char *s)
+{
+	char *p = s;
+	while ((*p = toupper(*p))) p++;
+	return s;
+}
+
 // 截取字符串右边n个字符
 char *rightstr(char *dst, char *src, int n)
 {

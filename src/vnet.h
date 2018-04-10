@@ -156,6 +156,7 @@ void free_vnet_list_proc(char **p);
 void free_nat_list_proc(nat_stru **p);
 char lastch(char *s);
 char *strtolower(char *s);
+char *strtoupper(char *s);
 char *rightstr(char *dst, char *src, int n);
 char *leftstr(char *dst, char *src, int n);
 void ltrim(char *s);

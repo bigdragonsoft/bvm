@@ -2211,22 +2211,53 @@ void print_vm_list(int list_type)
 {
 	if (vms == NULL) return;
 
-	if (list_type)
-		title("Name\t\tIP\t\t\tOS type\t\tCpu\tRam\tDisk\t\tStatus\n");
+	if (list_type == VM_LONG_LIST)
+		title("NAME\t\tIP\t\t\tGUEST\t\tLOADER\tAUTOSTART\tCPU\tMEMORY\tDISK\t\tSTATUS\n");
 	else
-		title("Name\t\tOS type\t\tCpu\tRam\tDisk\t\tStatus\n");
+		title("NAME\t\tGUEST\t\tCPU\tMEMORY\tDISK\t\tSTATUS\n");
 	vm_node *p = vms;
 	while (p) {
+		/* NAME */
 		printf("%s", p->vm.name);
 		for (int n=0; n<(2-strlen(p->vm.name) / TABSTOP); n++) printf("\t");
-		if (list_type) {
+
+		/* IP */
+		if (list_type == VM_LONG_LIST) {
 			printf("%s", p->vm.nic[0].ip);
 			for (int n=0; n<(3-strlen(p->vm.nic[0].ip) / TABSTOP); n++) printf("\t");
 		}
+
+		/* GUEST */
 		printf("%s", p->vm.ostype);
 		for (int n=0; n<(2-strlen(p->vm.ostype) / TABSTOP); n++) printf("\t");
+		
+		/* LOADER */
+		if (list_type == VM_LONG_LIST) {
+			if (strcmp(p->vm.uefi, "uefi") == 0)
+				printf("uefi\t");
+			else
+				printf("grub\t");
+		}
+
+		/* AUTO-START */
+		if (list_type == VM_LONG_LIST) {
+			if (strcmp(p->vm.autoboot, "yes") == 0) {
+				char str[16];
+				sprintf(str, "Yes [%d]", atoi(p->vm.bootindex));
+				printf("%s", str);
+				for (int n=0; n<(2-strlen(str) / TABSTOP); n++) printf("\t");
+			}
+			else
+				printf("No\t\t");
+		}
+
+
+		/* CPU */
 		printf("%s\t"  , p->vm.cpus);
-		printf("%s\t"  , p->vm.ram);
+
+		/* MEMORY */
+		printf("%s\t"  , strtoupper(p->vm.ram));
+
 		/* 容量 
 		char str[16];
 		unit_convert(total_disk_size(&p->vm), 1, str);
@@ -2249,7 +2280,7 @@ void print_vm_list(int list_type)
 		sprintf(str1, "[%d]", n);
 		unit_convert(total_disk_size(&p->vm), 1, str2);
 		strcat(str1, str2);
-		printf("%s", str1);
+		printf("%s", strtoupper(str1));
 		for (int n=0; n<(2-strlen(str1)/TABSTOP); n++) printf("\t");
 		
 
