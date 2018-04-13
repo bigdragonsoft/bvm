@@ -1,6 +1,6 @@
 #!/bin/sh
 
-./gen > ./+MANIFEST
+./gen > ./bin/+MANIFEST
 cd ./bin
-pkg create -m ../
+pkg create -m ./
 cd ../
