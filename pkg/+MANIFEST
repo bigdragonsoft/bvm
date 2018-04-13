@@ -1,14 +1,14 @@
 {
         "name":"bvm",
         "origin":"sysutils/bvm",
-        "version":"1.1.1_20180409",
+        "version":"1.1.2_0",
         "comment":"bhyve vm manager",
         "maintainer":"bigdragon@chinafreebsd.cn",
         "www":"http://bigdragon.chinafreebsd.cn/bvm/",
         "abi":"FreeBSD:11:amd64",
         "arch":"freebsd:11:x86:64",
         "prefix":"/usr/local",
-        "flatsize":303504,
+        "flatsize":304766,
         "licenselogic":"single",
         "desc":"bhyve vm manager",
 #        "deps":{
@@ -28,8 +28,8 @@
 #        },
         "categories":["sysutils"],
         "files":{
-                "/usr/local/bin/bvm":"1$1337cb29bdcda7a37213de616331479db9963a6a18a184e4bc8faf11593cf264",
-                "/usr/local/bin/bvmb":"1$0c7c38b2c3c404ed1ed7c90faa00c08dd8a27d34fd9cc5f7db6100ade672ee9d",
+                "/usr/local/bin/bvm":"1$760052522e07a295d5dbe13010746e0b0d126080508e0138a92886fb1deda6e5",
+                "/usr/local/bin/bvmb":"1$84558e5cbded4c7b7f6a4060b0ce624bbd5469ff33b0230d983e79d44abcb7a2",
                 "/usr/local/etc/rc.d/bvmd":"1$6883bcdddaa51a77539b224de9928c84821bbcee45714ec1024b6800258aafe7",
                 "/usr/local/etc/bvm/bvm.conf":"1$caf1da1699b0d90a8c2660793f4ee32b1f991ef23491d540ab36c5145961e280",
                 "/usr/local/etc/bvm/nat.conf":"1$705a3097f83dde1aba46f3782ca6143801366b89c287dae40664256964e48911",

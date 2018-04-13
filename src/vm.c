@@ -2212,9 +2212,9 @@ void print_vm_list(int list_type)
 	if (vms == NULL) return;
 
 	if (list_type == VM_LONG_LIST)
-		title("NAME\t\tIP\t\t\tGUEST\t\tLOADER\tAUTOSTART\tCPU\tMEMORY\tDISK\t\tSTATUS\n");
+		title("NAME\t\tIP\t\t\tGUEST\t\tLOADER\tAUTOSTART\tCPU\tMEMORY\tDISK\t\tSTATE\n");
 	else
-		title("NAME\t\tGUEST\t\tCPU\tMEMORY\tDISK\t\tSTATUS\n");
+		title("NAME\t\tGUEST\t\tCPU\tMEMORY\tDISK\t\tSTATE\n");
 	vm_node *p = vms;
 	while (p) {
 		/* NAME */
