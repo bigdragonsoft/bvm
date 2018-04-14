@@ -1292,7 +1292,9 @@ int get_nic_list()
 	get_lo_name(loname);
 
 	char wlan[VNET_BUFFERSIZE] = {0};
-	get_wlan_name(wlan);
+	//由于wifi不支持多MAC，所以bridged不会工作
+	//暂时取消无线网bridged模式
+	//get_wlan_name(wlan);
 
 	int n = 0;
 	char buf[VNET_BUFFERSIZE];
