@@ -1,0 +1,38 @@
+{
+        "name":"bvm",
+        "origin":"sysutils/bvm",
+        "version":"1.1.2_1",
+        "comment":"bhyve vm manager",
+        "maintainer":"bigdragon@chinafreebsd.cn",
+        "www":"http://bigdragon.chinafreebsd.cn/bvm/",
+        "abi":"FreeBSD:11:amd64",
+        "arch":"freebsd:11:x86:64",
+        "prefix":"/usr/local",
+        "flatsize":304702,
+        "licenselogic":"single",
+        "desc":"bhyve vm manager",
+#        "deps":{
+#                "tmux":{
+#                        "origin":"sysutils/tmux",
+#                        "version":"2.5_1"
+#                },
+#                "grub2-bhyve":{
+#                        "origin":"sysutils/grub2-bhyve",
+#                        "version":"0.40_3"
+#                },
+#                "bhyve-firmware":{
+#                        "origin":"sysutils/bhyve-firmware",
+#                        "version":"1.0"
+#                }
+#
+#        },
+        "categories":["sysutils"],
+        "files":{
+                "/usr/local/bin/bvm":"1$ca91f10d8cb249dbc2eff0ebe775d76b16c235ff149bcdfc0707fb9124b1c130",
+                "/usr/local/bin/bvmb":"1$d1fa3fb1fec4b9bf7b39c044195d24792db50943f8ecdfad7747d54422440946",
+                "/usr/local/etc/rc.d/bvmd":"1$6883bcdddaa51a77539b224de9928c84821bbcee45714ec1024b6800258aafe7",
+                "/usr/local/etc/bvm/bvm.conf":"1$caf1da1699b0d90a8c2660793f4ee32b1f991ef23491d540ab36c5145961e280",
+                "/usr/local/etc/bvm/nat.conf":"1$705a3097f83dde1aba46f3782ca6143801366b89c287dae40664256964e48911",
+                "/usr/local/etc/bvm/switch.conf":"1$6c3afc6acae3e24148608f3f00b8c3697771441fc0df9ae59aaf414aa7835ef5"
+        }
+}
