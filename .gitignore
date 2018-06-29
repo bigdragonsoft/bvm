@@ -1,3 +1,5 @@
+/src/bvm
+/src/bvmb
 /src/*.o
 /src/*~
 /pkg/bin/*.txz

@@ -183,7 +183,7 @@ void file_lock(char *file, int flag)
 	close(fd);
 }
 
-// 监测bvn运行环境
+// 监测bvm运行环境
 // bvm runtime environment 
 void check_bre()
 {

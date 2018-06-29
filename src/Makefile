@@ -8,10 +8,10 @@ opt =
 all: $(name) $(booter_name)
 
 $(name): $(objects)
-	cc $(opt) -o /usr/local/bin/$(name) $(objects)
+	cc $(opt) -o $(name) $(objects)
 
 $(booter_name): $(booter_objs)
-	cc $(opt) -o /usr/local/bin/$(booter_name)  $(booter_objs)
+	cc $(opt) -o $(booter_name)  $(booter_objs)
 
 main.o: main.c main.h
 	cc $(opt) -c main.c -o main.o
@@ -41,5 +41,5 @@ zfs.o: zfs.c zfs.h
 	cc $(opt) -c zfs.c -o zfs.o
 
 clean:
-	rm -f $(objects) /usr/local/bin/$(name)
-	rm -f booter.o /usr/local/bin/$(booter_name)
+	rm -f $(objects) $(name)
+	rm -f booter.o $(booter_name)
