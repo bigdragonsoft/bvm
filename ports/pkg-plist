@@ -1,0 +1,6 @@
+bin/bvm
+bin/bvmb
+etc/bvm/bvm.conf
+etc/bvm/nat.conf
+etc/bvm/switch.conf
+etc/rc.d/bvmd
