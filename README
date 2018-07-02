@@ -12,11 +12,13 @@ Features
 
 How to compile
 --------------
-  # mkdir /usr/local/etc/bvm/
-  # cp conf/*.conf /usr/local/etc/bvm/
-  # cp conf/bvmd /usr/local/etc/rc.d/
   # cd src
   # make
+  # cp bvm bvmb /usr/local/bin/
+  # mkdir /usr/local/etc/bvm/
+  # cd ..
+  # cp conf/*.conf /usr/local/etc/bvm/
+  # cp conf/bvmd /usr/local/etc/rc.d/
 
 Generate the installation package
 ---------------------------------
@@ -25,12 +27,12 @@ Generate the installation package
 
 Installation
 ------------
-# pkg add http://bigdragon.chinafreebsd.cn/bvm/bvm-1.1.2_1.txz (updated on: 2018/4/14)
+# pkg add http://bigdragon.chinafreebsd.cn/bvm/bvm-1.1.2_1.txz
 
 How to run
 ----------
 Before running, you need to edit the bvm.conf file to set the virtual machine storage directory
-Vmdir=your_vm_dir/
+vmdir=/your/vm/dir/
 
 How to use
 ----------
