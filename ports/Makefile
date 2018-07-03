@@ -14,10 +14,9 @@ LICENSE_FILE=	${WRKSRC}/LICENSE
 ONLY_FOR_ARCHS=	amd64
 ONLY_FOR_ARCHS_REASON=	Bhyve VM Manager is required to be built on a 64bit machine
 
-RUN_DEPENDS=	/usr/local/share/uefi-firmware/BHYVE_UEFI.fd:sysutils/bhyve-firmware \
-		/usr/local/sbin/grub-bhyve:sysutils/grub2-bhyve \
+RUN_DEPENDS=	bhyve-firmware>=0:sysutils/bhyve-firmware \
+		grub-bhyve:sysutils/grub2-bhyve \
 		tmux:sysutils/tmux
-		
 USE_GITHUB=	yes
 GH_ACCOUNT=	bigdragonsoft
 
@@ -29,7 +28,7 @@ do-install:
 	(cd ${WRKSRC}/conf && ${COPYTREE_SHARE} "*.conf" ${STAGEDIR}${PREFIX}/etc/bvm)
 	${MKDIR} ${STAGEDIR}${PREFIX}/etc/rc.d
 	(cd ${WRKSRC}/conf && ${COPYTREE_SHARE} "bvmd" ${STAGEDIR}${PREFIX}/etc/rc.d)
-	${CHMOD} +x ${STAGEDIR}${PREFIX}/etc/rc.d/bvmd
+#	${CHMOD} +x ${STAGEDIR}${PREFIX}/etc/rc.d/bvmd
 	${MKDIR} ${STAGEDIR}${PREFIX}/bin
 	(cd ${WRKSRC}/src && ${COPYTREE_SHARE} "bvm bvmb" ${STAGEDIR}${PREFIX}/bin)
 	${CHMOD} +x ${STAGEDIR}${PREFIX}/bin/bvm
