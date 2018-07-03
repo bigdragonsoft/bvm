@@ -27,7 +27,10 @@ Generate the installation package
 
 Installation
 ------------
-# pkg add http://bigdragon.chinafreebsd.cn/bvm/bvm-1.1.2_1.txz
+# pkg add bvm.txz
+
+  bvm.txz is replaced with the installation package you generated
+  For example, pkg add http://bigdragon.chinafreebsd.cn/bvm/bvm-1.1.2_1.txz
 
 How to run
 ----------
