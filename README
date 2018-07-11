@@ -1,6 +1,6 @@
 Introduction
 ------------
-Bhyve VM Manager is a Bhyve virtual machine management tool based on FreeBSD that allows you to easily manage virtual machines.
+The BVM is a Bhyve virtual machine management tool based on FreeBSD that allows you to easily manage virtual machines.
 
 Features
 --------
@@ -8,7 +8,7 @@ Features
 2. Supports multiple network cards and multiple hard disks.
 3. There are two kinds of network modes: Bridged and NAT
 4. Support grub and uefi boot
-5. Provide support for zfs
+5. Support for ZFS
 
 How to compile
 --------------
