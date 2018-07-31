@@ -3,4 +3,4 @@
 /src/*.o
 /src/*~
 /pkg/bin/*.txz
-/ports/*.tar.gz
+/port/*
