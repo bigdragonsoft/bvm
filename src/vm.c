@@ -2283,12 +2283,16 @@ void print_vm_list(int list_type)
 		printf("%s", strtoupper(str1));
 		for (int n=0; n<(2-strlen(str1)/TABSTOP); n++) printf("\t");
 		
-
+		/* STATE */
 		//if (strcmp(p->vm.status, "off") == 0)
 		//	printf("\033[33m");
 		if (strcmp(p->vm.status, "on") == 0)
 			printf("\033[32;1m");
 		printf("%s\033[0m", p->vm.status);
+
+		/* PID */
+		//if (strcmp(p->vm.status, "on") == 0) 
+		//	printf(" (%d)", get_vm_pid(&p->vm));
 
 		if (strcmp(p->vm.lock, "1") == 0)
 			warn(" *");
