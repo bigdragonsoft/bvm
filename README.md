@@ -1,17 +1,15 @@
-Introduction
-------------
+## Introduction
 The BVM is a Bhyve virtual machine management tool based on FreeBSD that allows you to easily manage virtual machines.
 
-Features
---------
+## Features
 1. The supported operating systems are: FreeBSD OpenBSD NetBSD Debian OpenSuse Ubuntu Windows10 etc.
 2. Supports multiple network cards and multiple hard disks.
 3. There are two kinds of network modes: Bridged and NAT
 4. Support grub and uefi boot
 5. Support for ZFS
 
-How to compile
---------------
+## How to compile
+```
   # cd src
   # make
   # cp bvm bvmb /usr/local/bin/
@@ -19,26 +17,30 @@ How to compile
   # cd ..
   # cp conf/*.conf /usr/local/etc/bvm/
   # cp conf/bvmd /usr/local/etc/rc.d/
+```
 
-Generate the installation package
----------------------------------
+## Generate the installation package
+```
   # cd pkg
   # ./create
+```
 
-Installation
-------------
+## Installation
+```
 # pkg add bvm.txz
 
   bvm.txz is replaced with the installation package you generated
   For example, pkg add http://bigdragon.chinafreebsd.cn/bvm/bvm-1.1.2_1.txz
+```
 
-How to run
-----------
+## How to run
 Before running, you need to edit the bvm.conf file to set the virtual machine storage directory
+```
 vmdir=/your/vm/dir/
+```
 
-How to use
-----------
+## How to use
+```
 Usage:  bvm <options> [args...]
 Options:
         --abinfo        Output autoboot vms info
@@ -78,3 +80,4 @@ Example:
         bvm --start vmname
         bvm --clone oldname newname
         bvm --ls
+```
