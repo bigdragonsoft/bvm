@@ -8,8 +8,18 @@ The BVM is a Bhyve virtual machine management tool based on FreeBSD that allows 
 4. Support grub and uefi boot
 5. Support for ZFS
 
-## How to compile
+## Installation
 ```
+  # pkg install bvm
+```
+### -- or --
+```
+  # cd /usr/ports/sysutils/bvm/
+  # make install clean
+```
+### -- or --
+```
+  // Compile source code
   # cd src
   # make
   # cp bvm bvmb /usr/local/bin/
@@ -17,29 +27,23 @@ The BVM is a Bhyve virtual machine management tool based on FreeBSD that allows 
   # cd ..
   # cp conf/*.conf /usr/local/etc/bvm/
   # cp conf/bvmd /usr/local/etc/rc.d/
-```
 
-## Generate the installation package
-```
+  // Generate the installation package
   # cd pkg
   # ./create
+
+  // Installation
+  // bvm.txz is replaced with the installation package you generated
+  # pkg add bvm.txz
 ```
 
-## Installation
-```
-# pkg add bvm.txz
-
-  bvm.txz is replaced with the installation package you generated
-  For example, pkg add http://bigdragon.chinafreebsd.cn/bvm/bvm-1.1.2_1.txz
-```
-
-## How to run
+## Basic Setup
 Before running, you need to edit the bvm.conf file to set the virtual machine storage directory
 ```
 vmdir=/your/vm/dir/
 ```
 
-## How to use
+## Usage
 ```
 Usage:  bvm <options> [args...]
 Options:
@@ -81,3 +85,4 @@ Example:
         bvm --clone oldname newname
         bvm --ls
 ```
+
