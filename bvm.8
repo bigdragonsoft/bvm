@@ -1,0 +1,312 @@
+.Dd August 3, 2018
+.Dt BVM 8
+.Os
+.Sh NAME
+.Nm bvm
+.Nd "Bhyve Virtual machines Management tool"
+.Sh SYNOPSIS
+.Nm
+.Cm --help
+.Nm
+.Cm --version
+.Pp
+.Nm
+.Cm --create
+.Ar name
+.Nm
+.Cm --config
+.Ar name
+.Nm
+.Cm --vminfo
+.Ar name
+.Nm
+.Cm --os
+.Pp
+.Nm
+.Cm --ls
+.Nm
+.Cm --ll
+.Nm
+.Cm --login
+.Ar name
+.Nm
+.Cm --start
+.Ar name
+.Nm
+.Cm --restart
+.Ar name
+.Nm
+.Cm --stop
+.Ar name
+.Nm
+.Cm --poweroff
+.Ar name
+.Pp
+.Nm
+.Cm --clone
+.Ar name new-name
+.Nm
+.Cm --remove
+.Ar name
+.Nm
+.Cm --rename
+.Ar name new-name
+.Pp
+.Nm
+.Cm --lock
+.Ar name
+.Nm
+.Cm --unlock
+.Ar name
+.Nm
+.Cm --lockall
+.Nm
+.Cm --unlockall
+.Pp
+.Nm
+.Cm --addisk
+.Ar name
+.Nm
+.Cm --deldisk
+.Ar name
+.Pp
+.Nm
+.Cm --abinfo
+.Nm
+.Cm --autoboot
+.Pp
+.Nm
+.Cm --setnat
+.Ar Nat ip/mask
+.Nm
+.Cm --setsw
+.Ar Switch ip/mask
+.Nm
+.Cm --unsetsw
+.Ar Switch
+.Pp
+.Nm
+.Cm --showdev
+.Nm
+.Cm --showdevuse
+.Nm
+.Cm --showdevall
+.Pp
+.Nm
+.Cm --snapshot
+.Ar name
+.Nm
+.Cm --rollback
+.Ar name
+.Nm
+.Cm --showsnap
+.Ar name
+.Nm
+.Cm --showsnapall
+.Pp
+.\" ============ DESCRIPTION =============
+.Sh DESCRIPTION
+The
+.Nm
+is a 
+.Xr bhyve 8
+virtual machine management tool based on FreeBSD that 
+allows you to easily manage virtual machines.
+.Pp
+The virtual machine's network is handled by one or more virtual switches. 
+Each switch has a simple name, which is stored in the corresponding 
+configuration file and can be modified by the 
+.Nm
+create one or more 
+.Xr bridge 4 
+devices for each virtual switch and dynamically assign them to the 
+virtual machine 
+.Xr tap 4 
+interface. When the virtual machine is shut down normally, the 
+.Nm
+will automatically clean up the useless network devices.
+.Pp
+The 
+.Nm
+supports multiple network cards and multiple hard disks. 
+Each virtual machine can have multiple network cards or multiple hard disks, 
+and can easily add, delete, and modify network cards or hard disks.
+.\" ============ BASIC SETUP ============
+.Sh BASIC SETUP
+Once
+.Nm
+is installed, the first thing you have to do is set up the virtual 
+machine's storage directory.
+.Pp
+Edit the value of 
+.Pa vmdir 
+in
+.Pa /usr/local/etc/bvm/bvm.conf 
+.Bd -literal -offset indent
+vmdir=/your/vm/dir/
+.Ed
+.Pp
+If you want to automatically boot the specified list of virtual machines 
+in order while the host is booting, add the following 
+lines to 
+.Pa /etc/rc.conf 
+to enable:
+.Bd -literal -offset indent
+bvmd_enable="YES"
+.Ed
+.\" ============ OPTIONS =============
+.Sh OPTIONS
+.Bl -tag -width indent
+.It Cm --abinfo
+Show information for all auto-bootstrap virtual machines.
+.It Cm --addisk Ar name
+Add a hard disk to the virtual machine.
+.It Cm --autoboot
+Start the automatic booting virtual machine in order.
+.It Cm --clone Ar name Ar new-name
+Clone a new virtual machine from an existing virtual machine.
+.It Cm --config Ar name
+Edit the configuration of the virtual machine.
+.It Cm --create Ar name
+Create a new virtual machine.
+.It Cm --deldisk Ar name
+Delete the disks in the virtual machine.
+.It Cm --help
+Show all options and descriptions.
+.It Cm --login Ar name
+Login to a running virtual machine from console, the boot loader of this 
+virtual machine must be grub, and the uefi mode needs to log in using 
+the VNC client.
+.It Cm --ls
+Show a list and status of all virtual machines.
+The meaning of the list items is as follows:
+.Bl -tag -width 17n
+.It Ar NAME
+The name of the virtual machine.
+.It Ar GUEST
+Virtual machine operating system.
+.It Ar CPU
+Number of CPUs.
+.It Ar MEMORY
+Size of memory.
+.It Ar DISK
+Disk capacity, the number in square brackets represents the number of disks, 
+and the capacity is the sum of all disk capacities.
+.It Ar STATE
+The state of the virtual machine, off or on, if the virtual machine is locked, 
+a symbol '*' is also displayed.
+.El
+.It Cm --ll
+Show a list and status of all virtual machines in long format.
+The added list items have the following meanings:
+.Bl -tag -width 17n
+.It Ar IP
+The IP address of the virtual machine.
+.It Ar LOADER
+The boot loader for the virtual machine.
+.It Ar AUTOSTART
+The state in which the virtual machine is automatically started, "Yes" is 
+automatically started, and the number next to it is the startup sequence.
+.El
+.It Cm --lock Ar name
+Locking the virtual machine and disable everything.
+This option also prevents the risk of virtual machine files being accidentally deleted.
+.It Cm --lockall
+Lock all virtual machines and disable everything.
+.It Cm --os
+Show a list of operating systems supported by 
+.Nm
+.Cm.
+.It Cm --poweroff Ar name
+Force the virtual machine to power off. When there are some special reasons 
+that prevent the virtual machine from shutting down properly, you need to use 
+this option to force the virtual machine to power off.
+.It Cm --remove Ar name
+Destroy a virtual machine and it cannot be recovered.
+.It Cm --rename Ar name new-name
+Rename the virtual machine.
+.It Cm --restart Ar name
+Restart a virtual machine.
+.It Cm --rollback Ar name
+Roll back to the snapshot point.
+.It Cm --setnat Ar nat ip/mask
+Set the IP address and mask of the NAT.
+.Bd -literal -offset indent
+# bvm --setnat nat0 172.16.1.1/24
+.Ed
+.It Cm --setsw Ar switch ip/mask
+Set the ip address and mask of the virtual switch.
+.It Cm --showdev
+Select a network device and show its relationship to the virtual machine NIC.
+.It Cm --showdevall
+Show a relationship table for all network devices.
+.It Cm --showdevuse
+Show a relational table of all network devices in use.
+.It Cm --showsnap Ar name
+Show snapshots list of the virtual machine.
+.It Cm --showsnapall
+Show snapshots list of the all virtual machines.
+.It Cm --snapshot Ar name
+Generating snapshots for the virtual machine.
+.It Cm --start Ar name
+Start a virtual machine.
+.It Cm --stop Ar name
+Shut down a virtual machine.
+.It Cm --unlock Ar name
+Unlock a virtual machine.
+.It Cm --unlockall
+Unlock all virtual machines.
+.It Cm --unsetsw Ar switch
+Delete the IP address of the virtual switch.
+.It Cm --version
+Show the version number of 
+.Nm
+installed.
+.It Cm --vminfo Ar name
+Shows the configuration of the virtual machine.
+.\" ============ CONFIGURE FILES =============
+.Sh CONFIGURE FILES
+.Pa /usr/local/etc/bvm/bvm.conf
+.Bd -literal -offset indent
+This file records the virtual machine's directory and a list of all supported 
+operating systems.
+.Ed
+.Pp
+.Pa /usr/local/etc/bvm/nat.conf
+.Bd -literal -offset indent
+This file records the configuration information for all NAT.
+.Pp
+nat0=172.16.1.1/24
+nat1=10.10.30.1/24
+nat2=192.168.1.1/24
+.Ed
+.Pp
+.Pa /usr/local/etc/bvm/switch.conf
+.Bd -literal -offset indent
+This file records the configuration information of all virtual switches. 
+The default 0-2 sets the IP address, and 3-7 is not set.
+.Pp
+switch0=10.0.1.0/24
+switch1=10.0.2.0/24
+switch2=10.0.3.0/24
+switch3=
+switch4=
+switch5=
+switch6=
+switch7=
+.Ed
+.\" ============ SEE ALSO =============
+.Sh SEE ALSO
+.Xr tmux 1 ,
+.Xr bridge 4 ,
+.Xr tap 4 ,
+.Xr bhyve 8 ,
+.Xr bhyveload 8 ,
+.Xr zfs 8
+.\" ============ BUGS =============
+.Sh BUGS
+Please report all bugs/issues/feature requests to the GitHub project at
+.Lk https://github.com/bigdragonsoft/bvm
+.\" ============ AUTHOR =============
+.Sh AUTHORS
+.An Qiang Guo Aq Mt guoqiang_cn@126.com
