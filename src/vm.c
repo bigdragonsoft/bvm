@@ -941,6 +941,11 @@ void vm_start(char *vm_name)
 		p = find_vm_list(vm_name);
 	}
 
+	if (get_vmx(&p->vm) != 1) {
+		error("This machine does not support virtualization.\n");
+		return;
+	}
+
 	if (get_vm_status(vm_name) == VM_ON) {
 		error("%s is running\n", vm_name);
 		return;
@@ -2772,6 +2777,26 @@ int get_vm_pid(vm_stru *vm)
 	pclose(fp);
 
 	return pid;
+}
+
+// 获取是否支持虚拟化
+int get_vmx(vm_stru *vm)
+{
+	int value;
+	char cmd[BUFFERSIZE];
+	sprintf(cmd, "sysctl hw.vmm.vmx.initialized | awk -F: '{print $2}'");
+	char buf[16];
+	FILE *fp = popen(cmd, "r");
+	if (fgets(buf, 16, fp)) {
+		buf[strlen(buf)-1] = '\0';
+		value = atoi(buf);
+	}
+	else
+		value = -1;
+
+	pclose(fp);
+
+	return value;
 }
 
 

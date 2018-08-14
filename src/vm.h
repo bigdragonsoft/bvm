@@ -224,6 +224,7 @@ int  disk_offset(vm_stru *vm);
 int  check_vm_disks(vm_stru *vm);
 int  select_disk(vm_stru *vm);
 int  get_vm_pid(vm_stru *vm);
+int  get_vmx(vm_stru *vm);
 void file_lock(char *file, int flag);
 void clean_tap(char *tap_name);
 void clean_bridge(char *bridge_name);
