@@ -1110,6 +1110,13 @@ void vm_poweroff(char *vm_name,int flag_msg)
 	if (get_vm_status(vm_name) == VM_ON) {
 		sprintf(cmd, "bhyvectl --force-poweroff --vm=%s", vm_name);
 		system(cmd);
+
+		//给 --force-poweroff 一秒钟的处理时间
+		//避免下面执行 --destroy 时发生错误
+		//Give --force-poweroff a one-second processing time 
+		//to avoid an error when executing --destroy below
+		delay(1);
+		
 		if (get_vm_status(vm_name) == VM_ON) {
 			sprintf(cmd, "bhyvectl --destroy --vm=%s", vm_name);
 			system(cmd);
