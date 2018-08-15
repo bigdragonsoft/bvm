@@ -163,10 +163,84 @@ Show information for all auto-bootstrap virtual machines.
 Add a hard disk to the virtual machine.
 .It Cm --autoboot
 Start the automatic booting virtual machine in order.
+Boot option, which is usually not required in administrator manual 
+maintenance mode. Sometimes the host is powered on again after shutdown 
+or unexpected downtime. 
+At this time, the administrator-set virtual machine can be automatically 
+started by the rc script. The method is to use 
+.Nm Cm --config 
+to modify the default value of the auto boot menu to yes.
+
+In self-start mode, 
+.Nm
+will refer to the boot level and delay options of vm. The boot level is 
+the boot priority. When there are multiple self-starting virtual machines, 
+the lower the startup priority, the more the virtual machine starts. 
+Back to front. Boot time (boot time) 
+After starting the current virtual machine, it can also be said that 
+the number of seconds is tentative before starting the next virtual machine. 
+The reason for designing these two parameters is because some services may 
+need to be activated first to ensure normal business.
+
+For example, the relationship between the database and the web service, 
+if the data virtual machine library is not prioritized, 
+it may cause the web service to be abnormal! 
+
+The correct way to use this option is to add the startup script:
+.Bd -literal -offset indent
+# syrc bvmd_enable=yes
+.Ed 
 .It Cm --clone Ar name Ar new-name
 Clone a new virtual machine from an existing virtual machine.
 .It Cm --config Ar name
 Edit the configuration of the virtual machine.
+This option needs to be used in the case of a virtual machine. Options that 
+allow users to configure independently are: cpus, ram, iso path, boot from, 
+hostbridge, uefi, auto boot, disk config, and network config.
+.Bl -tag -width 17n
+.It cpus
+The number of CPUs (non-cores) used by the current virtual machine.
+.It ram
+The size of the memory requested by the current virtual machine, 
+the unit of which can be M/G, etc.
+.It iso path
+The directory where the iso disc image is located (is the directory, 
+non-iso absolute address). When the directory is specified, 
+.Nm
+will automatically list the iso files contained in the current directory. 
+The user can select the menu number.
+.It boot from
+This is an important option. When the system is first installed, 
+.Nm
+will automatically adjust this option to hd0 for system startup. 
+When you need to use iso disc for system maintenance, you can change 
+this option to cd0.
+.It uefi
+This option is mostly used by the operating system that installs the graphical 
+interface. It needs to be used with VNC to get the desktop. In addition, 
+this option will invalidate the 
+.Cm --login 
+option because 
+.Cm --login 
+is a text console and does not have graphical interface operating conditions.
+.It auto boot
+See 
+.Cm --autoboot 
+for details.
+.It hostbridge
+This is a schema attribute whose attribute value should be hostbridge when 
+using the Intel system CPU; its attribute value should be amd_hostbridge when 
+using the AMD series CPU.
+.It disk config
+The option can add or delete the hard disk of the current virtual machine. 
+If you only want to add the hard disk, it is recommended to use 
+.Nm
+.Cm --addisk 
+shortcut command.
+.It network config
+This option allows you to configure the networking or networking of 
+virtual machines.
+.El
 .It Cm --create Ar name
 Create a new virtual machine.
 .It Cm --deldisk Ar name
