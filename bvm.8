@@ -1,4 +1,4 @@
-.Dd August 3, 2018
+.Dd August 16, 2018
 .Dt BVM 8
 .Os
 .Sh NAME
@@ -283,20 +283,32 @@ The state in which the virtual machine is automatically started, "Yes" is
 automatically started, and the number next to it is the startup sequence.
 .El
 .It Cm --lock Ar name
-Locking the virtual machine and disable everything.
-This option also prevents the risk of virtual machine files being accidentally deleted.
+Locks the specified virtual machine, and can't 
+.Cm --config
+, 
+.Cm --remove
+,
+.Cm --start
+, and so on. 
+Only simple read operations can be performed, such as 
+.Cm --vminfo
+, 
+.Cm --ls
+,
+this option also prevents the risk of virtual machine files being accidentally deleted.
 .It Cm --lockall
-Lock all virtual machines and disable everything.
+Lock all virtual machines, behaving the same as 
+.Cm --lock .
 .It Cm --os
 Show a list of operating systems supported by 
-.Nm
-.Cm.
+.Nm .
 .It Cm --poweroff Ar name
 Force the virtual machine to power off. When there are some special reasons 
 that prevent the virtual machine from shutting down properly, you need to use 
 this option to force the virtual machine to power off.
 .It Cm --remove Ar name
 Destroy a virtual machine and it cannot be recovered.
+Note that the virtual machine cannot be running when you run this command.
 .It Cm --rename Ar name new-name
 Rename the virtual machine.
 .It Cm --restart Ar name
@@ -310,6 +322,8 @@ Set the IP address and mask of the NAT.
 .Ed
 .It Cm --setsw Ar switch ip/mask
 Set the ip address and mask of the virtual switch.
+The same method as 
+.Cm --setnat .
 .It Cm --showdev
 Select a network device and show its relationship to the virtual machine NIC.
 .It Cm --showdevall
