@@ -51,7 +51,10 @@ create_stru tbl[MM_MAX] = {0};
 create_stru *sel[MM_MAX] = {0};
 char *options = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-// 创建菜单
+/*
+ * 创建菜单
+ * create menu
+ */
 void create_init()
 {
 	/*-----table--desc------------value-----------------------------func--------------------arg-----edit----submenu*/
@@ -67,8 +70,8 @@ void create_init()
 	add_item(tbl, "uefi", 	      (char*)&new_vm.uefi,     		enter_vm_uefi, 		0,	0,	0);
 	add_item(tbl, "VNC", 	      (char*)&new_vm.vncstatus,  	enter_vm_vncstatus,	0,	1,	0);
 	add_item(tbl, "VNC port",     (char*)&new_vm.vncport,  		enter_vm_vncport,	0,	1,	0);
-	//add_item(tbl, "VNC width",  (char*)&new_vm.vncwidth, 		enter_vm_vncwidth, 	0,	1,	0);
-	//add_item(tbl, "VNC height", (char*)&new_vm.vncheight,		enter_vm_vncheight, 	0,	1,	0);
+	add_item(tbl, "VNC width",    (char*)&new_vm.vncwidth, 		enter_vm_vncwidth, 	0,	1,	0);
+	add_item(tbl, "VNC height",   (char*)&new_vm.vncheight,		enter_vm_vncheight, 	0,	1,	0);
 	add_item(tbl, "hostbridge",   (char*)&new_vm.hostbridge, 	enter_vm_hostbridge,	0,	1,	0);
 	add_item(tbl, "auto boot",    (char*)&new_vm.autoboot, 		enter_vm_autoboot,	0,	1,	0);
 	add_item(tbl, "boot index",   (char*)&new_vm.bootindex, 	enter_vm_bootindex,	0,	1,	0);
@@ -86,8 +89,8 @@ void set_const_config()
 	sprintf(new_vm.disk,      "%s%s%s", vmdir, new_vm.name, "/disk.img");
 	sprintf(new_vm.devicemap, "%s%s%s", vmdir, new_vm.name, "/device.map");
 	//strcpy(new_vm.vncstatus,  "on");
-	strcpy(new_vm.vncwidth,	  "1024");
-	strcpy(new_vm.vncheight,  "768");
+	//strcpy(new_vm.vncwidth,	  "1024");
+	//strcpy(new_vm.vncheight,  "768");
 	strcpy(new_vm.status, 	  "off");
 	strcpy(new_vm.lock,	  "0");
 
@@ -230,7 +233,6 @@ int check_enter_valid()
 			return -1;
 		}
 
-		/*
 		if (strlen(new_vm.vncwidth) == 0) {
 			warn("VNC display width invalid\n");
 			return -1;
@@ -238,7 +240,7 @@ int check_enter_valid()
 		if (strlen(new_vm.vncheight) == 0) {
 			warn("VNC display height invalid\n");
 			return -1;
-		}*/
+		}
 	}
 	if (check_vm_disks(&new_vm) == -1) {
 		warn("disk config invalid\n");
