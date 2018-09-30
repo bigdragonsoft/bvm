@@ -352,7 +352,7 @@ void vm_init()
 {
 	create_vm_list();
 	get_vm_name(vmdir);
-	sort_vm_list();
+	//sort_vm_list(LS_BY_NAME);
 }
 
 // 虚拟机列表销毁
@@ -361,9 +361,23 @@ void vm_end()
 	destroy_vm_list();
 }
 
-// 输出虚拟机列表
-void vm_list(int list_type)
+/*
+ * 输出虚拟机列表
+ * Output virtual machine list
+ */
+void vm_list(int list_type, char *index_key)
 {
+	//先将虚拟机列表按键值排序
+	if (strcmp(index_key, "byip") == 0)
+		sort_vm_list(LS_BY_IP);
+	else if (strcmp(index_key, "byos") == 0)
+		sort_vm_list(LS_BY_GUEST);
+	else if (strcmp(index_key, "bystatus") == 0)
+		sort_vm_list(LS_BY_STATUS);
+	else
+		sort_vm_list(LS_BY_NAME);	
+
+	//再开始输出列表
 	print_vm_list(list_type);
 }
 
@@ -1907,16 +1921,35 @@ void add_to_vm_list(char *vm_name)
 }
 
 // 将vm列表按名称排序
-void sort_vm_list()
+void sort_vm_list(int type)
 {
+	char *s1, *s2;
 	for (vm_node *p1=vms; p1!=NULL; p1=p1->next)
-		for (vm_node *p2=p1->next; p2!=NULL; p2=p2->next)
-			if (strcmp(p1->vm.name, p2->vm.name) > 0) {
+		for (vm_node *p2=p1->next; p2!=NULL; p2=p2->next) {
+			if (type == LS_BY_NAME) {
+				s1 = p1->vm.name;
+				s2 = p2->vm.name;
+			} 
+			else if (type == LS_BY_IP) {
+				s1 = p1->vm.nic[0].ip;
+				s2 = p2->vm.nic[0].ip;
+			}
+			else if (type == LS_BY_GUEST) {
+				s1 = p1->vm.ostype;
+				s2 = p2->vm.ostype;
+			}
+			else if (type == LS_BY_STATUS) {
+				s1 = p1->vm.status;
+				s2 = p2->vm.status;
+			}
+			if (strcmp(s1, s2) > 0) {
+			//if (strcmp(p1->vm.name, p2->vm.name) > 0) {
 				vm_stru t;
 				t = p1->vm;
 				p1->vm = p2->vm;
 				p2->vm = t;
 			}
+		}
 }
 
 // 载入vm配置信息

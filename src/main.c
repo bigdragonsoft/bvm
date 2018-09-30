@@ -277,10 +277,16 @@ int main(int argc, char *argv[])
 			version();
 			break;
 		case 'l': //ls
-			vm_list(VM_SHORT_LIST);
+			if (argv[optind])
+				vm_list(VM_SHORT_LIST, argv[optind]);
+			else
+				vm_list(VM_SHORT_LIST, "byname");
 			break;
 		case '(': //ll
-			vm_list(VM_LONG_LIST);
+			if (argv[optind])
+				vm_list(VM_LONG_LIST, argv[optind]);
+			else
+				vm_list(VM_LONG_LIST, "byname");
 			break;
 		case 't': //test
 			break;

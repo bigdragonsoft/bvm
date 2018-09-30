@@ -1,4 +1,4 @@
-.Dd August 16, 2018
+.Dd September 30, 2018
 .Dt BVM 8
 .Os
 .Sh NAME
@@ -24,8 +24,10 @@
 .Pp
 .Nm
 .Cm --ls
+.Op Ar byname|byip|byos|bystatus
 .Nm
 .Cm --ll
+.Op Ar byname|byip|byos|bystatus
 .Nm
 .Cm --login
 .Ar name
@@ -251,10 +253,41 @@ Show all options and descriptions.
 Login to a running virtual machine from console, the boot loader of this 
 virtual machine must be grub, and the uefi mode needs to log in using 
 the VNC client.
-.It Cm --ls
+.It Cm --ls Op Ar byname|byip|byos|bystatus
 Show a list and status of all virtual machines.
-The meaning of the list items is as follows:
+By default, the output is sorted in ascending order by name, 
+or one of the following options is specified.
 .Bl -tag -width 17n
+.It Ar byname
+Output list in ascending order by name.
+.It Ar byip
+Output list in ascending order by IP-addr.
+.It Ar byos
+Output list in ascending order by OS.
+.It Ar bystatus
+Output list in ascending order by virtual machine status.
+.El
+.Pp
+.Bd -literal -offset indent
+# bvm --ls byos
+NAME        GUEST           CPU     MEMORY  DISK        STATE
+c           Debian          1       512M    [2]5.5G     off
+d           Debian          1       512M    [1]5G       off *
+abc         Debian          1       512M    [1]10G      on
+b           FreeBSD         1       1G      [1]10G      off
+bb          FreeBSD         1       1G      [1]10G      off
+
+# bvm --ls
+NAME        GUEST           CPU     MEMORY  DISK        STATE
+abc         Debian          1       512M    [1]10G      on
+b           FreeBSD         1       1G      [1]10G      off
+bb          FreeBSD         1       1G      [1]10G      off
+c           Debian          1       512M    [2]5.5G     off
+d           Debian          1       512M    [1]5G       off *
+.Ed
+.Pp
+.Bl -tag -width 17n
+The meaning of the list items is as follows:
 .It Ar NAME
 The name of the virtual machine.
 .It Ar GUEST
@@ -270,7 +303,7 @@ and the capacity is the sum of all disk capacities.
 The state of the virtual machine, off or on, if the virtual machine is locked, 
 a symbol '*' is also displayed.
 .El
-.It Cm --ll
+.It Cm --ll Op Ar byname|byip|byos|bystatus
 Show a list and status of all virtual machines in long format.
 The added list items have the following meanings:
 .Bl -tag -width 17n

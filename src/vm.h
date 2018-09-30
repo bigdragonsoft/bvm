@@ -36,6 +36,13 @@ enum VM_LIST_ENUM {
 	VM_LONG_LIST  = 1,
 };
 
+enum VM_LIST_SORT_ENUM {
+	LS_BY_NAME = 0,
+	LS_BY_IP,
+	LS_BY_GUEST,
+	LS_BY_STATUS,
+};
+
 enum VM_ENUM {
 	VM_OFF = 0,
 	VM_ON,
@@ -163,7 +170,7 @@ int  vm_rename(char *old_vm_name, char *new_vm_name);
 int  vm_remove(char *vm_name);
 void vm_add_disk(char *vm_name);
 void vm_del_disk(char *vm_name);
-void vm_list();
+void vm_list(int list_type, char *index_key);
 void vm_show_device_all(int show_type);
 void vm_show_nat(int show_type);
 void vm_show_switch(int show_type);
@@ -197,7 +204,7 @@ int  copy_vm_disk(copy_stru *name);
 void create_vm_list();
 void destroy_vm_list();
 void add_to_vm_list(char *vm_name);
-void sort_vm_list();
+void sort_vm_list(int type);
 void load_vm_info(char *vm_name, vm_stru *vm);
 void save_vm_info(char *vm_name, vm_stru *vm);
 void show_vm_name(int status);
