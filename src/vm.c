@@ -368,14 +368,18 @@ void vm_end()
 void vm_list(int list_type, char *index_key)
 {
 	//先将虚拟机列表按键值排序
-	if (strcmp(index_key, "byip") == 0)
+	if (strcmp(index_key, "byname") == 0)
+		sort_vm_list(LS_BY_NAME);
+	else if (strcmp(index_key, "byip") == 0 && list_type == VM_LONG_LIST)
 		sort_vm_list(LS_BY_IP);
 	else if (strcmp(index_key, "byos") == 0)
-		sort_vm_list(LS_BY_GUEST);
+		sort_vm_list(LS_BY_OS);
 	else if (strcmp(index_key, "bystatus") == 0)
 		sort_vm_list(LS_BY_STATUS);
-	else
-		sort_vm_list(LS_BY_NAME);	
+	else {
+		error("Incorrect parameters.\n");
+		err_exit();
+	}
 
 	//再开始输出列表
 	print_vm_list(list_type);
@@ -1934,7 +1938,7 @@ void sort_vm_list(int type)
 				s1 = p1->vm.nic[0].ip;
 				s2 = p2->vm.nic[0].ip;
 			}
-			else if (type == LS_BY_GUEST) {
+			else if (type == LS_BY_OS) {
 				s1 = p1->vm.ostype;
 				s2 = p2->vm.ostype;
 			}

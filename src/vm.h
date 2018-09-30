@@ -39,7 +39,7 @@ enum VM_LIST_ENUM {
 enum VM_LIST_SORT_ENUM {
 	LS_BY_NAME = 0,
 	LS_BY_IP,
-	LS_BY_GUEST,
+	LS_BY_OS,
 	LS_BY_STATUS,
 };
 

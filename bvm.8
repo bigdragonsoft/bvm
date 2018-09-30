@@ -24,7 +24,7 @@
 .Pp
 .Nm
 .Cm --ls
-.Op Ar byname|byip|byos|bystatus
+.Op Ar byname|byos|bystatus
 .Nm
 .Cm --ll
 .Op Ar byname|byip|byos|bystatus
@@ -253,15 +253,13 @@ Show all options and descriptions.
 Login to a running virtual machine from console, the boot loader of this 
 virtual machine must be grub, and the uefi mode needs to log in using 
 the VNC client.
-.It Cm --ls Op Ar byname|byip|byos|bystatus
+.It Cm --ls Op Ar byname|byos|bystatus
 Show a list and status of all virtual machines.
 By default, the output is sorted in ascending order by name, 
 or one of the following options is specified.
 .Bl -tag -width 17n
 .It Ar byname
 Output list in ascending order by name.
-.It Ar byip
-Output list in ascending order by IP-addr.
 .It Ar byos
 Output list in ascending order by OS.
 .It Ar bystatus
@@ -305,6 +303,19 @@ a symbol '*' is also displayed.
 .El
 .It Cm --ll Op Ar byname|byip|byos|bystatus
 Show a list and status of all virtual machines in long format.
+By default, the output is sorted in ascending order by name,
+or one of the following options is specified.
+.Bl -tag -width 17n
+.It Ar byname
+Output list in ascending order by name.
+.It Ar byip
+Output list in ascending order by IP-addr.
+.It Ar byos
+Output list in ascending order by OS.
+.It Ar bystatus
+Output list in ascending order by virtual machine status.
+.El
+.Pp
 The added list items have the following meanings:
 .Bl -tag -width 17n
 .It Ar IP
