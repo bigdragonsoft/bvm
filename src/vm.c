@@ -1327,13 +1327,13 @@ void vm_info(char *vm_name)
 		if (strcmp(p->vm.nic[n].netmode, "NAT") == 0) {
 			printf("|-%-11s : %s", "nat", 		p->vm.nic[n].nat);
 			get_nat_info(p->vm.nic[n].nat);
-			printf(" [%s]\n", nat.ip);
+			printf(" [GW %s]\n", nat.ip);
 		}
 		if (strcmp(p->vm.nic[n].netmode, "Bridged") == 0) {	
 			printf("|-%-11s : %s", "bind",        p->vm.nic[n].bind);
 			get_switch_info(p->vm.nic[n].bind);
 			if (strstr(p->vm.nic[n].bind, "switch") && strlen(Switch.ip) > 0)
-				printf(" [%s]", Switch.ip);
+				printf(" [GW %s]", Switch.ip);
 			printf("\n");
 		}
 		if (strlen(p->vm.nic[n].bridge) > 0)
