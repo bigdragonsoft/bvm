@@ -370,8 +370,7 @@ int search_nat_redirect(int pn, int nat_order)
 		if (get_vm_status(p->vm.name) == VM_ON) {
 			for (int i=0; i<atoi(p->vm.nics); i++) {
 				int cond = (strcmp(p->vm.nic[i].netmode, "NAT") == 0 &&
-						//strcmp(p->vm.nic[i].nat, nat_name) == 0 &&
-						strcmp(p->vm.nic[i].rpstatus, "enable") == 0 &&
+						//strcmp(p->vm.nic[i].rpstatus, "enable") == 0 &&
 						strcmp(p->vm.nic[i].bind, nic_list[pn]) == 0 &&
 						p->vm.nic[i].rpnum > 0);
 				if (cond) {
@@ -395,17 +394,18 @@ int search_nat_redirect(int pn, int nat_order)
 						}
 						++n;
 					}
-
-					for (int j=0; j<p->vm.nic[i].rpnum; j++) {
-						//-------------------------------------------------
-						//redirect_port tcp $sub_ip:$sub_port $server_port
-						//-------------------------------------------------
-						char sub_ip[BUFFERSIZE];
-						strcpy(sub_ip, p->vm.nic[i].ip);
-						get_ip(sub_ip);
-						sprintf(t, "redirect_port tcp %s:%d %d ", sub_ip, p->vm.nic[i].ports[j].vm_port, p->vm.nic[i].ports[j].host_port);
-						strcat(cmd, t);
-					}
+					
+					if (strcmp(p->vm.nic[i].rpstatus, "enable") == 0)  /* */
+						for (int j=0; j<p->vm.nic[i].rpnum; j++) {
+							//-------------------------------------------------
+							//redirect_port tcp $sub_ip:$sub_port $server_port
+							//-------------------------------------------------
+							char sub_ip[BUFFERSIZE];
+							strcpy(sub_ip, p->vm.nic[i].ip);
+							get_ip(sub_ip);
+							sprintf(t, "redirect_port tcp %s:%d %d ", sub_ip, p->vm.nic[i].ports[j].vm_port, p->vm.nic[i].ports[j].host_port);
+							strcat(cmd, t);
+						}
 				}
 			}
 		}
