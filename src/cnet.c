@@ -1,4 +1,31 @@
+/*-----------------------------------------------------------------------------
+   BVM Copyright (c) 2018, Qiang Guo (guoqiang_cn@126.com)
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+   FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+   DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+   SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ *---------------------------------------------------------------------------*/
+
 #include "cnet.h"
+#define	NIC_MENU_ITEM_NUM	6
 
 create_stru networkmenu[NM_MAX] = {0};
 create_stru *network_sel[NM_MAX] = {0};
@@ -10,21 +37,25 @@ void network_config_init()
 	static int flag = 1;
 	if (flag) {
 		flag = 0;
-		add_item(networkmenu, "NIC numbers",	(char*)&new_vm.nics,		enter_vm_nics,		0,1, 0);
+		add_item(networkmenu, "NIC numbers",	(char*)&new_vm.nics,		enter_vm_nics,		0, 1, 0);
 		for (int n=0; n<NIC_NUM; n++) {
 			char desc[BUFFERSIZE];
 			sprintf(desc, "nic-%d mode", n);
-			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].netmode, 	enter_vm_netmode_proc,  n,1, 0);
-			sprintf(desc, "nic-%d bind", n);
-			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].bind, 	enter_vm_bind_proc,  	n,1, 0);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].netmode, 	enter_vm_netmode_proc,  n, 1, 0);
 			sprintf(desc, "nic-%d NAT", n);
-			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].nat, 	enter_vm_nat_proc,  	n,1, 0);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].nat, 	enter_vm_nat_proc,  	n, 1, 0);
+			sprintf(desc, "nic-%d redirect", n);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].rpstatus,	enter_vm_rpstatus_proc,	n, 1, 0);
+			sprintf(desc, "nic-%d bind", n);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].bind, 	enter_vm_bind_proc,  	n, 1, 0);
+			sprintf(desc, "nic-%d ports", n);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].rplist, 	enter_vm_rplist_proc,  	n, 1, 0);
 			sprintf(desc, "nic-%d ip", n);
-			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].ip, 	enter_vm_ip_proc,  	n,1, 0);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].ip, 	enter_vm_ip_proc,  	n, 1, 0);
 		}
-		add_item(networkmenu, "add a nic",	NULL,			add_nic,		0,1, 1);
-		add_item(networkmenu, "delete a nic", 	NULL,			delete_nic,		0,1, 1);
-		add_item(networkmenu, "go back",	NULL,			goback_mainmenu,	0,1, 1);
+		add_item(networkmenu, "add a nic",	NULL,			add_nic,		0, 1, 1);
+		add_item(networkmenu, "delete a nic", 	NULL,			delete_nic,		0, 1, 1);
+		add_item(networkmenu, "go back",	NULL,			goback_mainmenu,	0, 1, 1);
 	}
 }
 
@@ -96,7 +127,7 @@ void edit_network_config()
 // 设置网络菜单项的编辑属性
 void set_network_edit(int type, int edit)
 {
-	int n = NIC_NUM * 4 + 1;
+	int n = NIC_NUM * NIC_MENU_ITEM_NUM + 1;
 	if (type == BVMNETWORK)
 		for (int i=0; i<n; i++)
 			networkmenu[i].edit = edit;
@@ -111,7 +142,18 @@ int check_network_enter_valid()
 	for (int i=0; i<atoi(new_vm.nics); i++) {
 		if (strlen(new_vm.nic[i].netmode) == 0) return -1;
 		if (strlen(new_vm.nic[i].ip) == 0) return -1;
+		/*
 		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0 && strlen(new_vm.nic[i].nat) == 0) return -1;
+		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0 && strlen(new_vm.nic[i].rpstatus) == 0) return -1;
+		*/
+		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0) {
+			if (strlen(new_vm.nic[i].nat) == 0) return -1;
+			if (strlen(new_vm.nic[i].rpstatus) == 0) return -1;
+			if (strcmp(new_vm.nic[i].rpstatus, "enable") == 0) {
+				if (strlen(new_vm.nic[i].rplist) == 0) return -1;
+				if (strlen(new_vm.nic[i].bind) == 0) return -1;
+			}
+		}
 		if (strcmp(new_vm.nic[i].netmode, "Bridged") == 0 && strlen(new_vm.nic[i].bind) == 0) return -1;
 	}
 	return 1;
@@ -121,13 +163,18 @@ int check_network_enter_valid()
 void show_network_config()
 {
 	if (atoi(new_vm.nics) <= 1)
-		networkmenu[NIC_NUM * 4 + 2].edit = -1;
+		networkmenu[NIC_NUM * NIC_MENU_ITEM_NUM + 2].edit = -1;
 
 	int n = 0;
 	int index = 0;
 	while (networkmenu[n].func) {
 		if ((networkmenu[n].func == enter_vm_netmode_proc && atoi(new_vm.nics) < networkmenu[n].arg + 1) ||
-		    (networkmenu[n].func == enter_vm_bind_proc && strcmp(new_vm.nic[networkmenu[n].arg].netmode, "Bridged") != 0) ||
+		    (networkmenu[n].func == enter_vm_rpstatus_proc && strcmp(new_vm.nic[networkmenu[n].arg].netmode, "NAT") != 0) ||
+		    (networkmenu[n].func == enter_vm_rplist_proc && 
+		     	(strcmp(new_vm.nic[networkmenu[n].arg].netmode, "NAT") != 0 || 
+			(strcmp(new_vm.nic[networkmenu[n].arg].rpstatus, "enable") != 0))) ||
+		    (networkmenu[n].func == enter_vm_bind_proc && 
+		     	strcmp(new_vm.nic[networkmenu[n].arg].netmode, "Bridged") != 0 && strcmp(new_vm.nic[networkmenu[n].arg].rpstatus, "enable") != 0) ||
 		    (networkmenu[n].func == enter_vm_nat_proc && strcmp(new_vm.nic[networkmenu[n].arg].netmode, "NAT") != 0) ||
 		    (networkmenu[n].func == enter_vm_ip_proc && strlen(new_vm.nic[networkmenu[n].arg].netmode) == 0) //atoi(new_vm.nics) < networkmenu[n].arg + 1)
 		   );
@@ -135,7 +182,7 @@ void show_network_config()
 			if (networkmenu[n].edit != -1) {
 				network_sel[index] = &networkmenu[n];
 				//printf("[%2d]. %-13s", index, networkmenu[n].desc);
-				printf("[%c]. %-13s", options[index], networkmenu[n].desc);
+				printf("[%c]. %-14s", options[index], networkmenu[n].desc);
 				if (networkmenu[n].value)
 					printf(": %s", networkmenu[n].value);
 				printf("\n");

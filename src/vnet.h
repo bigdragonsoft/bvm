@@ -1,3 +1,30 @@
+/*-----------------------------------------------------------------------------
+   BVM Copyright (c) 2018, Qiang Guo (guoqiang_cn@126.com)
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+   FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+   DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+   SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ *---------------------------------------------------------------------------*/
+
+
 #ifndef BVM_VNET_H
 #define BVM_VNET_H
 
@@ -61,6 +88,7 @@ struct _nat_stru {
 	char name[16];
 	char desc[32];
 	char ip[16];
+	int flag;
 };
 typedef struct _nat_stru nat_stru;
 
@@ -92,6 +120,12 @@ extern nat_stru Switch;
 extern int cur_nic_idx;
 extern vm_stru *cur_vm;
 
+void redirect_port();
+int  search_nat_redirect(int pn, int nat_order);
+int  run_ipfw(char *cmd);
+int  read_redirect_rule();
+int  write_redirect_rule();
+
 int  create_nat(char *nat_name);
 int  create_bridged(char *bind);
 int  create_switch(char *switch_name);
@@ -120,6 +154,7 @@ int  check_nic_in_bridge(char *bridge, char *nic);
 void find_desc_in_all_bridges(char *mode, char *bridge);
 void find_nic_in_all_bridges(char *bridge);
 void get_new_vnet_name(int type, char *name);
+int  get_ip(char *ip);
 int  check_ip(char *ip);
 int  get_new_nat();
 int  get_new_switch();

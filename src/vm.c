@@ -1,3 +1,29 @@
+/*-----------------------------------------------------------------------------
+   BVM Copyright (c) 2018, Qiang Guo (guoqiang_cn@126.com)
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+   FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+   DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+   SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ *---------------------------------------------------------------------------*/
+
 /**************************************************************************************************
  *
  *
@@ -187,22 +213,36 @@ void file_lock(char *file, int flag)
 // bvm runtime environment 
 void check_bre()
 {
+	/********************************
+	 * Dependency package detection 
+	 * 1. bhyve-firmware
+	 * 2. tmux
+	 * 3. grub-bhyve
+	 ********************************/
+	
 	//bhyve-firmware
 	if (access("/usr/local/share/uefi-firmware/BHYVE_UEFI.fd", 0) == -1 ||
 	    access("/usr/local/share/uefi-firmware/BHYVE_UEFI_CSM.fd", 0) == -1) {
 		warn("unable to support UEFI\n");
 		warn("please use 'pkg install bhyve-firmware' to install first\n\n");
 	}	
+
 	//tmux
 	if (access("/usr/local/bin/tmux", 0) == -1) {
 		error("tmux is not installed, use 'pkg install tmux' to install it\n");
 		exit(0);
 	}
+
 	//grub-bhyve
 	if (access("/usr/local/sbin/grub-bhyve", 0) == -1) {
 		error("grub2-bhyve is not installed, use 'pkg install grub2-bhyve' to install it\n");
 		exit(0);
 	}
+
+	/**************************
+	 * bhyve module detection
+	 **************************/
+
 	//vmm_load="YES"
 	//if_bridge_load="YES"
 	//if_tap_load="YES"
@@ -245,6 +285,40 @@ void check_bre()
 		warn("net.link.tap.up_on_open=1\n");
 
 		exit(0);
+	}
+
+	/**************************
+	 * IPFW module detection 
+	 **************************/
+	
+	//ipfw_load="YES"
+	//ipfw_nat_load="YES"
+	//libalias_load="YES"
+	//net.inet.ip.fw.default_to_accept=1
+	init_config("/boot/loader.conf");
+
+	int fipfw = 0;
+	int fnat = 0;
+	int flib = 0;
+	int faccept = 0;
+
+	strcpy(key, "ipfw_load");
+	if ((value = get_value_by_name(key)) == NULL || strcmp(strtolower(value), "yes") != 0) fipfw = 1;
+	strcpy(key, "ipfw_nat_load");
+	if ((value = get_value_by_name(key)) == NULL || strcmp(strtolower(value), "yes") != 0) fnat = 1; 
+	strcpy(key, "libalias_load");
+	if ((value = get_value_by_name(key)) == NULL || strcmp(strtolower(value), "yes") != 0) flib = 1; 
+	strcpy(key, "net.inet.ip.fw.default_to_accept");
+	if ((value = get_value_by_name(key)) == NULL || strcmp(value, "1") != 0) faccept = 1;
+
+	free_config();
+
+	if (fipfw + fnat + flib + faccept > 0) {
+		error("In order to help you solve the NAT reflow problem, \nyou need to add the following line to /boot/loader.conf\n");
+		if (fipfw) 	warn("ipfw_load=\"YES\"\n");
+		if (fnat) 	warn("ipfw_nat_load=\"YES\"\n");
+		if (flib) 	warn("libalias_load=\"YES\"\n");
+		if (faccept)	warn("net.inet.ip.fw.default_to_accept=1\n");
 	}
 
 }
@@ -1228,6 +1302,10 @@ void vm_info_all(char *vm_name)
 		printf("%-13s = %s\n",	str,	p->vm.nic[n].netmode);
 		sprintf(str, "vm_nic%d_nat", n);
 		printf("%-13s = %s\n",	str,	p->vm.nic[n].nat);
+		sprintf(str, "vm_nic%d_rpstatus", n);
+		printf("%-13s = %s\n",	str,	p->vm.nic[n].rpstatus);
+		sprintf(str, "vm_nic%d_rplist", n);
+		printf("%-13s = %s\n",	str,	p->vm.nic[n].rplist);
 		sprintf(str, "vm_nic%d_bind", n);
 		printf("%-13s = %s\n",	str,	p->vm.nic[n].bind);
 		sprintf(str, "vm_nic%d_bridge", n);
@@ -1328,6 +1406,11 @@ void vm_info(char *vm_name)
 			printf("|-%-11s : %s", "nat", 		p->vm.nic[n].nat);
 			get_nat_info(p->vm.nic[n].nat);
 			printf(" [GW %s]\n", nat.ip);
+			printf("|-%-11s : %s\n", "redirect",	p->vm.nic[n].rpstatus);
+			if (strcmp(p->vm.nic[n].rpstatus, "enable") == 0) {
+				printf("  |-%-9s : %s\n", "ports",	p->vm.nic[n].rplist);
+				printf("  |-%-9s : %s\n", "bind",	p->vm.nic[n].bind);
+			}
 		}
 		if (strcmp(p->vm.nic[n].netmode, "Bridged") == 0) {	
 			printf("|-%-11s : %s", "bind",        p->vm.nic[n].bind);
@@ -2030,6 +2113,25 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 		sprintf(str, "vm_nic%d_nat", n);
 		if ((value = get_value_by_name(str)) != NULL)
 			strcpy(vm->nic[n].nat, value);
+		sprintf(str, "vm_nic%d_rpstatus", n);
+		if ((value = get_value_by_name(str)) != NULL)
+			strcpy(vm->nic[n].rpstatus, value);
+		sprintf(str, "vm_nic%d_rpnum", n);
+		if ((value = get_value_by_name(str)) != NULL)
+			vm->nic[n].rpnum = atoi(value);
+
+		for (int m=0; m<vm->nic[n].rpnum; m++) {
+			sprintf(str, "vm_nic%d_ports%d_vm_port", n, m);
+			if ((value = get_value_by_name(str)) != NULL)
+				vm->nic[n].ports[m].vm_port = atoi(value);
+			sprintf(str, "vm_nic%d_ports%d_host_port", n, m);
+			if ((value = get_value_by_name(str)) != NULL)
+				vm->nic[n].ports[m].host_port = atoi(value);
+		}
+
+		sprintf(str, "vm_nic%d_rplist", n);
+		if ((value = get_value_by_name(str)) != NULL)
+			strcpy(vm->nic[n].rplist, value);
 		sprintf(str, "vm_nic%d_bridge", n);
 		if ((value = get_value_by_name(str)) != NULL)
 			strcpy(vm->nic[n].bridge, value);
@@ -2171,6 +2273,20 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 		sprintf(str, "vm_nic%d_netmode=%s\n", n, vm->nic[n].netmode);
 		fputs(str, fp);
 		sprintf(str, "vm_nic%d_nat=%s\n", n, vm->nic[n].nat);
+		fputs(str, fp);
+		sprintf(str, "vm_nic%d_rpstatus=%s\n", n, vm->nic[n].rpstatus);
+		fputs(str, fp);
+		sprintf(str, "vm_nic%d_rpnum=%d\n", n, vm->nic[n].rpnum);
+		fputs(str, fp);
+
+		for (int m=0; m<vm->nic[n].rpnum; m++) {
+			sprintf(str, "vm_nic%d_ports%d_vm_port=%d\n", n, m, vm->nic[n].ports[m].vm_port);
+			fputs(str, fp);
+			sprintf(str, "vm_nic%d_ports%d_host_port=%d\n", n, m, vm->nic[n].ports[m].host_port);
+			fputs(str, fp);
+		}
+
+		sprintf(str, "vm_nic%d_rplist=%s\n", n, vm->nic[n].rplist);
 		fputs(str, fp);
 		sprintf(str, "vm_nic%d_bridge=%s\n", n, vm->nic[n].bridge);
 		fputs(str, fp);

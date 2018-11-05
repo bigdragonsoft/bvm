@@ -1,3 +1,29 @@
+/*-----------------------------------------------------------------------------
+   BVM Copyright (c) 2018, Qiang Guo (guoqiang_cn@126.com)
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+   FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+   DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+   SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ *---------------------------------------------------------------------------*/
+
 #ifndef BVM_VM_H
 #define BVM_VM_H
 
@@ -23,10 +49,13 @@
 #define BUFFERSIZE 	512
 #define FN_MAX_LEN 	512
 #define CMD_MAX_LEN 	256
+#define PORT_LIST_LEN	256
 #define OS_NUM		32	//最大操作系统类型数量
 #define DISK_NUM	8	//最大磁盘数量
 #define NIC_NUM		8	//最大网卡数量
+#define PORT_NUM	8	//最大端口数量
 #define MAX_BOOT_NUM	32	//最大自动启动数量
+#define NAT_ORDER	1029	//防火墙规则中nat的序列号
 
 extern char *osdir;
 extern char vmdir[];
@@ -68,14 +97,24 @@ struct _os_stru {
 typedef struct _os_stru os_stru;
 extern os_stru bvm_os[];
 
+struct _redirect_stru {
+	int vm_port;		//虚拟机端口 virtual machine port
+	int host_port;		//宿主机端口 host machine port
+};
+typedef struct _redirect_stru redirect_stru;
+
 struct _nic_stru {
-	char name[32];		//网卡名称
-	char netmode[32];	//网络模式
-	char nat[32];		//NAT
-	char bridge[32];	//网桥
-	char tap[32];		//tap
-	char ip[32];		//ip
-	char bind[32];		//绑定宿主的网卡名称
+	char name[32];			//网卡名称
+	char netmode[32];		//网络模式
+	char nat[32];			//NAT
+	char rpstatus[32];		//是否端口转发
+	int  rpnum;			//端口转发的数量
+	redirect_stru ports[PORT_NUM];	//端口映射表
+	char rplist[PORT_LIST_LEN];	//端口映射列表 (80:80,22:2224)
+	char bridge[32];		//网桥
+	char tap[32];			//tap
+	char ip[32];			//ip
+	char bind[32];			//绑定宿主的网卡名称
 };
 typedef struct _nic_stru nic_stru;
 

@@ -1,3 +1,30 @@
+/*-----------------------------------------------------------------------------
+   BVM Copyright (c) 2018, Qiang Guo (guoqiang_cn@126.com)
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+   FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+   DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+   SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ *---------------------------------------------------------------------------*/
+
+
 /*--------------------------------------------
 
  桥接方式：
@@ -56,6 +83,8 @@ nat_stru Switch;
 
 int cur_nic_idx = 0;
 vm_stru *cur_vm = NULL;
+
+int rule[VNET_LISTSIZE];
 
 // 字符串最后一个字符
 char lastch(char *s)
@@ -203,6 +232,238 @@ void run_bridge_command(int action)
 
 		pclose(fp);
 	}
+}
+
+/*-------------------------------------------------------------------------------
+                            -=- 端口重定向示例 -=-
+                           Port redirection example
+  -------------------------------------------------------------------------------
+  
+             192.168.1.0/24
+     网卡A +----- NAT1 ----- vm1,vm2,vm3
+           +
+           +  172.16.1.0/24
+           +----- NAT2 ----- vm4,vm5 
+  
+     ipfw –fq nat 1029 flush config
+     ipfw –fq add nat 1029 config if A redirect_port vm1:port PORT \
+                                       redirect_port vm2:port PORT \
+                                       redirect_port vm3:port PORT \
+                                       redirect_port vm4:port PORT \
+                                       redirect_port vm5:port PORT
+  
+    ipfw –fq add nat 1029 ip from nat1,nat2 to not nat1,nat2 out via A
+    ipfw –fq add nat 1029 ip from not nat1,nat2 to any in via A
+  
+  
+  
+             192.168.1.0/24
+     网卡B +----- NAT1 ----- vm6
+           +
+           +   10.10.1.1/24
+           +----- NAT3 ----- vm7,vm8
+     
+     ipfw –fq nat 1030 flush config
+     ipfw –fq add nat 1030 config if B redirect_port vm6:port PORT \
+                                       redirect_port vm7:port PORT \
+                                       redirect_port vm8:port PORT
+     
+     ipfw –fq add nat 1030 ip from nat1,nat3 to not nat1,nat3 out via B
+     ipfw –fq add nat 1030 ip from not nat1,nat3 to any in via B
+  -------------------------------------------------------------------------------*/
+
+// 对所有运行状态的虚拟机进行端口转发处理
+void redirect_port()
+{
+	get_nic_list();
+	load_nat_list();
+
+	read_redirect_rule();
+
+	int nat_order = NAT_ORDER;
+	int pn = 0;
+	while (strlen(nic_list[pn]) > 0) {
+
+		char cmd[4096];
+
+		//-------------------------------
+		//ipfw -fq nat 1 flush config
+		//-------------------------------
+		sprintf(cmd, "ipfw -fq nat %d flush config\n", nat_order);
+		run_ipfw(cmd);
+
+		int n = 0;
+		while (nat_list[n]) {
+			//search_nat_redirect(nat_list[n]->name, pn, nat_order++);
+			nat_list[n]->flag = 0;
+			++n;
+		}
+		if (search_nat_redirect(pn, nat_order)) {
+
+		//-----------------------------------------------------------------------
+		//$sub_net="nat1,nat2,nat3,..."
+		//ipfw -fq add nat 1 ip from $sub_net to not $sub_net out via $server_if
+		//-----------------------------------------------------------------------
+		char sub_net[BUFFERSIZE] = {0};
+		n--;
+		while (n >= 0) {
+			if (nat_list[n]->flag) {
+				strcat(sub_net, nat_list[n]->ip);
+				if (n > 0)
+					strcat(sub_net, ",");
+			}
+			--n;
+		}
+		sprintf(cmd, "ipfw -fq add nat %d ip from %s to not %s out via %s\n", nat_order, sub_net, sub_net, nic_list[pn]);
+		run_ipfw(cmd);
+
+		//-----------------------------------------------------------------
+		//$sub_net="nat1,nat2,nat3,..."
+		//ipfw -fq add nat 1 ip from not $sub_net to any in via $server_if
+		//-----------------------------------------------------------------
+		sprintf(cmd, "ipfw -fq add nat %d ip from not %s to any in via %s", nat_order, sub_net, nic_list[pn]);
+		run_ipfw(cmd);
+
+		rule[pn] = nat_order;
+		}
+		else {
+			//---------------------------------
+			//对于没有端口重定向的网卡删除规则
+			//ipfw nat 1029 delete
+			//---------------------------------
+			if (rule[pn]) {
+				sprintf(cmd, "ipfw nat %d delete", nat_order);
+				run_ipfw(cmd);
+				rule[pn] = 0;
+			}
+		}
+			
+		++pn;
+		++nat_order;
+
+	} //网卡循环
+
+	write_redirect_rule();
+
+	free_vnet_list(NAT);
+}
+
+// 在虚拟机列表中查找符合端口转发条件的主机
+// 并执行ipfw nat相关语句
+int search_nat_redirect(int pn, int nat_order)
+{
+	if (vms == NULL) return 0;
+
+	//static int nat_order = NAT_ORDER;
+	int flag = 0;
+
+	char cmd[4096];
+	char t[BUFFERSIZE];
+
+	vm_node *p = vms;
+	while (p) {
+		if (get_vm_status(p->vm.name) == VM_ON) {
+			for (int i=0; i<atoi(p->vm.nics); i++) {
+				int cond = (strcmp(p->vm.nic[i].netmode, "NAT") == 0 &&
+						//strcmp(p->vm.nic[i].nat, nat_name) == 0 &&
+						strcmp(p->vm.nic[i].rpstatus, "enable") == 0 &&
+						strcmp(p->vm.nic[i].bind, nic_list[pn]) == 0 &&
+						p->vm.nic[i].rpnum > 0);
+				if (cond) {
+					//error("name:%s, nat=%s, stat=%s, port=%s\n", p->vm.name, p->vm.nic[i].nat, p->vm.nic[i].rpstatus, p->vm.nic[i].rplist);
+					if (flag == 0) {
+						flag = 1;
+						//------------------------------------
+						//ipfw -fq nat 1 config if $server_if
+						//------------------------------------
+						sprintf(cmd, "ipfw -fq nat %d config if %s ", nat_order, nic_list[pn]);
+					}
+					else {
+						
+					}
+
+					//标记使用的NAT
+					int n =0;
+					while (nat_list[n]) {
+						if (strcmp(p->vm.nic[i].nat, nat_list[n]->name) == 0) {
+							nat_list[n]->flag = 1;
+						}
+						++n;
+					}
+
+					for (int j=0; j<p->vm.nic[i].rpnum; j++) {
+						//-------------------------------------------------
+						//redirect_port tcp $sub_ip:$sub_port $server_port
+						//-------------------------------------------------
+						char sub_ip[BUFFERSIZE];
+						strcpy(sub_ip, p->vm.nic[i].ip);
+						get_ip(sub_ip);
+						sprintf(t, "redirect_port tcp %s:%d %d ", sub_ip, p->vm.nic[i].ports[j].vm_port, p->vm.nic[i].ports[j].host_port);
+						strcat(cmd, t);
+					}
+				}
+			}
+		}
+		p = p->next;
+	}
+	if (flag) {
+		strcat(cmd, "\n");
+		run_ipfw(cmd);
+		}
+	//nat_order++;
+	return flag;
+}
+
+// 执行ipfw指令
+int run_ipfw(char *cmd)
+{
+	//warn("%s\n", cmd);
+	//return 0;
+
+	write_log(cmd);
+	int ret = system(cmd);
+	return WEXITSTATUS(ret);
+}
+
+// 读取ipfw转发规则号
+// 返回值：
+// 	 0 ：文件不存在/文件打开失败
+//     cnt ：读取到的数据量
+int read_redirect_rule()
+{
+	char fn[FN_MAX_LEN];
+	sprintf(fn, "%s/.redirect_rule", vmdir);
+
+	//规则号清空
+	memset(rule, 0, sizeof(rule));
+
+	//文件不存在、打开失败均返回0
+	if (access(fn, 0) == -1) return 0;
+	FILE *fp;
+        if ((fp = fopen(fn, "rb")) == NULL) {
+                error("open %s error\n", fn);
+		return 0;
+        }
+
+	int cnt = fread(rule, sizeof(int), VNET_LISTSIZE, fp);
+	fclose(fp);
+	return cnt;
+}
+
+// 将生成的ipfw转发规则好写入文件
+int write_redirect_rule()
+{
+	char fn[FN_MAX_LEN];
+	sprintf(fn, "%s/.redirect_rule", vmdir);
+
+	FILE *fp;
+	if ((fp = fopen(fn, "wb")) == NULL) {
+		error("write %s error\n", fn);
+		return 0;
+	}
+	int cnt = fwrite(rule, sizeof(int), VNET_LISTSIZE, fp);
+	fclose(fp);
+	return cnt;
 }
 
 // 建立NAT
@@ -624,6 +885,18 @@ void get_new_bridge(char *bridge)
 void get_new_tap(char *tap)
 {
 	get_new_vnet_name(TAP, tap);
+}
+
+// 分割IP地址
+// 截取IP部分去掉掩码
+// 返回：若成功则为1,不成功为0 
+int get_ip(char *ip)
+{
+	if (check_ip(ip) == 0) return 0;
+
+	char *ch = strchr(ip, '/');
+	*ch = 0;
+	return 1;
 }
 
 // 检测IP地址的有效性

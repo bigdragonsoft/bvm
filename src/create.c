@@ -1,3 +1,29 @@
+/*-----------------------------------------------------------------------------
+   BVM Copyright (c) 2018, Qiang Guo (guoqiang_cn@126.com)
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+   FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+   DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+   SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ *---------------------------------------------------------------------------*/
+
 /*
  * ============= 颜色代码 =============
  * 字背景颜色:40~49	字颜色:30~39
@@ -46,6 +72,8 @@
 #include "vnet.h"
 #include "zfs.h"
 
+//#define BVM_DEBUG
+
 vm_stru new_vm;
 create_stru tbl[MM_MAX] = {0};
 create_stru *sel[MM_MAX] = {0};
@@ -79,6 +107,8 @@ void create_init()
 
 	add_item(tbl, "disk config",  NULL,				enter_vm_disk_config,	0,	1,	1);
 	add_item(tbl, "network config", NULL,				enter_vm_network_config,0,	1,	1);
+
+	add_item(tbl, "cancel",		NULL,				exit_the_menu,		0,	1,	1);
 
 }
 
@@ -674,6 +704,11 @@ void enter_vm_network_config(int not_use)
 	create_network_config();
 }
 
+// 退出菜单系统
+void exit_the_menu(int not_use)
+{
+	err_exit();
+}
 
 // vm_netmode
 // 网络模式输入处理
@@ -689,41 +724,224 @@ void enter_vm_netmode(char *msg, char *value)
 
 }
 
-// vm_nat
-// NAT网络输入处理
-void enter_vm_nat(char *netmode, char *value)
+// vm_rpstatus
+// 是否开启端口转发输入处理
+void enter_vm_rpstatus(char *netmode, char *value)
 {
 	if (strcmp(netmode, "NAT") != 0) return;
 
-	char *msg = "Enter NAT: ";
-	char *nat_opts[VNET_LISTSIZE] = {0};
-	char *nat_desc[VNET_LISTSIZE] = {0};
+	char *msg = "Enter port redirection status: ";
+	char *opts[] = {
+		"disable",
+		"enable",
+		NULL,
+	};
 
-	load_nat_list();
+	enter_options(msg, opts, NULL, value);
+}
 
+// vm_rplist
+// 端口映射列表输入处理
+void enter_vm_rplist(char *netmode, char *value)
+{
+	if (strcmp(netmode, "NAT") != 0) return;
+
+	char *msg = "Format: vm-port:host-port,vm-port:host-port,...\nEnter redirect port list (e.g. 22:2224,80:8080,...): ";
+
+	printf("%s", msg);
+	fgets(value, PORT_LIST_LEN, stdin);
+	value[strlen(value) - 1] = '\0';
+}
+
+// 检测端口映射列表输入的有效性
+// 返回 -1：错误
+// 返回  0：列表为空 
+int check_portlist(char *portlist, int nic_idx)
+{
+	//初始化端口映射表
+	for (int i=0; i<PORT_NUM; i++) {
+		new_vm.nic[nic_idx].ports[i].vm_port   = -1;
+		new_vm.nic[nic_idx].ports[i].host_port = -1;
+	}
+
+	//删除掉列表两侧的空格
+	trim(portlist);
+	if (strlen(portlist) == 0) return 0;
+
+	//对于列表中包含非法字符的均视为错误
+	for (int i=0; i<strlen(portlist)-1; i++)
+		if (!isdigit(portlist[i]) && portlist[i] != ':' && portlist[i] != ',' && !isblank(portlist[i]))
+			return -1;
+
+	//分割
+	int lport, hport;
+	int m = 0, n = 0;
+	int count = 0;
+	
+	while (strlen(portlist) > (m + n)) {
+		portlist += n;
+		m = split_portlist(&lport, portlist, ':');
+		portlist += m;
+		n = split_portlist(&hport, portlist, ',');
+		#ifdef BVM_DEBUG
+		warn("len=%d, port=%d\n", m, lport);
+		warn("len=%d, port=%d\n", n, hport);
+		#endif
+		if (m != -1 && n != -1) {
+			new_vm.nic[nic_idx].ports[count].vm_port   = lport;
+			new_vm.nic[nic_idx].ports[count].host_port = hport;
+			++count;
+		}
+		else 
+			break;
+	}
+
+	//保存端口转发的数量
+	new_vm.nic[nic_idx].rpnum = count;
+
+	#ifdef BVM_DEBUG
+	warn("count=%d\n", count);
+	#endif
+
+	//将结果重新写入rplist
+	strcpy(new_vm.nic[nic_idx].rplist, "");
+	for (int i=0; i<count; i++) {
+		char str[PORT_LIST_LEN] = {0};
+		sprintf(str, "%d:%d,", 	new_vm.nic[nic_idx].ports[i].vm_port,
+					new_vm.nic[nic_idx].ports[i].host_port);
+		strcat(new_vm.nic[nic_idx].rplist, str);
+	}
+	new_vm.nic[nic_idx].rplist[strlen(new_vm.nic[nic_idx].rplist) - 1] = '\0';
+	
+	#ifdef BVM_DEBUG
+	warn("rplist=%s\n", new_vm.nic[nic_idx].rplist);
+	#endif
+	
+	//返回获取到的映射数量
+	return count;
+}
+
+// 拆分端口映射列表
+// 参数 
+//    port 	: 拆分后得到的端口号
+//    portlist 	: 端口映射列表
+//    sep	: 分隔符
+// 返回值
+//    列表不合法，拆分失败，返回 -1
+//    否则，返回指针移动的距离
+int split_portlist(int *port, char *portlist, char sep)
+{
+	#ifdef BVM_DEBUG
+	warn("portlist=%s, sep=%c\n", portlist, sep);
+	#endif
+
+	*port = 0;
+	char ch;
+	int flag = 0;
+	int n = 0;	//指针移动的距离
+	while ((ch = portlist[n++])) {
+		if (ch == sep) {
+			#ifdef BVM_DEBUG
+			warn("port=%d\n", *port);
+			#endif
+			return n;
+		}
+		if (ch == ' ' || ch == '\t') {
+			if (*port == 0) 
+				continue;
+			else
+				flag = 1;
+		}
+		else {
+			if (isdigit(ch) && flag == 0)
+				*port = *port * 10 + ch - '0';
+			else
+				break;
+				
+		}
+	}
+	if (sep == ':') {
+		#ifdef BVM_DEBUG
+		warn("error\n");
+		#endif
+		return -1;
+	}
+	else {
+		#ifdef BVM_DEBUG
+		warn("port=%d\n", *port);
+		#endif
+		return n;
+	}
+}
+
+// vm_bind
+// 绑定网卡输入处理
+void enter_vm_bind(char *netmode, char *rpstatus, char *value)
+{
+	enum {
+		BIND_NOTHING = -1,	//什么也不做
+		BIND_BRIDGED = 0,	//桥接绑定
+		BIND_NAT_REDIRECT,	//转口重定像绑定
+	};
+
+	int flag = BIND_NOTHING;
+	if (strcmp(netmode, "Bridged") == 0) flag = BIND_BRIDGED;
+	if (strcmp(netmode, "NAT") == 0 && strcmp(rpstatus, "enable") == 0) flag = BIND_NAT_REDIRECT;
+
+	if (flag == BIND_NOTHING) return;
+
+	char *msg = "Select the binding device: ";
+	char *opts[VNET_LISTSIZE] = {0};
+	char *desc[VNET_LISTSIZE] = {0};
+
+	get_nic_list();
+	load_switch_list();
+
+	int idx = 0;
 	int n = 0;
-	while (nat_list[n]) {
-		
-		nat_desc[n] = (char*)malloc(BUFFERSIZE * sizeof(char));
-		memset(nat_desc[n], 0, BUFFERSIZE * sizeof(char));
-		strcpy(nat_desc[n], nat_list[n]->name);
-		strncat(nat_desc[n], "  ", 2);
-		strncat(nat_desc[n], nat_list[n]->ip, sizeof(nat_list[n]->ip));
-
-		nat_opts[n] = (char*)&nat_list[n]->name;
+	while (strlen(nic_list[n]) > 0) {
+		opts[idx] = (char*)&nic_list[n];
+		desc[idx] = (char*)&nic_list[n];
+		++idx;
 		++n;
 	}
 
-	enter_options(msg, nat_opts, nat_desc, value);
+	//保存一下物理网卡的数量
+	int pn = n;
 
-	while (n >= 0) {
-		if (nat_desc[n]) free(nat_desc[n]);
-		--n;
+	//当做桥接绑定时需要添加虚拟交换机列表
+	n = 0;
+	int g_idx = idx;
+	if (flag == BIND_BRIDGED)
+		while (switch_list[n]) {
+			desc[idx] = (char*)malloc(BUFFERSIZE * sizeof(char));
+			memset(desc[idx], 0, BUFFERSIZE * sizeof(char));
+			strcpy(desc[idx], switch_list[n]->name);
+			strncat(desc[idx], "  ", 2);
+			strncat(desc[idx], switch_list[n]->ip, sizeof(switch_list[n]->ip));
+
+			opts[idx] = (char*)&switch_list[n]->name;
+			++idx;
+			++n;
+	}
+
+	//当做端口重定向并只有一块物理网卡时
+	//直接填写绑定的网卡名称，无需进行选择录入
+	if (flag == BIND_NAT_REDIRECT && pn == 1)
+		strcpy(value, nic_list[0]);
+	else
+		enter_options(msg, opts, desc, value);
+
+	//释放空间
+	while (idx >= g_idx) {
+		if (desc[idx]) free(desc[idx]);
+		--idx;
 	}
 
 	free_vnet_list(NAT);
 }
 
+/*
 // vm_bind
 // 绑定网卡输入处理
 void enter_vm_bind(char *netmode, char *value)
@@ -765,6 +983,41 @@ void enter_vm_bind(char *netmode, char *value)
 	while (idx >= g_idx) {
 		if (desc[idx]) free(desc[idx]);
 		--idx;
+	}
+
+	free_vnet_list(NAT);
+}*/
+
+// vm_nat
+// NAT网络输入处理
+void enter_vm_nat(char *netmode, char *value)
+{
+	if (strcmp(netmode, "NAT") != 0) return;
+
+	char *msg = "Enter NAT: ";
+	char *nat_opts[VNET_LISTSIZE] = {0};
+	char *nat_desc[VNET_LISTSIZE] = {0};
+
+	load_nat_list();
+
+	int n = 0;
+	while (nat_list[n]) {
+		
+		nat_desc[n] = (char*)malloc(BUFFERSIZE * sizeof(char));
+		memset(nat_desc[n], 0, BUFFERSIZE * sizeof(char));
+		strcpy(nat_desc[n], nat_list[n]->name);
+		strncat(nat_desc[n], "  ", 2);
+		strncat(nat_desc[n], nat_list[n]->ip, sizeof(nat_list[n]->ip));
+
+		nat_opts[n] = (char*)&nat_list[n]->name;
+		++n;
+	}
+
+	enter_options(msg, nat_opts, nat_desc, value);
+
+	while (n >= 0) {
+		if (nat_desc[n]) free(nat_desc[n]);
+		--n;
 	}
 
 	free_vnet_list(NAT);
@@ -875,10 +1128,38 @@ void enter_vm_netmode_proc(int nic_idx)
 	enter_vm_netmode(msg, (char*)&new_vm.nic[nic_idx].netmode);
 }
 
+// 是否开启端口转发前端接口
+void enter_vm_rpstatus_proc(int nic_idx)
+{
+	enter_vm_rpstatus(new_vm.nic[nic_idx].netmode, (char*)&new_vm.nic[nic_idx].rpstatus);
+
+	//确保端口转发状态为enable时ip地址的有效性
+	//ip地址为 none/dhcp 时，将ip地址一栏清空
+	//bind也随之一起清空
+	if (strcmp(new_vm.nic[nic_idx].rpstatus, "enable") == 0)
+		if (!check_ip(new_vm.nic[nic_idx].ip)) {
+			strcpy(new_vm.nic[nic_idx].ip, "");
+			strcpy(new_vm.nic[nic_idx].bind, "");
+		}
+}
+
+// 端口转发列表输入前端接口
+void enter_vm_rplist_proc(int nic_idx)
+{
+	while (1) {
+		enter_vm_rplist(new_vm.nic[nic_idx].netmode, (char*)&new_vm.nic[nic_idx].rplist);
+		if (check_portlist((char*)&new_vm.nic[nic_idx].rplist, nic_idx) > 0)
+			break;
+		else
+			warn("invalid redirect-port list\n");
+	}
+}
+
 // 网卡绑定输入前端接口
 void enter_vm_bind_proc(int nic_idx)
 {
-	enter_vm_bind(new_vm.nic[nic_idx].netmode, (char*)&new_vm.nic[nic_idx].bind);
+	//enter_vm_bind(new_vm.nic[nic_idx].netmode, (char*)&new_vm.nic[nic_idx].bind);
+	enter_vm_bind(new_vm.nic[nic_idx].netmode, new_vm.nic[nic_idx].rpstatus, (char*)&new_vm.nic[nic_idx].bind);
 }
 
 // NAT输入前端接口
@@ -891,7 +1172,11 @@ void enter_vm_nat_proc(int nic_idx)
 void enter_vm_ip_proc(int nic_idx)
 {
 	if (atoi(new_vm.nics) < (nic_idx + 1)) return;
-	enter_vm_ip((char*)&new_vm.nic[nic_idx].ip);
+
+	if (strcmp(new_vm.nic[nic_idx].rpstatus, "enable") != 0)
+		enter_vm_ip((char*)&new_vm.nic[nic_idx].ip);
+	else
+		enter_static_ipv4((char*)&new_vm.nic[nic_idx].ip);
 }
 
 // vm_cdstatus

@@ -1,3 +1,29 @@
+/*-----------------------------------------------------------------------------
+   BVM Copyright (c) 2018, Qiang Guo (guoqiang_cn@126.com)
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions are met:
+
+   * Redistributions of source code must retain the above copyright notice, this
+     list of conditions and the following disclaimer.
+
+   * Redistributions in binary form must reproduce the above copyright notice,
+     this list of conditions and the following disclaimer in the documentation
+     and/or other materials provided with the distribution.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+   AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+   DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+   FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+   DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+   SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+   CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+   OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ *---------------------------------------------------------------------------*/
+
 #ifndef BVM_CREATE_H
 #define BVM_CREATE_H
 
@@ -14,7 +40,7 @@
 
 #define MM_MAX	32	//Main Menu Max
 #define DM_MAX	40	//Disk Menu Max
-#define NM_MAX	40	//Network Menu Max
+#define NM_MAX	64	//Network Menu Max
 
 struct _create_stru {
 	char desc[128];
@@ -59,19 +85,29 @@ void enter_vm_bootindex(int);
 void enter_vm_bootdelay(int);
 void enter_vm_nics(int);
 void enter_vm_netmode(char *msg, char *value);
+void enter_vm_rpstatus(char *netmode, char *value);
+void enter_vm_rplist(char *netmode, char *value);
 void enter_vm_nat(char *netmode, char *value);
-void enter_vm_bind(char *netmode, char *value);
+//void enter_vm_bind(char *netmode, char *value);
+void enter_vm_bind(char *netmode, char *rpstatus, char *value);
 void enter_vm_ip(char *value);
 void enter_vm_device(char *value);
 
 void enter_vm_disk_config(int);
 void enter_vm_network_config(int);
 
+void exit_the_menu(int);
+
 void enter_vm_netmode_proc(int nic_idx);
+void enter_vm_rpstatus_proc(int nic_idx);
+void enter_vm_rplist_proc(int nic_idx);
 void enter_vm_bind_proc(int nic_idx);
 void enter_vm_nat_proc(int nic_idx);
 void enter_vm_ip_proc(int nic_idx);
 void enter_static_ipv4(char *value);
+
+int  check_portlist(char *portlist, int nic_idx);
+int  split_portlist(int *port, char *portlist, char sep);
 
 int  get_filelist(char *dir, char **opt, char **opt_desc);
 int  check_numbers(char *value, char *unit);

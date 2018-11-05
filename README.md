@@ -61,6 +61,7 @@ Options:
         --poweroff      Force poweroff
         --lock          Lock vm
         --lockall       Lock all vms
+	--reload-nat    Reload NAT redirect-port
         --remove        Destroy vm
         --rename        Rename vm
         --restart       Restart vm
