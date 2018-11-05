@@ -123,8 +123,8 @@ extern vm_stru *cur_vm;
 void redirect_port();
 int  search_nat_redirect(int pn, int nat_order);
 int  run_ipfw(char *cmd);
-int  read_redirect_rule();
-int  write_redirect_rule();
+int  read_redirect_rule(int *rule);
+int  write_redirect_rule(int *rule);
 
 int  create_nat(char *nat_name);
 int  create_bridged(char *bind);

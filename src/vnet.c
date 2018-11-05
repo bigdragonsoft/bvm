@@ -84,8 +84,6 @@ nat_stru Switch;
 int cur_nic_idx = 0;
 vm_stru *cur_vm = NULL;
 
-int rule[VNET_LISTSIZE];
-
 // 字符串最后一个字符
 char lastch(char *s)
 {
@@ -278,7 +276,9 @@ void redirect_port()
 	get_nic_list();
 	load_nat_list();
 
-	read_redirect_rule();
+	int rule[VNET_LISTSIZE];
+	read_redirect_rule((int*)&rule);
+	//warn("rule[0]=%d\n", rule[0]);
 
 	int nat_order = NAT_ORDER;
 	int pn = 0;
@@ -343,7 +343,8 @@ void redirect_port()
 
 	} //网卡循环
 
-	write_redirect_rule();
+	write_redirect_rule((int*)&rule);
+	//warn("rule[0]=%d\n", rule[0]);
 
 	free_vnet_list(NAT);
 }
@@ -429,13 +430,14 @@ int run_ipfw(char *cmd)
 // 返回值：
 // 	 0 ：文件不存在/文件打开失败
 //     cnt ：读取到的数据量
-int read_redirect_rule()
+int read_redirect_rule(int *rule)
 {
 	char fn[FN_MAX_LEN];
 	sprintf(fn, "%s/.redirect_rule", vmdir);
 
 	//规则号清空
-	memset(rule, 0, sizeof(rule));
+	//memset(rule, 0, sizeof(rule));
+	memset(rule, 0, VNET_LISTSIZE);
 
 	//文件不存在、打开失败均返回0
 	if (access(fn, 0) == -1) return 0;
@@ -451,7 +453,7 @@ int read_redirect_rule()
 }
 
 // 将生成的ipfw转发规则好写入文件
-int write_redirect_rule()
+int write_redirect_rule(int *rule)
 {
 	char fn[FN_MAX_LEN];
 	sprintf(fn, "%s/.redirect_rule", vmdir);
