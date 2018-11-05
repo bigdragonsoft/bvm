@@ -78,6 +78,9 @@
 .Cm --autoboot
 .Pp
 .Nm
+.Cm --reload-nat
+.Pp
+.Nm
 .Cm --setnat
 .Ar Nat ip/mask
 .Nm
@@ -350,6 +353,10 @@ Show a list of operating systems supported by
 Force the virtual machine to power off. When there are some special reasons 
 that prevent the virtual machine from shutting down properly, you need to use 
 this option to force the virtual machine to power off.
+.It Cm --reload-nat
+Reload the NAT port redirect. In general, you do not need to use this option, 
+.Nm 
+will automatically handle port redirection, this option is manual mode.
 .It Cm --remove Ar name
 Destroy a virtual machine and it cannot be recovered.
 Note that the virtual machine cannot be running when you run this command.
