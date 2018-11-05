@@ -287,10 +287,12 @@ void redirect_port()
 		char cmd[4096];
 
 		//-------------------------------
-		//ipfw -fq nat 1 flush config
+		//ipfw -fq 1 delete
 		//-------------------------------
-		sprintf(cmd, "ipfw -fq nat %d flush config\n", nat_order);
-		run_ipfw(cmd);
+		if (rule[pn]) {
+			sprintf(cmd, "ipfw -fq %d delete\n", pn + 1);
+			run_ipfw(cmd);
+		}
 
 		int n = 0;
 		while (nat_list[n]) {
@@ -300,28 +302,30 @@ void redirect_port()
 		}
 		if (search_nat_redirect(pn, nat_order)) {
 
-		//-----------------------------------------------------------------------
+		//---------------------------------------------------------------------------
 		//$sub_net="nat1,nat2,nat3,..."
-		//ipfw -fq add nat 1 ip from $sub_net to not $sub_net out via $server_if
-		//-----------------------------------------------------------------------
+		//ipfw -fq add 1 nat 1029 ip from $sub_net to not $sub_net out via $server_if
+		//---------------------------------------------------------------------------
 		char sub_net[BUFFERSIZE] = {0};
 		n--;
 		while (n >= 0) {
 			if (nat_list[n]->flag) {
 				strcat(sub_net, nat_list[n]->ip);
-				if (n > 0)
-					strcat(sub_net, ",");
+				//if (n > 0)
+				strcat(sub_net, ",");
 			}
 			--n;
 		}
-		sprintf(cmd, "ipfw -fq add nat %d ip from %s to not %s out via %s\n", nat_order, sub_net, sub_net, nic_list[pn]);
+		sub_net[strlen(sub_net) - 1] = '\0';
+
+		sprintf(cmd, "ipfw -fq add %d nat %d ip from %s to not %s out via %s\n", pn + 1, nat_order, sub_net, sub_net, nic_list[pn]);
 		run_ipfw(cmd);
 
-		//-----------------------------------------------------------------
+		//---------------------------------------------------------------------
 		//$sub_net="nat1,nat2,nat3,..."
-		//ipfw -fq add nat 1 ip from not $sub_net to any in via $server_if
-		//-----------------------------------------------------------------
-		sprintf(cmd, "ipfw -fq add nat %d ip from not %s to any in via %s", nat_order, sub_net, nic_list[pn]);
+		//ipfw -fq add 1 nat 1029 ip from not $sub_net to any in via $server_if
+		//---------------------------------------------------------------------
+		sprintf(cmd, "ipfw -fq add %d nat %d ip from not %s to any in via %s", pn + 1, nat_order, sub_net, nic_list[pn]);
 		run_ipfw(cmd);
 
 		rule[pn] = nat_order;
