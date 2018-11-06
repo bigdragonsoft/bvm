@@ -886,7 +886,9 @@ void enter_vm_bind(char *netmode, char *rpstatus, char *value)
 
 	int flag = BIND_NOTHING;
 	if (strcmp(netmode, "Bridged") == 0) flag = BIND_BRIDGED;
-	if (strcmp(netmode, "NAT") == 0 && strcmp(rpstatus, "enable") == 0) flag = BIND_NAT_REDIRECT;
+	else
+	//if (strcmp(netmode, "NAT") == 0 && strcmp(rpstatus, "enable") == 0) flag = BIND_NAT_REDIRECT;
+	if (strcmp(netmode, "NAT") == 0) flag = BIND_NAT_REDIRECT;
 
 	if (flag == BIND_NOTHING) return;
 
@@ -1146,6 +1148,7 @@ void enter_vm_rpstatus_proc(int nic_idx)
 // 端口转发列表输入前端接口
 void enter_vm_rplist_proc(int nic_idx)
 {
+	if (strcmp(new_vm.nic[nic_idx].rpstatus, "enable") != 0) return;
 	while (1) {
 		enter_vm_rplist(new_vm.nic[nic_idx].netmode, (char*)&new_vm.nic[nic_idx].rplist);
 		if (check_portlist((char*)&new_vm.nic[nic_idx].rplist, nic_idx) > 0)
@@ -1158,6 +1161,7 @@ void enter_vm_rplist_proc(int nic_idx)
 // 网卡绑定输入前端接口
 void enter_vm_bind_proc(int nic_idx)
 {
+	if (atoi(new_vm.nics) < (nic_idx + 1)) return;
 	//enter_vm_bind(new_vm.nic[nic_idx].netmode, (char*)&new_vm.nic[nic_idx].bind);
 	enter_vm_bind(new_vm.nic[nic_idx].netmode, new_vm.nic[nic_idx].rpstatus, (char*)&new_vm.nic[nic_idx].bind);
 }

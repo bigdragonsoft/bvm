@@ -42,12 +42,12 @@ void network_config_init()
 			char desc[BUFFERSIZE];
 			sprintf(desc, "nic-%d mode", n);
 			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].netmode, 	enter_vm_netmode_proc,  n, 1, 0);
+			sprintf(desc, "nic-%d bind", n);
+			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].bind, 	enter_vm_bind_proc,  	n, 1, 0);
 			sprintf(desc, "nic-%d NAT", n);
 			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].nat, 	enter_vm_nat_proc,  	n, 1, 0);
 			sprintf(desc, "nic-%d redirect", n);
 			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].rpstatus,	enter_vm_rpstatus_proc,	n, 1, 0);
-			sprintf(desc, "nic-%d bind", n);
-			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].bind, 	enter_vm_bind_proc,  	n, 1, 0);
 			sprintf(desc, "nic-%d ports", n);
 			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].rplist, 	enter_vm_rplist_proc,  	n, 1, 0);
 			sprintf(desc, "nic-%d ip", n);
@@ -146,15 +146,16 @@ int check_network_enter_valid()
 		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0 && strlen(new_vm.nic[i].nat) == 0) return -1;
 		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0 && strlen(new_vm.nic[i].rpstatus) == 0) return -1;
 		*/
+		if (strlen(new_vm.nic[i].bind) == 0) return -1;
 		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0) {
 			if (strlen(new_vm.nic[i].nat) == 0) return -1;
 			if (strlen(new_vm.nic[i].rpstatus) == 0) return -1;
 			if (strcmp(new_vm.nic[i].rpstatus, "enable") == 0) {
 				if (strlen(new_vm.nic[i].rplist) == 0) return -1;
-				if (strlen(new_vm.nic[i].bind) == 0) return -1;
+				//if (strlen(new_vm.nic[i].bind) == 0) return -1;
 			}
 		}
-		if (strcmp(new_vm.nic[i].netmode, "Bridged") == 0 && strlen(new_vm.nic[i].bind) == 0) return -1;
+		//if (strcmp(new_vm.nic[i].netmode, "Bridged") == 0 && strlen(new_vm.nic[i].bind) == 0) return -1;
 	}
 	return 1;
 }
@@ -173,8 +174,9 @@ void show_network_config()
 		    (networkmenu[n].func == enter_vm_rplist_proc && 
 		     	(strcmp(new_vm.nic[networkmenu[n].arg].netmode, "NAT") != 0 || 
 			(strcmp(new_vm.nic[networkmenu[n].arg].rpstatus, "enable") != 0))) ||
-		    (networkmenu[n].func == enter_vm_bind_proc && 
-		     	strcmp(new_vm.nic[networkmenu[n].arg].netmode, "Bridged") != 0 && strcmp(new_vm.nic[networkmenu[n].arg].rpstatus, "enable") != 0) ||
+		    (networkmenu[n].func == enter_vm_bind_proc && atoi(new_vm.nics) < networkmenu[n].arg + 1) ||
+		    /*(networkmenu[n].func == enter_vm_bind_proc && 
+		     	strcmp(new_vm.nic[networkmenu[n].arg].netmode, "Bridged") != 0 && strcmp(new_vm.nic[networkmenu[n].arg].rpstatus, "enable") != 0) ||*/
 		    (networkmenu[n].func == enter_vm_nat_proc && strcmp(new_vm.nic[networkmenu[n].arg].netmode, "NAT") != 0) ||
 		    (networkmenu[n].func == enter_vm_ip_proc && strlen(new_vm.nic[networkmenu[n].arg].netmode) == 0) //atoi(new_vm.nics) < networkmenu[n].arg + 1)
 		   );

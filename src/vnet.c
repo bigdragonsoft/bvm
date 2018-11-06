@@ -278,7 +278,6 @@ void redirect_port()
 
 	int rule[VNET_LISTSIZE];
 	read_redirect_rule((int*)&rule);
-	//warn("rule[0]=%d\n", rule[0]);
 
 	int nat_order = NAT_ORDER;
 	int pn = 0;
@@ -348,7 +347,6 @@ void redirect_port()
 	} //网卡循环
 
 	write_redirect_rule((int*)&rule);
-	//warn("rule[0]=%d\n", rule[0]);
 
 	free_vnet_list(NAT);
 }
@@ -371,8 +369,8 @@ int search_nat_redirect(int pn, int nat_order)
 			for (int i=0; i<atoi(p->vm.nics); i++) {
 				int cond = (strcmp(p->vm.nic[i].netmode, "NAT") == 0 &&
 						//strcmp(p->vm.nic[i].rpstatus, "enable") == 0 &&
-						strcmp(p->vm.nic[i].bind, nic_list[pn]) == 0 &&
-						p->vm.nic[i].rpnum > 0);
+						strcmp(p->vm.nic[i].bind, nic_list[pn]) == 0);// &&
+						//p->vm.nic[i].rpnum > 0);
 				if (cond) {
 					//error("name:%s, nat=%s, stat=%s, port=%s\n", p->vm.name, p->vm.nic[i].nat, p->vm.nic[i].rpstatus, p->vm.nic[i].rplist);
 					if (flag == 0) {
