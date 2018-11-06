@@ -2842,7 +2842,7 @@ int create_networking(char *vm_name)
 		else if (strcmp(p->vm.nic[n].netmode, "NAT") == 0) {
 
 			if (create_nat(p->vm.nic[n].nat) == RET_FAILURE) return RET_FAILURE;
-			//run_ipfw("sysctl net.inet.ip.forwarding=1");
+			run_ipfw("set bvm_nat_fw=`sysctl net.inet.ip.forwarding=1`");
 		}
 
 		//错误
