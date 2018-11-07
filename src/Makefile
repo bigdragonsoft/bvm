@@ -3,7 +3,7 @@ objs = config.o vnet.o vm.o create.o cdisk.o cnet.o zfs.o
 objects = main.o $(objs)
 booter_name = bvmb
 booter_objs = booter.o $(objs)
-opt = -O3
+opt = -O
 
 all: $(name) $(booter_name)
 
