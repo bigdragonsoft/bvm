@@ -290,12 +290,11 @@ void redirect_port()
 		//-------------------------------
 		if (rule[pn]) {
 			sprintf(cmd, "ipfw -fq %d delete\n", pn + 1);
-			run_ipfw(cmd);
+			run_cmd(cmd);
 		}
 
 		int n = 0;
 		while (nat_list[n]) {
-			//search_nat_redirect(nat_list[n]->name, pn, nat_order++);
 			nat_list[n]->flag = 0;
 			++n;
 		}
@@ -318,14 +317,14 @@ void redirect_port()
 		sub_net[strlen(sub_net) - 1] = '\0';
 
 		sprintf(cmd, "ipfw -fq add %d nat %d ip from %s to not %s out via %s\n", pn + 1, nat_order, sub_net, sub_net, nic_list[pn]);
-		run_ipfw(cmd);
+		run_cmd(cmd);
 
 		//---------------------------------------------------------------------
 		//$sub_net="nat1,nat2,nat3,..."
 		//ipfw -fq add 1 nat 1029 ip from not $sub_net to any in via $server_if
 		//---------------------------------------------------------------------
 		sprintf(cmd, "ipfw -fq add %d nat %d ip from not %s to any in via %s", pn + 1, nat_order, sub_net, nic_list[pn]);
-		run_ipfw(cmd);
+		run_cmd(cmd);
 
 		rule[pn] = nat_order;
 		}
@@ -336,7 +335,7 @@ void redirect_port()
 			//---------------------------------
 			if (rule[pn]) {
 				sprintf(cmd, "ipfw nat %d delete", nat_order);
-				run_ipfw(cmd);
+				run_cmd(cmd);
 				rule[pn] = 0;
 			}
 		}
@@ -357,9 +356,7 @@ int search_nat_redirect(int pn, int nat_order)
 {
 	if (vms == NULL) return 0;
 
-	//static int nat_order = NAT_ORDER;
 	int flag = 0;
-
 	char cmd[4096];
 	char t[BUFFERSIZE];
 
@@ -380,9 +377,6 @@ int search_nat_redirect(int pn, int nat_order)
 						//------------------------------------
 						sprintf(cmd, "ipfw -fq nat %d config if %s ", nat_order, nic_list[pn]);
 					}
-					else {
-						
-					}
 
 					//标记使用的NAT
 					int n =0;
@@ -393,32 +387,34 @@ int search_nat_redirect(int pn, int nat_order)
 						++n;
 					}
 					
-					if (strcmp(p->vm.nic[i].rpstatus, "enable") == 0)  /* */
+					//-------------------------------------------------
+					//redirect_port tcp $sub_ip:$sub_port $server_port
+					//-------------------------------------------------
+					if (strcmp(p->vm.nic[i].rpstatus, "enable") == 0) {
 						for (int j=0; j<p->vm.nic[i].rpnum; j++) {
-							//-------------------------------------------------
-							//redirect_port tcp $sub_ip:$sub_port $server_port
-							//-------------------------------------------------
 							char sub_ip[BUFFERSIZE];
 							strcpy(sub_ip, p->vm.nic[i].ip);
 							get_ip(sub_ip);
 							sprintf(t, "redirect_port tcp %s:%d %d ", sub_ip, p->vm.nic[i].ports[j].vm_port, p->vm.nic[i].ports[j].host_port);
 							strcat(cmd, t);
 						}
+					}
 				}
 			}
 		}
 		p = p->next;
+
 	}
 	if (flag) {
 		strcat(cmd, "\n");
-		run_ipfw(cmd);
-		}
-	//nat_order++;
+		run_cmd(cmd);
+	}
+
 	return flag;
 }
 
 // 执行ipfw指令
-int run_ipfw(char *cmd)
+int run_cmd(char *cmd)
 {
 	//warn("%s\n", cmd);
 	//return 0;

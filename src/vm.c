@@ -819,7 +819,7 @@ void create_vm_disk(vm_stru *vm, int disk_ord)
 		//truncate -s [+|-]size[K|k|M|m|G|g|T|t] file
 		//sprintf(cmd, "truncate -s %s %s", (char*)(&vm->imgsize + n * offset), fn);
 		sprintf(cmd, "truncate -s %s %s", vm->vdisk[n].size, fn);
-		system(cmd);
+		run_cmd(cmd);
 	}
 }
 
@@ -868,12 +868,12 @@ void adjust_vm_disk(vm_stru *vm, char *size, int disk_ord)
 		char cmd[BUFFERSIZE];
 		if (offset > 0) {
 			sprintf(cmd, "truncate -s %s%ld%s %s", "+", offset, "K", fn);
-			system(cmd);
+			run_cmd(cmd);
 		}
 		if (offset < 0) {
 			//对磁盘容量减少暂不处理
 			//sprintf(cmd, "truncate -s %ld%s %s", offset, "K", fn);
-			//system(cmd);
+			//run_cmd(cmd);
 			strcpy(newp, p);
 			//strcpy(new_vm.imgsize, vm->imgsize);
 		}
@@ -1060,7 +1060,7 @@ void vm_start(char *vm_name)
 		char shell[FN_MAX_LEN];
 		//sprintf(shell, "/usr/local/bin/tmux -2 -u new -d -s %s \"/bin/sh /tmp/start_%s.sh\"", vm_name, vm_name);
 		sprintf(shell, "/usr/local/bin/tmux -2 -u new -d -s %s \"bvmb %s\"", vm_name, vm_name);
-		system(shell);
+		run_cmd(shell);
 
 		//等待虚拟机启动成功
 		waitting_boot(vm_name);
@@ -1090,7 +1090,7 @@ void vm_login(char *vm_name)
 	if (get_vm_status(vm_name) == VM_ON) { 
 		char cmd[CMD_MAX_LEN];
 		sprintf(cmd, "tmux attach-session -t %s", vm_name);
-		system(cmd);
+		run_cmd(cmd);
 	}
 	else {
 		error("%s does not start\n", vm_name);
@@ -1125,7 +1125,7 @@ void vm_stop(char *vm_name)
 			return;
 		}
 		sprintf(cmd, "kill 15 %d", pid);
-		system(cmd);
+		run_cmd(cmd);
 
 		//等待vm进程消失
 		sprintf(cmd, "ps | grep %d | grep -v grep", pid);
@@ -1200,8 +1200,8 @@ void vm_poweroff(char *vm_name,int flag_msg)
 
 	char cmd[CMD_MAX_LEN];
 	if (get_vm_status(vm_name) == VM_ON) {
-		sprintf(cmd, "bhyvectl --force-poweroff --vm=%s", vm_name);
-		system(cmd);
+		sprintf(cmd, "/usr/sbin/bhyvectl --force-poweroff --vm=%s", vm_name);
+		run_cmd(cmd);
 
 		//给 --force-poweroff 一秒钟的处理时间
 		//避免下面执行 --destroy 时发生错误
@@ -1210,19 +1210,19 @@ void vm_poweroff(char *vm_name,int flag_msg)
 		delay(1);
 		
 		if (get_vm_status(vm_name) == VM_ON) {
-			sprintf(cmd, "bhyvectl --destroy --vm=%s", vm_name);
-			system(cmd);
+			sprintf(cmd, "/usr/sbin/bhyvectl --destroy --vm=%s", vm_name);
+			run_cmd(cmd);
 		}
 		//删除tmux窗口
 		if (strcmp(p->vm.uefi, "none") == 0) {
 			sprintf(cmd, "tmux kill-session -t %s", vm_name);
-			system(cmd);
+			//run_cmd(cmd);
 		}
 		//删除tap
 		/*
 		for (int n=0; n<atoi(p->vm.nics); n++) {
 			sprintf(cmd, "ifconfig %s destroy", p->vm.nic[n].tap);
-			system(cmd);
+			run_cmd(cmd);
 		}
 		*/
 	}
@@ -1247,8 +1247,8 @@ void vm_restart(char *vm_name)
 
 	if (get_vm_status(vm_name) == VM_ON) {
 		char cmd[CMD_MAX_LEN];
-		sprintf(cmd, "bhyvectl --force-reset --vm=%s", vm_name);
-		system(cmd);
+		sprintf(cmd, "/usr/sbin/bhyvectl --force-reset --vm=%s", vm_name);
+		run_cmd(cmd);
 	}
 	else {
 		error("%s does not start\n", vm_name);
@@ -1402,6 +1402,7 @@ void vm_info(char *vm_name)
 	for (int n=0; n<atoi(p->vm.nics); n++) {
 		printf("%s\n", p->vm.nic[n].name);
 		printf("|-%-11s: %s\n", "network mode",		p->vm.nic[n].netmode);
+		printf("|-%-11s : %s\n", "bind",		p->vm.nic[n].bind);
 		if (strcmp(p->vm.nic[n].netmode, "NAT") == 0) {
 			printf("|-%-11s : %s", "nat", 		p->vm.nic[n].nat);
 			get_nat_info(p->vm.nic[n].nat);
@@ -1409,11 +1410,11 @@ void vm_info(char *vm_name)
 			printf("|-%-11s : %s\n", "redirect",	p->vm.nic[n].rpstatus);
 			if (strcmp(p->vm.nic[n].rpstatus, "enable") == 0) {
 				printf("  |-%-9s : %s\n", "ports",	p->vm.nic[n].rplist);
-				printf("  |-%-9s : %s\n", "bind",	p->vm.nic[n].bind);
+				//printf("  |-%-9s : %s\n", "bind",	p->vm.nic[n].bind);
 			}
 		}
 		if (strcmp(p->vm.nic[n].netmode, "Bridged") == 0) {	
-			printf("|-%-11s : %s", "bind",        p->vm.nic[n].bind);
+			//printf("|-%-11s : %s", "bind",        p->vm.nic[n].bind);
 			get_switch_info(p->vm.nic[n].bind);
 			if (strstr(p->vm.nic[n].bind, "switch") && strlen(Switch.ip) > 0)
 				printf(" [GW %s]", Switch.ip);
@@ -2842,7 +2843,7 @@ int create_networking(char *vm_name)
 		else if (strcmp(p->vm.nic[n].netmode, "NAT") == 0) {
 
 			if (create_nat(p->vm.nic[n].nat) == RET_FAILURE) return RET_FAILURE;
-			run_ipfw("set bvm_nat_fw=`sysctl net.inet.ip.forwarding=1`");
+			run_cmd("set bvm_nat_fw=`sysctl net.inet.ip.forwarding=1`");
 		}
 
 		//错误

@@ -885,10 +885,11 @@ void enter_vm_bind(char *netmode, char *rpstatus, char *value)
 	};
 
 	int flag = BIND_NOTHING;
-	if (strcmp(netmode, "Bridged") == 0) flag = BIND_BRIDGED;
-	else
+	if (strcmp(netmode, "Bridged") == 0) 
+		flag = BIND_BRIDGED;
+	else if (strcmp(netmode, "NAT") == 0) 
+		flag = BIND_NAT_REDIRECT;
 	//if (strcmp(netmode, "NAT") == 0 && strcmp(rpstatus, "enable") == 0) flag = BIND_NAT_REDIRECT;
-	if (strcmp(netmode, "NAT") == 0) flag = BIND_NAT_REDIRECT;
 
 	if (flag == BIND_NOTHING) return;
 

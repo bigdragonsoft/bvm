@@ -189,7 +189,7 @@ void create_zfs_disk(vm_stru *vm, int disk_ord)
 
 	if (!exist_zvol(zvol)) {
 		sprintf(cmd, "zfs create -V %s %s", vm->vdisk[n].size, zvol);
-		system(cmd);
+		run_cmd(cmd);
 		link_to_zvol(vm, disk_ord, zvol);
 	}
 }
@@ -249,7 +249,7 @@ void remove_zvol(vm_stru *vm, int disk_ord)
 			int n = 0;
 			while (strlen(snapshot_list[n]) > 0) {
 				sprintf(cmd, "zfs destroy %s", snapshot_list[n]);
-				system(cmd);
+				run_cmd(cmd);
 				++n;
 			}
 		}
@@ -260,7 +260,7 @@ void remove_zvol(vm_stru *vm, int disk_ord)
 
 	if (fdel) {
 		sprintf(cmd, "zfs destroy %s", zvol);
-		system(cmd);
+		run_cmd(cmd);
 	}
 	else {
 		error("can't remove \"%s\" with associated snapshots\n", vm->name);
@@ -287,7 +287,7 @@ void rename_zvol(vm_stru *vm, char *oldname, char *newname)
 
 		char cmd[BUFFERSIZE];
 		sprintf(cmd, "zfs rename %s %s", zvol_old, zvol_new);
-		system(cmd);
+		run_cmd(cmd);
 
 		if (n == 0)
 			sprintf(cmd, "%s%s/disk.img", vmdir, newname);
@@ -325,9 +325,9 @@ int clone_zvol(vm_stru *vm, char *src_vm_name, char *dst_vm_name, int link)
 
 		char cmd[BUFFERSIZE];
 		sprintf(cmd, "zfs snapshot %s@%s", zvol_src, snapname);
-		system(cmd);
+		run_cmd(cmd);
 		sprintf(cmd, "zfs clone %s@%s %s", zvol_src, snapname, zvol_dst);
-		system(cmd);
+		run_cmd(cmd);
 
 		if (link) {
 			link_to_zvol(vm, n, zvol_dst);
@@ -413,7 +413,7 @@ void vm_snapshot(char *vm_name)
 
 		char cmd[BUFFERSIZE];
 		sprintf(cmd, "zfs snapshot %s@%s", zvol, ssname);
-		system(cmd);
+		run_cmd(cmd);
 	}
 
 
@@ -451,7 +451,7 @@ void vm_rollback(char *vm_name)
 
 		char cmd[BUFFERSIZE];
 		sprintf(cmd, "zfs rollback %s@%s", zvol, ssname);
-		system(cmd);
+		run_cmd(cmd);
 	}
 
 
