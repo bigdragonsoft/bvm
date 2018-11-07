@@ -290,7 +290,7 @@ void redirect_port()
 		//-------------------------------
 		if (rule[pn]) {
 			sprintf(cmd, "ipfw -fq %d delete\n", pn + 1);
-			run_cmd(cmd);
+			dup2_run_cmd(cmd);
 		}
 
 		int n = 0;
@@ -335,7 +335,7 @@ void redirect_port()
 			//---------------------------------
 			if (rule[pn]) {
 				sprintf(cmd, "ipfw nat %d delete", nat_order);
-				run_cmd(cmd);
+				dup2_run_cmd(cmd);
 				rule[pn] = 0;
 			}
 		}
@@ -413,7 +413,7 @@ int search_nat_redirect(int pn, int nat_order)
 	return flag;
 }
 
-// 执行ipfw指令
+// 执行指令
 int run_cmd(char *cmd)
 {
 	//warn("%s\n", cmd);
@@ -421,6 +421,20 @@ int run_cmd(char *cmd)
 
 	write_log(cmd);
 	int ret = system(cmd);
+	return WEXITSTATUS(ret);
+}
+
+// 执行指令（不输出错误信息）
+int dup2_run_cmd(char *cmd)
+{
+	write_log(cmd);
+
+	int fd = open("/dev/null", O_RDWR);
+	dup2(fd, STDERR_FILENO);
+	close(fd);
+
+	int ret = system(cmd);
+	fflush(stderr);
 	return WEXITSTATUS(ret);
 }
 
