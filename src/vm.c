@@ -1409,7 +1409,13 @@ void vm_info(char *vm_name)
 			printf(" [GW %s]\n", nat.ip);
 			printf("|-%-11s : %s\n", "redirect",	p->vm.nic[n].rpstatus);
 			if (strcmp(p->vm.nic[n].rpstatus, "enable") == 0) {
-				printf("  |-%-9s : %s\n", "ports",	p->vm.nic[n].rplist);
+				for (int m=0; m<p->vm.nic[n].rpnum; m++) {
+					char t[16];
+					sprintf(t, "port(%d)", m);
+					printf("  |-%-9s : %d:%d\n", t, p->vm.nic[n].ports[m].vm_port, 
+									      p->vm.nic[n].ports[m].host_port);
+				}
+				//printf("  |-%-9s : %s\n", "ports",	p->vm.nic[n].rplist);
 				//printf("  |-%-9s : %s\n", "bind",	p->vm.nic[n].bind);
 			}
 		}
