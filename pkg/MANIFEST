@@ -1,7 +1,7 @@
 {
         "name":"bvm",
         "origin":"sysutils/bvm",
-        "version":"1.2.0",
+        "version":"1.2.1",
         "comment":"bhyve vm manager",
         "maintainer":"guoqiang_cn@126.com",
         "www":"https://github.com/bigdragonsoft/bvm",

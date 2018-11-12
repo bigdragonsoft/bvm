@@ -29,7 +29,7 @@
 
 pro_stru program = {
 	"bvm", 
-	"1.2.0", 
+	"1.2.1", 
 	"Qiang Guo",
 	"guoqiang_cn@126.com",
 	"https://github.com/bigdragonsoft/bvm",
