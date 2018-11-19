@@ -1142,7 +1142,7 @@ void enter_vm_rpstatus_proc(int nic_idx)
 	if (strcmp(new_vm.nic[nic_idx].rpstatus, "enable") == 0)
 		if (!check_ip(new_vm.nic[nic_idx].ip)) {
 			strcpy(new_vm.nic[nic_idx].ip, "");
-			strcpy(new_vm.nic[nic_idx].bind, "");
+			//strcpy(new_vm.nic[nic_idx].bind, "");
 		}
 }
 
