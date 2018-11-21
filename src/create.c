@@ -422,6 +422,7 @@ void enter_vm_version(int not_use)
 		"6.1",
 		"6.2",
 		"6.3",
+		"6.4",
 		"other",
 		NULL,
 	};
@@ -1227,7 +1228,7 @@ void enter_vm_iso(int not_use)
 		}
 	}
 
-	enter_options(msg, dir_opts, dir_desc, (char*)&new_vm.iso);
+	enter_options("Enter a iso file: ", dir_opts, dir_desc, (char*)&new_vm.iso);
 
 	while (n >= 0) {
 		if (dir_opts[n]) free(dir_opts[n]);
