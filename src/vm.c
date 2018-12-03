@@ -1423,8 +1423,8 @@ void vm_info(char *vm_name)
 			//printf("|-%-11s : %s", "bind",        p->vm.nic[n].bind);
 			get_switch_info(p->vm.nic[n].bind);
 			if (strstr(p->vm.nic[n].bind, "switch") && strlen(Switch.ip) > 0)
-				printf(" [GW %s]", Switch.ip);
-			printf("\n");
+				printf(" [GW %s]\n", Switch.ip);
+			//printf("\n");
 		}
 		if (strlen(p->vm.nic[n].bridge) > 0)
 		printf("|-%-11s : %s\n", "bridge", 		p->vm.nic[n].bridge);
