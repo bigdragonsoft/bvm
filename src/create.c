@@ -428,7 +428,7 @@ void enter_vm_version(int not_use)
 	};
 
 	enter_options(msg, ver, NULL, (char*)&new_vm.version);
-	if (strcmp(new_vm.version, (char*)ver[4]) == 0)
+	if (strcmp(new_vm.version, (char*)ver[5]) == 0)
 		enter_version("Enter other version: ", (char*)&new_vm.version);
 }
 
