@@ -1412,8 +1412,9 @@ void vm_info(char *vm_name)
 				for (int m=0; m<p->vm.nic[n].rpnum; m++) {
 					char t[16];
 					sprintf(t, "port(%d)", m);
-					printf("  |-%-9s : %d:%d\n", t, p->vm.nic[n].ports[m].vm_port, 
-									      p->vm.nic[n].ports[m].host_port);
+					printf("  |-%-9s : %s %d:%d\n", t, 	p->vm.nic[n].ports[m].proto,	
+										p->vm.nic[n].ports[m].vm_port, 
+									      	p->vm.nic[n].ports[m].host_port);
 				}
 				//printf("  |-%-9s : %s\n", "ports",	p->vm.nic[n].rplist);
 				//printf("  |-%-9s : %s\n", "bind",	p->vm.nic[n].bind);
@@ -2128,6 +2129,9 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 			vm->nic[n].rpnum = atoi(value);
 
 		for (int m=0; m<vm->nic[n].rpnum; m++) {
+			sprintf(str, "vm_nic%d_ports%d_protocol", n, m);
+			if ((value = get_value_by_name(str)) != NULL)
+				strcpy(vm->nic[n].ports[m].proto, value);
 			sprintf(str, "vm_nic%d_ports%d_vm_port", n, m);
 			if ((value = get_value_by_name(str)) != NULL)
 				vm->nic[n].ports[m].vm_port = atoi(value);
@@ -2287,6 +2291,8 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 		fputs(str, fp);
 
 		for (int m=0; m<vm->nic[n].rpnum; m++) {
+			sprintf(str, "vm_nic%d_ports%d_protocol=%s\n", n, m, vm->nic[n].ports[m].proto);
+			fputs(str, fp);
 			sprintf(str, "vm_nic%d_ports%d_vm_port=%d\n", n, m, vm->nic[n].ports[m].vm_port);
 			fputs(str, fp);
 			sprintf(str, "vm_nic%d_ports%d_host_port=%d\n", n, m, vm->nic[n].ports[m].host_port);

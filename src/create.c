@@ -747,7 +747,7 @@ void enter_vm_rplist(char *netmode, char *value)
 {
 	if (strcmp(netmode, "NAT") != 0) return;
 
-	char *msg = "Format: vm-port:host-port,vm-port:host-port,...\nEnter redirect port list (e.g. 22:2224,80:8080,...): ";
+	char *msg = "Format: vm-port:host-port, vm-port:host-port,...\nEnter redirect port list (e.g. 22:2224,tcp 80:8080,udp 53:53...): ";
 
 	printf("%s", msg);
 	fgets(value, PORT_LIST_LEN, stdin);
@@ -763,6 +763,7 @@ int check_portlist(char *portlist, int nic_idx)
 	for (int i=0; i<PORT_NUM; i++) {
 		new_vm.nic[nic_idx].ports[i].vm_port   = -1;
 		new_vm.nic[nic_idx].ports[i].host_port = -1;
+		strcpy(new_vm.nic[nic_idx].ports[i].proto, "tcp");
 	}
 
 	//删除掉列表两侧的空格
@@ -771,26 +772,46 @@ int check_portlist(char *portlist, int nic_idx)
 
 	//对于列表中包含非法字符的均视为错误
 	for (int i=0; i<strlen(portlist)-1; i++)
-		if (!isdigit(portlist[i]) && portlist[i] != ':' && portlist[i] != ',' && !isblank(portlist[i]))
+		if (!isdigit(portlist[i]) && portlist[i] != ':' && portlist[i] != ',' && !isblank(portlist[i])
+			&& portlist[i] != 't' && portlist[i] != 'c' && portlist[i] != 'p'
+			&& portlist[i] != 'u' && portlist[i] != 'd')
 			return -1;
 
 	//分割
+	char proto[PROTO_LEN];
 	int lport, hport;
 	int m = 0, n = 0;
 	int count = 0;
 	
 	while (strlen(portlist) > (m + n)) {
 		portlist += n;
+		
+		//获取协议
+		#ifdef BVM_DEBUG 
+		error("%s\n", portlist);
+		#endif
+		if (get_proto(proto, portlist) == -1) 
+			return -1;
+		else {
+			trim(portlist);
+			if (strlen(portlist) == 0) return 0;
+		}
+
+		//获取本地端口号
 		m = split_portlist(&lport, portlist, ':');
 		portlist += m;
+
+		//获取宿主机端口号
 		n = split_portlist(&hport, portlist, ',');
 		#ifdef BVM_DEBUG
+		warn("proto=%s\n", proto);
 		warn("len=%d, port=%d\n", m, lport);
 		warn("len=%d, port=%d\n", n, hport);
 		#endif
 		if (m != -1 && n != -1) {
 			new_vm.nic[nic_idx].ports[count].vm_port   = lport;
 			new_vm.nic[nic_idx].ports[count].host_port = hport;
+			strcpy(new_vm.nic[nic_idx].ports[count].proto, proto);
 			++count;
 		}
 		else 
@@ -808,8 +829,9 @@ int check_portlist(char *portlist, int nic_idx)
 	strcpy(new_vm.nic[nic_idx].rplist, "");
 	for (int i=0; i<count; i++) {
 		char str[PORT_LIST_LEN] = {0};
-		sprintf(str, "%d:%d,", 	new_vm.nic[nic_idx].ports[i].vm_port,
-					new_vm.nic[nic_idx].ports[i].host_port);
+		sprintf(str, "%s %d:%d,", 	new_vm.nic[nic_idx].ports[i].proto,
+						new_vm.nic[nic_idx].ports[i].vm_port,
+						new_vm.nic[nic_idx].ports[i].host_port);
 		strcat(new_vm.nic[nic_idx].rplist, str);
 	}
 	new_vm.nic[nic_idx].rplist[strlen(new_vm.nic[nic_idx].rplist) - 1] = '\0';
@@ -821,6 +843,48 @@ int check_portlist(char *portlist, int nic_idx)
 	//返回获取到的映射数量
 	return count;
 }
+
+// 获得端口映射表的协议文字
+// 参数
+//    proto	: 分离出的协议
+//    protlist	: 端口映射表
+// 返回值
+//    获取失败，返回 -1
+//    否则，返回指针移动的距离
+int get_proto(char *proto, char *portlist)
+{
+	int n = 0;
+	char str[PROTO_LEN];
+
+	// 映射表长度过短
+	if (strlen(portlist) < 3) return -1;
+
+	// 映射表为数字开头默认为 tcp 协议
+	if (isdigit(portlist[n])) {
+		strcpy(proto, "tcp");
+		return 0;
+	}
+
+	// 对映射表前3个字符进行对比
+	char *p = portlist;
+	for (n=0; n<3; n++)
+		str[n] = portlist[n];
+	str[n] = '\0';
+	if (strcmp(strtolower(str), "tcp") == 0) {
+		strcpy(proto, "tcp");
+		p += 3;
+	}
+	else if (strcmp(strtolower(str), "udp") == 0) {
+		strcpy(proto, "udp");
+		p += 3;
+	}
+	else
+		return -1;
+
+	strcpy(portlist, p);
+	return strlen(str);
+}
+
 
 // 拆分端口映射列表
 // 参数 

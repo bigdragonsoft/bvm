@@ -50,10 +50,11 @@
 #define FN_MAX_LEN 	512
 #define CMD_MAX_LEN 	256
 #define PORT_LIST_LEN	256
+#define PROTO_LEN	4	//协议字符最大长度 tcp/udp
 #define OS_NUM		32	//最大操作系统类型数量
 #define DISK_NUM	8	//最大磁盘数量
 #define NIC_NUM		8	//最大网卡数量
-#define PORT_NUM	8	//最大端口数量
+#define PORT_NUM	16	//最大端口转发数量
 #define MAX_BOOT_NUM	32	//最大自动启动数量
 #define NAT_ORDER	1029	//防火墙规则中nat的序列号
 
@@ -98,6 +99,7 @@ typedef struct _os_stru os_stru;
 extern os_stru bvm_os[];
 
 struct _redirect_stru {
+	char proto[PROTO_LEN];	//协议类型 protocol
 	int vm_port;		//虚拟机端口 virtual machine port
 	int host_port;		//宿主机端口 host machine port
 };

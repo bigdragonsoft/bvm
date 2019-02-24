@@ -395,7 +395,9 @@ int search_nat_redirect(int pn, int nat_order)
 							char sub_ip[BUFFERSIZE];
 							strcpy(sub_ip, p->vm.nic[i].ip);
 							get_ip(sub_ip);
-							sprintf(t, "redirect_port tcp %s:%d %d ", sub_ip, p->vm.nic[i].ports[j].vm_port, p->vm.nic[i].ports[j].host_port);
+							//sprintf(t, "redirect_port tcp %s:%d %d ", sub_ip, p->vm.nic[i].ports[j].vm_port, p->vm.nic[i].ports[j].host_port);
+							sprintf(t, "redirect_port %s %s:%d %d ", (strcmp(p->vm.nic[i].ports[j].proto, "udp") != 0)?"tcp":"udp",
+								       				sub_ip, p->vm.nic[i].ports[j].vm_port, p->vm.nic[i].ports[j].host_port);
 							strcat(cmd, t);
 						}
 					}
