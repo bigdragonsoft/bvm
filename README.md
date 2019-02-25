@@ -10,10 +10,12 @@ The BVM is a Bhyve virtual machine management tool based on FreeBSD that allows 
 
 ## Installation
 ```
+  # pkg update
   # pkg install bvm
 ```
 ### -- or --
 ```
+  # portsnap fetch update
   # cd /usr/ports/sysutils/bvm/
   # make install clean
 ```
@@ -68,6 +70,7 @@ Options:
         --rollback      Roll back to the snapshot point
         --setnat        Setting NAT's IP-addr
         --setsw         Setting Switch's IP-addr
+	--setport       Setting port redirect list and effective immediately
         --showdev       Show device
         --showdevall    Show all devices in class mode
         --showdevuse    Show all devices in simple mode
