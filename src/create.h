@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2019, Qiang Guo (guoqiang_cn@126.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -109,6 +109,7 @@ void enter_static_ipv4(char *value);
 int  check_portlist(char *portlist, int nic_idx);
 int  split_portlist(int *port, char *portlist, char sep);
 int  get_proto(char *proto, char *portlist);
+int  set_portlist(char *vm_name, char *nic_order);
 
 int  get_filelist(char *dir, char **opt, char **opt_desc);
 int  check_numbers(char *value, char *unit);

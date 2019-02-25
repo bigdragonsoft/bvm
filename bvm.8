@@ -1,4 +1,4 @@
-.Dd November 12, 2018
+.Dd February 25, 2019
 .Dt BVM 8
 .Os
 .Sh NAME
@@ -89,6 +89,10 @@
 .Nm
 .Cm --unsetsw
 .Ar Switch
+.Pp
+.Nm
+.Cm --setport
+.Ar name nic-index
 .Pp
 .Nm
 .Cm --showdev
@@ -370,6 +374,20 @@ Roll back to the snapshot point.
 Set the IP address and mask of the NAT.
 .Bd -literal -offset indent
 # bvm --setnat nat0 172.16.1.1/24
+.Ed
+.It Cm --setport Ar name nic-index
+Dynamically set the port redirection list and effective immediately. 
+In general, modifying the virtual machine settings requires shutting down 
+the virtual machine. 
+But this parameter can dynamically set the port redirection list 
+when the virtual machine is powered on.
+.Bl -tag -width 17n
+.It Ar nic-index
+The index number of the NIC. 
+If there are N NICs, the nic-index value ranges from 0 to N-1.
+.El
+.Bd -literal -offset indent
+# bvm --setport fb 0
 .Ed
 .It Cm --setsw Ar switch ip/mask
 Set the ip address and mask of the virtual switch.

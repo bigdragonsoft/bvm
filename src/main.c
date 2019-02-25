@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2019, Qiang Guo (guoqiang_cn@126.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -42,7 +42,7 @@ void version()
 	printf("author: %s\n", program.author);
 	printf("email: %s\n", program.email);
 	printf("%s\n", program.website);
-	printf("Copyright (C) 2017~2018 ChinaFreeBSD.cn, BigDragonSoft.com\n");
+	printf("Copyright (C) 2017~2019 ChinaFreeBSD.cn, BigDragonSoft.com\n");
 }
 
 // 程序用法
@@ -77,6 +77,7 @@ void usage()
 		"	--restart	Restart vm",
 		"	--rollback	Roll back to the snapshot point",
 		"	--setnat	Setting NAT's IP-addr",
+		"	--setport	Setting port redirect list and effective immediately",
 		"	--setsw		Setting Switch's IP-addr",
 		"	--showdev	Show device",
 		"	--showdevall	Show all devices in class mode",
@@ -158,6 +159,7 @@ int main(int argc, char *argv[])
 		{"unlock", 		1, 	NULL, 	'6'},
 		{"lockall", 		0, 	NULL, 	'7'},
 		{"unlockall",		0, 	NULL, 	'8'},
+		{"setport", 		1, 	NULL, 	'a'},
 		{"showdev",		0, 	NULL, 	'9'},
 		{"showdevall",		0, 	NULL, 	'T'},
 		{"showdevuse",		0, 	NULL, 	'm'},
@@ -274,6 +276,9 @@ int main(int argc, char *argv[])
 			break;
 		case '8': //unlockall
 			vm_lock_all(0);
+			break;
+		case 'a': //setport
+			set_portlist(optarg, argv[optind]);
 			break;
 		case '9': //showdev
 			vm_show_device(NULL, SD_CLASSICAL);
