@@ -19,25 +19,6 @@ The BVM is a Bhyve virtual machine management tool based on FreeBSD that allows 
   # cd /usr/ports/sysutils/bvm/
   # make install clean
 ```
-### -- or --
-```
-  // Compile source code
-  # cd src
-  # make
-  # cp bvm bvmb /usr/local/bin/
-  # mkdir /usr/local/etc/bvm/
-  # cd ..
-  # cp conf/*.conf /usr/local/etc/bvm/
-  # cp conf/bvmd /usr/local/etc/rc.d/
-
-  // Generate the installation package
-  # cd pkg
-  # ./create
-
-  // Installation
-  // bvm.txz is replaced with the installation package you generated
-  # pkg add bvm.txz
-```
 
 ## Basic Setup
 Before running, you need to edit the bvm.conf file to set the virtual machine storage directory
@@ -71,6 +52,7 @@ Options:
         --setnat        Setting NAT's IP-addr
         --setsw         Setting Switch's IP-addr
 	--setport       Setting port redirect list and effective immediately
+	--showport      Show all list of port redirect
         --showdev       Show device
         --showdevall    Show all devices in class mode
         --showdevuse    Show all devices in simple mode
