@@ -1,4 +1,4 @@
-.Dd February 25, 2019
+.Dd February 26, 2019
 .Dt BVM 8
 .Os
 .Sh NAME
@@ -93,6 +93,8 @@
 .Nm
 .Cm --setport
 .Ar name nic-index
+.Nm
+.Cm --showport
 .Pp
 .Nm
 .Cm --showdev
@@ -388,6 +390,16 @@ If there are N NICs, the nic-index value ranges from 0 to N-1.
 .El
 .Bd -literal -offset indent
 # bvm --setport fb 0
+.Ed
+.It Cm --showport
+Show all list of port redirect.
+.Bd -literal -offset indent
+# bvm --showport
+udp 192.168.1.254:53    -> 9953 abc
+tcp 10.10.30.10:22      -> 3322 guo
+tcp 172.16.1.3:622      -> 2224 fb
+tcp 172.16.1.3:80       -> 8888 fb
+tcp 172.16.1.3:23       -> 2003 fb
 .Ed
 .It Cm --setsw Ar switch ip/mask
 Set the ip address and mask of the virtual switch.

@@ -79,6 +79,7 @@ void usage()
 		"	--setnat	Setting NAT's IP-addr",
 		"	--setsw		Setting Switch's IP-addr",
 		"	--setport	Setting port redirect list and effective immediately",
+		"	--showport	Show all list of port redirect",
 		"	--showdev	Show device",
 		"	--showdevall	Show all devices in class mode",
 		"	--showdevuse	Show all devices in simple mode",
@@ -160,6 +161,7 @@ int main(int argc, char *argv[])
 		{"lockall", 		0, 	NULL, 	'7'},
 		{"unlockall",		0, 	NULL, 	'8'},
 		{"setport", 		1, 	NULL, 	'a'},
+		{"showport", 		0, 	NULL, 	'f'},
 		{"showdev",		0, 	NULL, 	'9'},
 		{"showdevall",		0, 	NULL, 	'T'},
 		{"showdevuse",		0, 	NULL, 	'm'},
@@ -279,6 +281,9 @@ int main(int argc, char *argv[])
 			break;
 		case 'a': //setport
 			set_portlist(optarg, argv[optind]);
+			break;
+		case 'f': //showport
+			vm_show_ports();
 			break;
 		case '9': //showdev
 			vm_show_device(NULL, SD_CLASSICAL);

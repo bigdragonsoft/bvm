@@ -660,6 +660,114 @@ void clean_tap(char *tap_name)
 	run_bridge_command(DESTROY_TAP);
 }
 
+// 显示所有虚拟机的端口转向列表
+void vm_show_ports()
+{
+	vm_node *p = vms;
+	while(p) {
+		scan_port(SP_SHOW, &p->vm, -1);
+		p = p->next;
+	}
+
+}
+
+// 扫描端口
+int scan_port(int scan_type, vm_stru *vm, int port)
+{
+	//对所有网卡进行扫描
+	for (int n = 0; n < atoi(vm->nics); n++) {
+		if (strcmp(vm->nic[n].netmode, "NAT") == 0 && strcmp(vm->nic[n].rpstatus, "enable") == 0) {
+
+			switch (scan_type) {
+
+			case SP_SHOW:
+				show_port(vm, n);
+				break;
+
+			case SP_VALID:
+				break;
+
+			default:
+				break;
+
+			}
+		}
+	}
+	return RET_SUCCESS;
+}
+
+// 显示vm的端口转向
+// tcp 172.16.1.3:80	-> 80
+// udp 172.16.1.3:1194	-> 1194
+void show_port(vm_stru *vm, int nic_index)
+{
+	int n = nic_index;
+
+	char ip[32];
+	char proto[PROTO_LEN];
+
+	for (int r = 0; r < vm->nic[n].rpnum; r++) {
+		
+		strcpy(ip, vm->nic[n].ip);
+		get_ip(ip);
+
+		strcpy(proto, vm->nic[n].ports[r].proto);
+
+		printf("%s %s:%d\t-> %d\t%s\n",	(strlen(proto) > 0) ? proto : "tcp",
+						ip,
+						vm->nic[n].ports[r].vm_port,
+						vm->nic[n].ports[r].host_port,
+						vm->name);
+	}
+}
+
+// 端口号是否有效
+// 检测端口号是否存在重复
+int is_valid_port(vm_stru *vm, int nic_index, char *proto, int port, vm_stru *exclude)
+{
+	int n = nic_index;
+
+	//排除本机，只对其他vm进行检测
+	if (strcmp(vm->name, exclude->name) == 0)
+		return RET_SUCCESS;
+
+	for (int r = 0; r < vm->nic[n].rpnum; r++) {
+		int f1 = (strcmp(proto, vm->nic[n].ports[r].proto) == 0);
+		int f2 = (port == vm->nic[n].ports[r].host_port);
+
+		if (f1 && f2) return RET_FAILURE;
+	}
+
+	return RET_SUCCESS;
+}
+
+
+/*
+// 显示vm的端口转向
+// tcp 172.16.1.3:80	-> 80
+// udp 172.16.1.3:1194	-> 1194
+void show_port(vm_stru *vm)
+{
+	//对所有网卡进行扫描
+	for (int n = 0; n < atoi(vm->nics); n++) {
+		if (strcmp(vm->nic[n].netmode, "NAT") == 0 && strcmp(vm->nic[n].rpstatus, "enable") == 0) {
+
+			//按端口转发的数量进行扫描
+			char ip[32];
+			for (int r = 0; r < vm->nic[n].rpnum; r++) {
+				strcpy(ip, vm->nic[n].ip);
+				get_ip(ip);
+				printf("%s %s:%d\t-> %d\t%s\n",	(strlen(vm->nic[n].ports[r].proto) > 0) ? vm->nic[n].ports[r].proto : "tcp",
+								ip,
+								vm->nic[n].ports[r].vm_port,
+								vm->nic[n].ports[r].host_port,
+								vm->name);
+			}
+		}
+	}
+}
+*/
+
 // 启动vm
 int vm_booting(autoboot_stru *boot)
 {

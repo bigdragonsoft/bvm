@@ -89,6 +89,11 @@ enum SHOW_DEVICE_ENUM {
 	SD_SIMPLE,
 };
 
+enum SCAN_PORT_ENUM {
+	SP_SHOW = 0,
+	SP_VALID,
+};
+
 struct _os_stru {
 	char type[32];
 	int  uefi_boot;
@@ -223,10 +228,15 @@ void vm_os_list();
 void vm_lock_all(int flag);
 void vm_lock(char *vm_name, int flag);
 void vm_clean();
+void vm_show_ports();
 void vm_autoboot();
 void vm_autoboot_list();
 int  vm_booting(autoboot_stru *boot);
 void vm_boot_from_hd(char *vm_name);
+
+int  scan_port(int scan_type, vm_stru *vm, int port);
+void show_port(vm_stru *vm, int nic_index);
+int  is_valid_port(vm_stru *vm, int nic_index, char *proto, int port, vm_stru *exclude);
 
 void create_vm_disk_all(vm_stru *vm);
 void create_vm_disk(vm_stru *vm, int disk_ord);
