@@ -661,19 +661,25 @@ void clean_tap(char *tap_name)
 }
 
 // 搜索ip地址来确定虚拟机
-int find_vm_by_ip(char *ip, find_vm_stru *result)
+// 参数: ip不包含掩码
+// 	 self所搜中需要排除的自己
+int find_vm_by_ip(char *ip, find_vm_stru *result, vm_stru *self)
 {
 	vm_node *p = vms;
 	while (p) {
-		for (int n = 0; n < atoi(p->vm.nics); n++) {
-			char vm_ip[32];
-			strcpy(vm_ip, p->vm.nic[n].ip);
-			get_ip(vm_ip);
+		if (strcmp(p->vm.name, self->name) != 0) {
+			for (int n = 0; n < atoi(p->vm.nics); n++) {
+				char vm_ip[32];
+				strcpy(vm_ip, p->vm.nic[n].ip);
+				get_ip(vm_ip);
 
-			if (strcmp(ip, vm_ip) == 0) {
-				strcpy(result->vm_name, p->vm.name);
-				*result->nic_index = n;
-				return RET_SUCCESS;
+				if (strcmp(ip, vm_ip) == 0) {
+					if (result) {
+						strcpy(result->vm_name, p->vm.name);
+						*result->nic_index = n;
+						}
+					return RET_SUCCESS;
+				}
 			}
 		}
 		p = p->next;

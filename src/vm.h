@@ -247,7 +247,7 @@ void vm_autoboot_list();
 int  vm_booting(autoboot_stru *boot);
 void vm_boot_from_hd(char *vm_name);
 
-int  find_vm_by_ip(char *ip, find_vm_stru *result);
+int  find_vm_by_ip(char *ip, find_vm_stru *result, vm_stru *self);
 int  scan_port(int scan_type, vm_stru *vm, scan_redirect_port_stru *check);
 void show_port(vm_stru *vm, int nic_index);
 int  is_valid_port(vm_stru *vm, int nic_index, scan_redirect_port_stru *check);

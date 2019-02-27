@@ -1310,6 +1310,23 @@ void enter_vm_ip_proc(int nic_idx)
 		enter_vm_ip((char*)&new_vm.nic[nic_idx].ip);
 	else
 		enter_static_ipv4((char*)&new_vm.nic[nic_idx].ip);
+
+	if (check_ip(new_vm.nic[nic_idx].ip)) {
+		while (1) {
+			char ip[32];
+			strcpy(ip, new_vm.nic[nic_idx].ip);
+			get_ip(ip);
+	
+			if (find_vm_by_ip(ip, NULL, &new_vm) == RET_SUCCESS) { //found same IP
+				warn("found same ip\n");
+				enter_static_ipv4((char*)&new_vm.nic[nic_idx].ip);
+			}
+			else { //No found same IP
+				//warn("no found same ip\n");
+				break;
+			}
+		}
+	}
 }
 
 // vm_cdstatus
