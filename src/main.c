@@ -280,7 +280,6 @@ int main(int argc, char *argv[])
 			vm_lock_all(0);
 			break;
 		case 'a': //setpr
-			//set_portlist(optarg, argv[optind]);
 			set_portlist(optarg);
 			break;
 		case 'f': //showpr

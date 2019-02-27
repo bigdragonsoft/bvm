@@ -754,54 +754,6 @@ void enter_vm_rplist(char *netmode, char *value)
 	value[strlen(value) - 1] = '\0';
 }
 
-/*
-// 设置端口转发列表
-// 用于在虚拟机运行中动态设置端口转发
-int set_portlist(char *vm_name, char *nic_order)
-{
-	vm_node *p;
-	if ((p = find_vm_list(vm_name)) == NULL) {
-		error("%s not exist\n", vm_name);
-		show_vm_name(VM_ALL);
-		return RET_FAILURE;
-	}
-	
-	load_vm_info(vm_name, &new_vm);
-
-	//检测 nic_order 输入的有效性
-	int val = 0, n = 0;
-	char ch;
-	while ((ch = nic_order[n++])) {
-		if (isdigit(ch)) 
-			val = val*10+ch-'0';
-		else {
-			val = -1;
-			error("NIC serial number input error\n");
-			return RET_FAILURE;
-		}
-	}
-
-	if (atoi(nic_order) >= atoi(new_vm.nics)) {
-		error("no nic_%d in %s\n", atoi(nic_order), vm_name);
-		return RET_FAILURE;
-	}
-
-	if (strcmp(new_vm.nic[atoi(nic_order)].rpstatus, "enable") != 0) {
-		error("the nic_%d can't set port redirection\n", atoi(nic_order));
-		return RET_FAILURE;
-	}
-
-	//开始设置端口转发列表
-	printf("current port redirection list: ");
-	warn("%s\n", new_vm.nic[atoi(nic_order)].rplist);
-
-	enter_vm_rplist_proc(atoi(nic_order));
-	save_vm_info(vm_name, &new_vm);
-	success("ok!\n");
-
-	return 0;
-}
-*/
 
 // 设置端口转发列表
 // 用于在虚拟机运行中动态设置端口转发

@@ -677,7 +677,7 @@ int find_vm_by_ip(char *ip, find_vm_stru *result, vm_stru *self)
 					if (result) {
 						strcpy(result->vm_name, p->vm.name);
 						*result->nic_index = n;
-						}
+					}
 					return RET_SUCCESS;
 				}
 			}
@@ -774,33 +774,6 @@ int is_valid_port(vm_stru *vm, int nic_index, scan_redirect_port_stru *check)
 
 	return *check->ret = RET_SUCCESS;
 }
-
-
-/*
-// 显示vm的端口转向
-// tcp 172.16.1.3:80	-> 80
-// udp 172.16.1.3:1194	-> 1194
-void show_port(vm_stru *vm)
-{
-	//对所有网卡进行扫描
-	for (int n = 0; n < atoi(vm->nics); n++) {
-		if (strcmp(vm->nic[n].netmode, "NAT") == 0 && strcmp(vm->nic[n].rpstatus, "enable") == 0) {
-
-			//按端口转发的数量进行扫描
-			char ip[32];
-			for (int r = 0; r < vm->nic[n].rpnum; r++) {
-				strcpy(ip, vm->nic[n].ip);
-				get_ip(ip);
-				printf("%s %s:%d\t-> %d\t%s\n",	(strlen(vm->nic[n].ports[r].proto) > 0) ? vm->nic[n].ports[r].proto : "tcp",
-								ip,
-								vm->nic[n].ports[r].vm_port,
-								vm->nic[n].ports[r].host_port,
-								vm->name);
-			}
-		}
-	}
-}
-*/
 
 // 启动vm
 int vm_booting(autoboot_stru *boot)
