@@ -51,8 +51,8 @@ Options:
         --rollback      Roll back to the snapshot point
         --setnat        Setting NAT's IP-addr
         --setsw         Setting Switch's IP-addr
-	--setport       Setting port redirect list and effective immediately
-	--showport      Show all list of port redirect
+	--setpr         Setting the port redirection list
+	--showpr        Show port redirection list
         --showdev       Show device
         --showdevall    Show all devices in class mode
         --showdevuse    Show all devices in simple mode
