@@ -283,7 +283,7 @@ int main(int argc, char *argv[])
 			set_portlist(optarg, argv[optind]);
 			break;
 		case 'f': //showport
-			vm_show_ports();
+			vm_show_ports(SP_SHOW, NULL);
 			break;
 		case '9': //showdev
 			vm_show_device(NULL, SD_CLASSICAL);

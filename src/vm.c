@@ -660,19 +660,43 @@ void clean_tap(char *tap_name)
 	run_bridge_command(DESTROY_TAP);
 }
 
+// 搜索ip地址来确定虚拟机
+int find_vm_by_ip(char *ip, find_vm_stru *result)
+{
+	vm_node *p = vms;
+	while (p) {
+		for (int n = 0; n < atoi(p->vm.nics); n++) {
+			char vm_ip[32];
+			strcpy(vm_ip, p->vm.nic[n].ip);
+			get_ip(vm_ip);
+
+			if (strcmp(ip, vm_ip) == 0) {
+				strcpy(result->vm_name, p->vm.name);
+				*result->nic_index = n;
+				return RET_SUCCESS;
+			}
+		}
+		p = p->next;
+	}
+	return RET_FAILURE;
+}
+
 // 显示所有虚拟机的端口转向列表
-void vm_show_ports()
+void vm_show_ports(int show_type, scan_redirect_port_stru *check)
 {
 	vm_node *p = vms;
 	while(p) {
-		scan_port(SP_SHOW, &p->vm, -1);
-		p = p->next;
+		scan_port(show_type, &p->vm, check);
+		if (show_type == SP_VALID && *check->ret == RET_FAILURE)
+			return;
+		else
+			p = p->next;
 	}
 
 }
 
 // 扫描端口
-int scan_port(int scan_type, vm_stru *vm, int port)
+int scan_port(int scan_type, vm_stru *vm, scan_redirect_port_stru *check)
 {
 	//对所有网卡进行扫描
 	for (int n = 0; n < atoi(vm->nics); n++) {
@@ -685,6 +709,8 @@ int scan_port(int scan_type, vm_stru *vm, int port)
 				break;
 
 			case SP_VALID:
+				if (is_valid_port(vm, n, check) == RET_FAILURE) 
+					return RET_FAILURE;
 				break;
 
 			default:
@@ -723,22 +749,24 @@ void show_port(vm_stru *vm, int nic_index)
 
 // 端口号是否有效
 // 检测端口号是否存在重复
-int is_valid_port(vm_stru *vm, int nic_index, char *proto, int port, vm_stru *exclude)
+int is_valid_port(vm_stru *vm, int nic_index, scan_redirect_port_stru *check)
 {
 	int n = nic_index;
 
 	//排除本机，只对其他vm进行检测
-	if (strcmp(vm->name, exclude->name) == 0)
+	if (strcmp(vm->name, check->vm_name) == 0)
 		return RET_SUCCESS;
 
 	for (int r = 0; r < vm->nic[n].rpnum; r++) {
-		int f1 = (strcmp(proto, vm->nic[n].ports[r].proto) == 0);
-		int f2 = (port == vm->nic[n].ports[r].host_port);
+		if (strlen(vm->nic[n].ports[r].proto) == 0) 
+			strcpy(vm->nic[n].ports[r].proto, "tcp");
+		int f1 = (strcmp(check->port->proto, vm->nic[n].ports[r].proto) == 0);
+		int f2 = (check->port->host_port == vm->nic[n].ports[r].host_port);
 
-		if (f1 && f2) return RET_FAILURE;
+		if (f1 && f2) return *check->ret = RET_FAILURE;
 	}
 
-	return RET_SUCCESS;
+	return *check->ret = RET_SUCCESS;
 }
 
 

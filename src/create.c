@@ -862,7 +862,20 @@ int check_portlist(char *portlist, int nic_idx)
 			new_vm.nic[nic_idx].ports[count].vm_port   = lport;
 			new_vm.nic[nic_idx].ports[count].host_port = hport;
 			strcpy(new_vm.nic[nic_idx].ports[count].proto, proto);
-			++count;
+
+			scan_redirect_port_stru check;
+			int ret = 1;
+			check.vm_name = new_vm.name;
+			check.port = &new_vm.nic[nic_idx].ports[count];
+			check.ret = &ret;
+
+			vm_show_ports(SP_VALID, &check);
+			if (ret == RET_FAILURE) {
+				error("port %d has been occupied by other vm\n", check.port->host_port);
+				return -1;
+			}
+			else
+				++count;
 		}
 		else 
 			break;

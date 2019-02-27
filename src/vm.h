@@ -110,6 +110,19 @@ struct _redirect_stru {
 };
 typedef struct _redirect_stru redirect_stru;
 
+struct _scan_redirect_port_stru {	//用于扫描端口
+	char *vm_name;
+	redirect_stru *port;
+	int *ret;
+};
+typedef struct _scan_redirect_port_stru scan_redirect_port_stru;
+
+struct _find_vm_stru {
+	char *vm_name;
+	int *nic_index;
+};
+typedef struct _find_vm_stru find_vm_stru;
+
 struct _nic_stru {
 	char name[32];			//网卡名称
 	char netmode[32];		//网络模式
@@ -228,15 +241,16 @@ void vm_os_list();
 void vm_lock_all(int flag);
 void vm_lock(char *vm_name, int flag);
 void vm_clean();
-void vm_show_ports();
+void vm_show_ports(int show_type, scan_redirect_port_stru *check);
 void vm_autoboot();
 void vm_autoboot_list();
 int  vm_booting(autoboot_stru *boot);
 void vm_boot_from_hd(char *vm_name);
 
-int  scan_port(int scan_type, vm_stru *vm, int port);
+int  find_vm_by_ip(char *ip, find_vm_stru *result);
+int  scan_port(int scan_type, vm_stru *vm, scan_redirect_port_stru *check);
 void show_port(vm_stru *vm, int nic_index);
-int  is_valid_port(vm_stru *vm, int nic_index, char *proto, int port, vm_stru *exclude);
+int  is_valid_port(vm_stru *vm, int nic_index, scan_redirect_port_stru *check);
 
 void create_vm_disk_all(vm_stru *vm);
 void create_vm_disk(vm_stru *vm, int disk_ord);
