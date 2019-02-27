@@ -667,7 +667,7 @@ int find_vm_by_ip(char *ip, find_vm_stru *result, vm_stru *self)
 {
 	vm_node *p = vms;
 	while (p) {
-		if (strcmp(p->vm.name, self->name) != 0) {
+		if (self == NULL || strcmp(p->vm.name, self->name) != 0) {
 			for (int n = 0; n < atoi(p->vm.nics); n++) {
 				char vm_ip[32];
 				strcpy(vm_ip, p->vm.nic[n].ip);

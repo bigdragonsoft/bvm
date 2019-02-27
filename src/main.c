@@ -78,8 +78,8 @@ void usage()
 		"	--rollback	Roll back to the snapshot point",
 		"	--setnat	Setting NAT's IP-addr",
 		"	--setsw		Setting Switch's IP-addr",
-		"	--setport	Setting port redirect list and effective immediately",
-		"	--showport	Show all list of port redirect",
+		"	--setpr		Setting port redirect list and effective immediately",
+		"	--showpr	Show all list of port redirect",
 		"	--showdev	Show device",
 		"	--showdevall	Show all devices in class mode",
 		"	--showdevuse	Show all devices in simple mode",
@@ -160,8 +160,8 @@ int main(int argc, char *argv[])
 		{"unlock", 		1, 	NULL, 	'6'},
 		{"lockall", 		0, 	NULL, 	'7'},
 		{"unlockall",		0, 	NULL, 	'8'},
-		{"setport", 		1, 	NULL, 	'a'},
-		{"showport", 		0, 	NULL, 	'f'},
+		{"setpr", 		1, 	NULL, 	'a'},
+		{"showpr", 		0, 	NULL, 	'f'},
 		{"showdev",		0, 	NULL, 	'9'},
 		{"showdevall",		0, 	NULL, 	'T'},
 		{"showdevuse",		0, 	NULL, 	'm'},
@@ -279,10 +279,11 @@ int main(int argc, char *argv[])
 		case '8': //unlockall
 			vm_lock_all(0);
 			break;
-		case 'a': //setport
-			set_portlist(optarg, argv[optind]);
+		case 'a': //setpr
+			//set_portlist(optarg, argv[optind]);
+			set_portlist(optarg);
 			break;
-		case 'f': //showport
+		case 'f': //showpr
 			vm_show_ports(SP_SHOW, NULL);
 			break;
 		case '9': //showdev

@@ -754,6 +754,7 @@ void enter_vm_rplist(char *netmode, char *value)
 	value[strlen(value) - 1] = '\0';
 }
 
+/*
 // 设置端口转发列表
 // 用于在虚拟机运行中动态设置端口转发
 int set_portlist(char *vm_name, char *nic_order)
@@ -795,6 +796,40 @@ int set_portlist(char *vm_name, char *nic_order)
 	warn("%s\n", new_vm.nic[atoi(nic_order)].rplist);
 
 	enter_vm_rplist_proc(atoi(nic_order));
+	save_vm_info(vm_name, &new_vm);
+	success("ok!\n");
+
+	return 0;
+}
+*/
+
+// 设置端口转发列表
+// 用于在虚拟机运行中动态设置端口转发
+int set_portlist(char *ip)
+{
+	char vm_name[32];
+	int nic_index;
+	find_vm_stru vm;
+	vm.vm_name = vm_name;
+	vm.nic_index = &nic_index;
+
+	if (find_vm_by_ip(ip, &vm, NULL) == RET_FAILURE) {
+		error("the IP address does not exist or is an error\n");
+		return RET_FAILURE;
+	}
+
+	load_vm_info(vm_name, &new_vm);
+
+	if (strcmp(new_vm.nic[nic_index].rpstatus, "enable") != 0) {
+		error("port redirection for this IP is disabled\n");
+		return RET_FAILURE;
+	}
+
+	//开始设置端口转发列表
+	printf("current port redirection list: ");
+	warn("%s\n", new_vm.nic[nic_index].rplist);
+
+	enter_vm_rplist_proc(nic_index);
 	save_vm_info(vm_name, &new_vm);
 	success("ok!\n");
 

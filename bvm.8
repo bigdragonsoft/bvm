@@ -1,4 +1,4 @@
-.Dd February 26, 2019
+.Dd February 27, 2019
 .Dt BVM 8
 .Os
 .Sh NAME
@@ -91,10 +91,10 @@
 .Ar Switch
 .Pp
 .Nm
-.Cm --setport
-.Ar name nic-index
+.Cm --setpr
+.Ar ip
 .Nm
-.Cm --showport
+.Cm --showpr
 .Pp
 .Nm
 .Cm --showdev
@@ -377,24 +377,18 @@ Set the IP address and mask of the NAT.
 .Bd -literal -offset indent
 # bvm --setnat nat0 172.16.1.1/24
 .Ed
-.It Cm --setport Ar name nic-index
-Dynamically set the port redirection list and effective immediately. 
-In general, modifying the virtual machine settings requires shutting down 
-the virtual machine. 
-But this parameter can dynamically set the port redirection list 
-when the virtual machine is powered on.
-.Bl -tag -width 17n
-.It Ar nic-index
-The index number of the NIC. 
-If there are N NICs, the nic-index value ranges from 0 to N-1.
-.El
+.It Cm --setpr Ar ip
+Port redirection is set dynamically with immediate effect. 
+In general, the virtual machine must be turned off to set the 
+virtual machine parameters, but this option can set the port redirection 
+at any time in the virtual machine on state, and take effect immediately.
 .Bd -literal -offset indent
-# bvm --setport fb 0
+# bvm --setpr 10.10.30.10
 .Ed
-.It Cm --showport
+.It Cm --showpr
 Show all list of port redirect.
 .Bd -literal -offset indent
-# bvm --showport
+# bvm --showpr
 udp 192.168.1.254:53    -> 9953 abc
 tcp 10.10.30.10:22      -> 3322 guo
 tcp 172.16.1.3:622      -> 2224 fb
