@@ -722,7 +722,7 @@ void enter_vm_netmode(char *msg, char *value)
 	};
 
 	enter_options(msg, opts, NULL, value);
-
+	
 }
 
 // vm_rpstatus
@@ -996,7 +996,7 @@ void enter_vm_bind(char *netmode, char *rpstatus, char *value)
 	enum {
 		BIND_NOTHING = -1,	//什么也不做
 		BIND_BRIDGED = 0,	//桥接绑定
-		BIND_NAT_REDIRECT,	//转口重定像绑定
+		BIND_NAT_REDIRECT,	//端口重定向绑定
 	};
 
 	int flag = BIND_NOTHING;
@@ -1112,7 +1112,7 @@ void enter_vm_nat(char *netmode, char *value)
 {
 	if (strcmp(netmode, "NAT") != 0) return;
 
-	char *msg = "Enter NAT: ";
+	char *msg = "Enter gateway: ";
 	char *nat_opts[VNET_LISTSIZE] = {0};
 	char *nat_desc[VNET_LISTSIZE] = {0};
 
@@ -1243,7 +1243,19 @@ void enter_vm_netmode_proc(int nic_idx)
 	if (atoi(new_vm.nics) < (nic_idx + 1)) return;
 	char msg[BUFFERSIZE];
 	sprintf(msg, "Enter nic-%d network mode: ", nic_idx);
+
+	//变量old也是为了下面的清理做铺垫
+	char old[32];
+	strcpy(old, new_vm.nic[nic_idx].netmode);
+
 	enter_vm_netmode(msg, (char*)&new_vm.nic[nic_idx].netmode);
+
+	//当改变网络模式后需要将绑定的网卡清理一下
+	//例如：当模式为Bridged-switch
+	//      如果变更为NAT而switch会依旧保留
+	//      就会形成NAT-switch的局面
+	if (strcmp(new_vm.nic[nic_idx].netmode, old) != 0)
+		strcpy(new_vm.nic[nic_idx].bind, "");
 }
 
 // 是否开启端口转发前端接口

@@ -1517,9 +1517,12 @@ void vm_info(char *vm_name)
 	for (int n=0; n<atoi(p->vm.nics); n++) {
 		printf("%s\n", p->vm.nic[n].name);
 		printf("|-%-11s: %s\n", "network mode",		p->vm.nic[n].netmode);
-		printf("|-%-11s : %s\n", "bind",		p->vm.nic[n].bind);
+		if (strcmp(p->vm.nic[n].netmode, "NAT") == 0) 
+			printf("|-%-11s : %s\n", "wan",		p->vm.nic[n].bind);
+		else
+			printf("|-%-11s : %s\n", "bind",		p->vm.nic[n].bind);
 		if (strcmp(p->vm.nic[n].netmode, "NAT") == 0) {
-			printf("|-%-11s : %s", "nat", 		p->vm.nic[n].nat);
+			printf("|-%-11s : %s", "gateway", 		p->vm.nic[n].nat);
 			get_nat_info(p->vm.nic[n].nat);
 			printf(" [GW %s]\n", nat.ip);
 			printf("|-%-11s : %s\n", "redirect",	p->vm.nic[n].rpstatus);
