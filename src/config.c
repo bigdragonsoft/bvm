@@ -71,6 +71,17 @@ void read_config(const char * config_name)
 	}
 
 	while(!feof(fp)){
+		if(fgets(buf, NAME_LEN + VALUE_LEN, fp)) {
+			buf[strlen(buf) - 1] = '\0';
+			if(has_equal(buf)){
+				if((str = check_notes(&long_flag, buf))){
+					make_str_to_key(str);
+				}
+			}
+		}
+	}
+/*
+	while(!feof(fp)){
 		fscanf(fp, "%[^\n]\n", buf);
 		if(has_equal(buf)){
 			if((str = check_notes(&long_flag, buf))){
@@ -78,7 +89,7 @@ void read_config(const char * config_name)
 			}
 		}
 	}
-
+*/
 	fclose(fp);
 }
 
