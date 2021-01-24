@@ -273,7 +273,7 @@ void run_bridge_command(int action)
 // 对所有运行状态的虚拟机进行端口转发处理
 void redirect_port()
 {
-	get_nic_list();
+	get_nic_list(CABLE_AND_WIRELESS);
 	load_nat_list();
 
 	int rule[VNET_LISTSIZE];
@@ -488,7 +488,7 @@ int create_nat(char *nat_name)
 
 	//获取可用的bridge,tap以及物理网卡
 	//get_nic_name(0, nic);
-	get_nic_list();
+	get_nic_list(CABLE_AND_WIRELESS);
 	get_new_tap(tap);
 	get_new_bridge(bridge);
 
@@ -575,7 +575,7 @@ int create_nat(char *nat_name)
 int  create_bridged(char *bind)
 {
 
-	get_nic_list();
+	get_nic_list(CABLE);
 	if (strstr(bind, "switch")) return create_switch(bind);
 
 	//获取可用的bridge,tap以及物理网卡
@@ -1521,7 +1521,7 @@ void get_nic_name(char *nic)
 void get_nic_name(int index, char *nic)
 {
 	if (strlen(nic_list[0]) == 0)
-		get_nic_list();
+		get_nic_list(CABLE_AND_WIRELESS);
 
 	strcpy(nic, nic_list[index]);
 }
@@ -1568,7 +1568,7 @@ void get_lo_name(char *name)
 }
 
 // 获取所有物理网卡列表
-int get_nic_list()
+int get_nic_list(int type)
 {
 	FILE *fp;
 	fp = popen("ifconfig -l | awk '{for(i=1;i<NF;i++) print $i}'", "r");
@@ -1581,9 +1581,12 @@ int get_nic_list()
 	get_lo_name(loname);
 
 	char wlan[VNET_BUFFERSIZE] = {0};
-	//由于wifi不支持多MAC，所以bridged不会工作
-	//暂时取消无线网bridged模式
-	//get_wlan_name(wlan);
+	//由于wifi不支持多MAC，所以bridged不会工作，仅无线网卡处于AP模式下可以工作
+	//无线网卡只支持NAT模式
+	//暂时取消无线网卡bridged模式
+
+	if (type != CABLE)
+		get_wlan_name(wlan);
 
 	int n = 0;
 	char buf[VNET_BUFFERSIZE];
@@ -1615,7 +1618,7 @@ void print_vnet_list(int type)
 		p = tap_list;
 
 	int n = 0;
-	while (*(p+n) != '\0') {
+	while (*(p+n) != (void*)0/*'\0'*/) {
 		printf("%s\t", *(p+n));
 		++n;
 	}

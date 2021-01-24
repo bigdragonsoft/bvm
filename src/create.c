@@ -999,9 +999,12 @@ void enter_vm_bind(char *netmode, char *rpstatus, char *value)
 		BIND_NAT_REDIRECT,	//端口重定向绑定
 	};
 
+	int type = CABLE_AND_WIRELESS;
 	int flag = BIND_NOTHING;
-	if (strcmp(netmode, "Bridged") == 0) 
+	if (strcmp(netmode, "Bridged") == 0) { 
 		flag = BIND_BRIDGED;
+		type = CABLE;
+	}
 	else if (strcmp(netmode, "NAT") == 0) 
 		flag = BIND_NAT_REDIRECT;
 	//if (strcmp(netmode, "NAT") == 0 && strcmp(rpstatus, "enable") == 0) flag = BIND_NAT_REDIRECT;
@@ -1012,7 +1015,7 @@ void enter_vm_bind(char *netmode, char *rpstatus, char *value)
 	char *opts[VNET_LISTSIZE] = {0};
 	char *desc[VNET_LISTSIZE] = {0};
 
-	get_nic_list();
+	get_nic_list(type);
 	load_switch_list();
 
 	int idx = 0;

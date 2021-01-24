@@ -585,7 +585,7 @@ void vm_show_device(char *dev, int show_type)
 // 0 否
 int is_nic(char *nic_name)
 {
-	get_nic_list();
+	get_nic_list(CABLE_AND_WIRELESS);
 
 	int n = 0;
 	while (strlen(nic_list[n]) > 0) {

@@ -57,6 +57,12 @@ enum VNET_SWITCH_ENUM {
 	ALL,
 };
 
+enum NIC_LIST_TYPE_ENUM {
+	CABLE_AND_WIRELESS = 0,	//有线网卡和无线网卡
+	CABLE,			//有线网卡
+	WIRELESS,		//无线网卡
+};
+
 enum BRIDGE_ENUM {
 	CREATE_BRIDGE = 0,
 	CREATE_TAP,
@@ -176,7 +182,7 @@ void load_switch_list();
 void save_switch_list();
 void load_ng_list();
 void save_ng_list();
-int  get_nic_list();
+int  get_nic_list(int type);
 void get_lo_name(char *name);
 void get_wlan_name(char *name);
 char *get_nat_info(char *nat_name);
