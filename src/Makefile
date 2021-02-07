@@ -3,15 +3,21 @@ objs = config.o vnet.o vm.o create.o cdisk.o cnet.o zfs.o
 objects = main.o $(objs)
 booter_name = bvmb
 booter_objs = booter.o $(objs)
-opt = -O
+dhcp_name = bvmdhcp
+dhcp_objs = dhcp.o $(objs)
+#opt = -O
+opt = -g
 
-all: $(name) $(booter_name)
+all: $(name) $(booter_name) $(dhcp_name)
 
 $(name): $(objects)
 	cc $(opt) -o $(name) $(objects)
 
 $(booter_name): $(booter_objs)
 	cc $(opt) -o $(booter_name)  $(booter_objs)
+
+$(dhcp_name): $(dhcp_objs)
+	cc $(opt) -o $(dhcp_name) $(dhcp_objs) -lpcap
 
 main.o: main.c main.h
 	cc $(opt) -c main.c -o main.o
@@ -40,6 +46,11 @@ booter.o: booter.c booter.h
 zfs.o: zfs.c zfs.h
 	cc $(opt) -c zfs.c -o zfs.o
 
+dhcp.o: dhcp.c dhcp.h
+	cc $(opt) -c dhcp.c -o dhcp.o
+
+
 clean:
 	rm -f $(objects) $(name)
 	rm -f booter.o $(booter_name)
+	rm -f dhcp.o $(dhcp_name)

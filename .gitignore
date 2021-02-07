@@ -1,6 +1,8 @@
 /src/bvm
 /src/bvmb
+/src/bvmdhcp
 /src/*.o
 /src/*~
+/*~
 /pkg/bin/*.txz
 /port/
