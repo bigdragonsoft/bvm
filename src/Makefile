@@ -17,7 +17,7 @@ $(booter_name): $(booter_objs)
 	cc $(opt) -o $(booter_name)  $(booter_objs)
 
 $(dhcp_name): $(dhcp_objs)
-	cc $(opt) -o $(dhcp_name) $(dhcp_objs) -lpcap
+	cc $(opt) -o $(dhcp_name) $(dhcp_objs) -lpcap -lpthread
 
 main.o: main.c main.h
 	cc $(opt) -c main.c -o main.o

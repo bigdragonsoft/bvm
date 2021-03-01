@@ -27,7 +27,11 @@
 #ifndef BVM_DHCP_H
 #define BVM_DHCP_H
 
-#define DHCP_BROADCAST_FLAG 0x8000
+#include "vnet.h"
+
+#define DHCP_BROADCAST_FLAG 	0x8000
+#define DHCP_INVALID 		-1
+#define DHCP_NONE		0
 
 // 报文类型
 enum DHCP_MSSAGE_TYPES_ENUM {
@@ -173,10 +177,22 @@ typedef struct _dhcp_msg dhcp_msg;
 
 // DHCP 地址池 -----------------------------------------------------------------------------
 // 地址绑定的格式
+enum BIND_STATUS {
+	ERROR_STATUS = -1,	// 错误状态
+	EMPTY = 0,		// 空闲
+	ASSOCIATED,		// 已分配
+	PENDING,		// 未完成
+	EXPIRED,		// 已过期
+	RELEASED,		// 已回收
+	DISABLE,		// 禁用
+	STATIC,			// 静态ip
+};
+
 struct _address_bind {
 	uint32_t ip;		// ip地址
 	uint8_t mac[16];	// mac地址
-	uint8_t cid[256];	// 客户端标识
+	uint32_t xid;		// 验证码
+	uint8_t cid[16];	// 客户端标识
 	uint8_t cid_len;	// 客户端标识长度
 	time_t bind_time;	// 绑定开始的时间
 	int status;		// 绑定的状态
@@ -191,57 +207,147 @@ struct _address_bind_list {
 typedef struct _address_bind_list address_bind_list;
 
 // DHCP 服务器
-struct _dhcp_server {
+struct _dhcp_server_stru {
 	uint32_t ip;		// 服务器ip
 	uint32_t netmask;	// 服务器掩码
 	uint32_t broadcast;	// 服务器广播域
-	char ifname[16];	// 网卡名称
+	char ifname[16];	// 网卡（网桥）名称
+	uint8_t if_mac[16];	// 网卡（网桥）mac地址
+	char nat[16];		// nat名称
 	time_t lease_time;	// 租赁时间长度
 	uint32_t first_ip;	// 动态ip开始
 	uint32_t last_ip;	// 动态ip结束
 	uint32_t current_ip;	// 当前要分配的动态ip
 
-	address_bind_list *bind_list;
+	address_bind bind[256];
+	//address_bind_list *bind_list;
+};
+typedef struct _dhcp_server_stru dhcp_server_stru;
+
+// 网桥监控 -----------------------------------------------------------------------------
+enum {
+	REMOVE_BRIDGE = 0,		//删除网桥
+	REMOVE_MAC,			//删除MAC
 };
 
+enum {
+	BRIDGE_INIT =0,			//初始状态
+	BRIDGE_WORKING,			//网桥工作中
+	BRIDGE_REMOVE,			//删除网桥
+	BRIDGE_NEW,			//新增网桥
+};
+
+struct _listen_dev_stru {
+	char name[VNET_BUFFERSIZE];	//网桥名称
+	int status;			//网桥的状态 1:正在监控，2:无需监控，3:新增监控
+	pthread_t tid;			//线程id
+	pthread_mutex_t mux;
+};
+typedef struct _listen_dev_stru listen_dev_stru;
+
+//主机mac地址与网桥的对应结构
+struct _host_mac_stru {
+	char ifname[VNET_BUFFERSIZE];	//网桥名称
+	uint8_t mac[16];		//经过网桥服务器的MAC地址
+};
+typedef struct _host_mac_stru host_mac_stru;
+
+//对应结构链表
+struct _host_mac_list {
+        host_mac_stru host;
+        struct _host_mac_list *next;
+};
+typedef struct _host_mac_list host_mac_list;
+
+//给pcap_loop回调函数中传递参数的结构
+struct _configuration {
+	int id;
+	char title[255];
+};
+typedef struct _configuration configuration;
+
 /************函数部分**************/
-void test();
+
+//线程
+void *dhcp_server();
+void *scan_if();
+void *listen_bridge(void *net_dev);
+
+
+//地址池 ----------
+void init_dhcp_pool();
+int  get_server_index(uint8_t *mac);
+int  find_bridge_in_pool(char *dev);
+char *get_bridge_by_mac(uint8_t *mac);
+int  find_mac_in_pool(int server_id, uint8_t *mac);
+int  find_empty_ip_in_pool(int server_id);
+int  get_ip_status_in_pool(int server_id, uint32_t *ip, int *bind_idx);
+void fill_bind_in_pool(int server_idx, int bind_idx, int status, dhcp_msg *request);
+void print_dhcp_pool(int server_idx, int bind_idx);
+
+
+//报文处理 ----------
+int  get_dhcp_message_type(dhcp_msg *msg);
+int  set_option(dhcp_option *opt, uint8_t id, char *data);
+int  load_options(dhcp_option *opt, uint8_t id, dhcp_msg *msg);
+int  list_to_options(dhcp_msg *msg);
+int  add_option_list(dhcp_option *opt, dhcp_option_list **list);
+
+void message_controller(int fd, struct sockaddr_in server_sock);
+
+int dhcp_discover_proc(dhcp_msg *request, dhcp_msg *reply);
+int dhcp_request_proc(dhcp_msg *request, dhcp_msg *reply);
+int dhcp_decline_proc(dhcp_msg *request, dhcp_msg *reply);
+int dhcp_release_proc(dhcp_msg *request, dhcp_msg *reply);
+int dhcp_inform_proc(dhcp_msg *request, dhcp_msg *reply);
+
+void init_reply(dhcp_msg *request, dhcp_msg *reply);
+void set_reply_options(dhcp_msg *reply, int dhcp_type, int server_idx, int bind_idx);
+int  send_dhcp_reply(int s, struct sockaddr_in *client_sock, dhcp_msg *reply);
+
 void init_option_list(dhcp_option_list *list);
 void destroy_option_list(dhcp_option_list *list);
 void print_option_list(dhcp_option_list *list);
 void print_options(dhcp_msg *msg);
 void print_dhcp_msg(dhcp_msg *msg);
 
-int  get_dhcp_message_type(dhcp_msg *msg);
-void init_reply(dhcp_msg *request, dhcp_msg *reply);
-int  set_option(dhcp_option *opt, uint8_t id, char *data);
-int  load_options(dhcp_option *opt, uint8_t id, dhcp_msg *msg);
-int  list_to_options(dhcp_msg *msg);
-int  add_option_list(dhcp_option *opt, dhcp_option_list **list);
+int parse_byte(char *s, void **p);
+int parse_byte_list (char *s, void **p);
+int parse_short(char *s, void **p);
+int parse_short_list(char *s, void **p);
+int parse_long(char *s, void **p);
+int parse_string(char *s, void **p);
+int parse_ip(char *s, void **p);
+int parse_ip_list(char *s, void **p);
+int parse_mac(char *s, void **p);
+uint8_t parse_option(dhcp_option *opt, char *name, char *value);
 
-int  send_dhcp_reply(int s, struct sockaddr_in *client_sock, dhcp_msg *reply);
 
-char *get_bridge_name();
+//监控网桥 ----------
+void get_bridge_name();
+int  get_bridge_num(listen_dev_stru *dev);
+void bridge_cmp(listen_dev_stru *cur_dev, listen_dev_stru *new_dev);
+
+void create_listen(listen_dev_stru *dev);
+void get_packet(u_char *dev, const struct pcap_pkthdr *hdr, const u_char *packet);
+
 struct in_addr *get_interfaces_ip(const char *ifname);
 struct in_addr *get_interfaces_netmask(const char *ifname);
 struct in_addr get_interfaces_broadcast(const char *ifname);
-int listen_bridge(char *net_dev);
-void get_packet(u_char *user, const struct pcap_pkthdr *hdr, const u_char *packet);
+int get_interfaces_mac(char *ifname, uint8_t *mac); 
+ 
+int add_client_list(host_mac_stru *host);
+void destroy_client_list();
+host_mac_stru *find_client(host_mac_stru *host);
+int remove_client(int type, host_mac_stru *host);
+int print_client_list();
 
-int parse_byte (char *s, void **p);
-int parse_byte_list (char *s, void **p);
-int parse_short (char *s, void **p);
-int parse_short_list (char *s, void **p);
-int parse_long (char *s, void **p);
-int parse_string (char *s, void **p);
-int parse_ip (char *s, void **p);
-int parse_ip_list (char *s, void **p);
-int parse_mac (char *s, void **p);
-uint8_t parse_option (dhcp_option *opt, char *name, char *value);
 
+//辅助函数 ----------
 char *ip_to_str(uint32_t ip);
 char *mac_to_str(uint8_t *mac);
+char *status_to_str(int status);
 
-void message_controller(int fd, struct sockaddr_in server_sock);
+void test();
 
 #endif	//BVM_DHCP_H

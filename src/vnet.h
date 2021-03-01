@@ -93,7 +93,7 @@ enum TAP_LIST_TYPE {
 struct _nat_stru {
 	char name[16];
 	char desc[32];
-	char ip[16];
+	char ip[20];
 	int flag;
 };
 typedef struct _nat_stru nat_stru;

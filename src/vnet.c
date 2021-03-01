@@ -760,7 +760,7 @@ void get_bridge_desc(char *bridge, char *desc)
 		err_exit();
 	}
 
-	char buf[BUFFERSIZE];
+	char buf[BUFFERSIZE] = {0};
 	fgets(buf, BUFFERSIZE, fp);
 	buf[strlen(buf)-1] = '\0';
 	ltrim(buf);
