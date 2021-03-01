@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2019, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2021, Qiang Guo (guoqiang_cn@126.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -3252,6 +3252,32 @@ int error(char *fmt, ...)
 	}
 	
 	return cnt;
+}
+
+// 调试输出
+int debug(unsigned color, char *fmt, ...)
+{	
+#ifdef BVM_DEBUG
+	va_list argptr;
+	int cnt;
+
+	if (color == DEFAULT_COLOR)
+		printf("\033[m");
+	if (color == RED)
+		printf("\033[1;31m");
+	if (color == GREEN)
+		printf("\033[32m");
+	if (color == YELLOW)
+		printf("\033[1;33m");
+
+	va_start(argptr, fmt);
+	cnt = vprintf(fmt, argptr);
+	va_end(argptr);
+	printf("\033[0m");
+	return cnt;
+#else
+	return 0;
+#endif
 }
 
 // 严重警告信息（红色高亮闪烁）

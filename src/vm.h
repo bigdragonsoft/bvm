@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2019, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2021, Qiang Guo (guoqiang_cn@126.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -61,6 +61,16 @@
 extern char *osdir;
 extern char vmdir[];
 
+enum DEBUG_COLOR_ENUM {
+	DEFAULT_COLOR = 0,
+	RED,
+	GREEN,
+	YELLOW,
+	RED_FLASH,
+	GREEN_FLASH,
+	YELLOW_FLASH,
+};
+		
 enum VM_LIST_ENUM {
 	VM_SHORT_LIST = 0,
 	VM_LONG_LIST  = 1,
@@ -310,6 +320,7 @@ void err_exit();
 int  wait_exec(fun func, void *args);
 void waitting();
 void delay(int sec);
+int  debug(unsigned color, char *fmt, ...);
 int  error(char *fmt, ...);
 int  WARN(char *fmt, ...);
 int  warn(char *fmt, ...);
