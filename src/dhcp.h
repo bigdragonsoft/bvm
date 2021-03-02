@@ -212,7 +212,6 @@ struct _dhcp_server_stru {
 	uint32_t netmask;	// 服务器掩码
 	uint32_t broadcast;	// 服务器广播域
 	char ifname[16];	// 网卡（网桥）名称
-	uint8_t if_mac[16];	// 网卡（网桥）mac地址
 	char nat[16];		// nat名称
 	time_t lease_time;	// 租赁时间长度
 	uint32_t first_ip;	// 动态ip开始
@@ -241,7 +240,6 @@ struct _listen_dev_stru {
 	char name[VNET_BUFFERSIZE];	//网桥名称
 	int status;			//网桥的状态 1:正在监控，2:无需监控，3:新增监控
 	pthread_t tid;			//线程id
-	pthread_mutex_t mux;
 };
 typedef struct _listen_dev_stru listen_dev_stru;
 
@@ -278,7 +276,6 @@ void *listen_bridge(void *net_dev);
 void init_dhcp_pool();
 int  get_server_index(uint8_t *mac);
 int  find_bridge_in_pool(char *dev);
-char *get_bridge_by_mac(uint8_t *mac);
 int  find_mac_in_pool(int server_id, uint8_t *mac);
 int  find_empty_ip_in_pool(int server_id);
 int  get_ip_status_in_pool(int server_id, uint32_t *ip, int *bind_idx);

@@ -52,7 +52,6 @@
 #include "dhcp.h"
 #include "config.h"
 
-#define BVM_DEBUG
 
 pthread_mutex_t mux = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mux_callback = PTHREAD_MUTEX_INITIALIZER;
@@ -388,7 +387,7 @@ int add_option_list(dhcp_option *opt, dhcp_option_list **list)
 	new = (dhcp_option_list*)malloc(sizeof(dhcp_option_list));
 
 	if (new == NULL) {
-		error("malloc error\n");
+		printf("malloc error\n");
 		return -1;
 	}
 	
@@ -421,9 +420,9 @@ void print_option_list(dhcp_option_list *list)
 {
 	if (list == NULL) return;
 
-	debug(YELLOW, "list:\n");
-	debug(YELLOW, "ID\tLEN\tVALUE\n");
-	debug(YELLOW, "--\t---\t-----\n");
+	warn("option list:\n");
+	warn("ID\tLEN\tVALUE\n");
+	warn("--\t---\t-----\n");
 	dhcp_option_list *p = list;
 	while (p) {
 		printf("%d\t%d\t", p->opts.id, p->opts.len);
@@ -439,11 +438,10 @@ void print_options(dhcp_msg *msg)
 {
 	if (msg == NULL) return;
 
-	debug(YELLOW, "options:\n");
-	debug(YELLOW, "ID\tLEN\tVALUE\n");
-	debug(YELLOW, "--\t---\t-----\n");
+	warn("options:\n");
+	warn("ID\tLEN\tVALUE\n");
+	warn("--\t---\t-----\n");
 
-	//for (int i = 0; i<256;) {
 	int i = 0;
 	int id;
 	while ((id = msg->hdr.options[i]) != END) {
@@ -544,11 +542,11 @@ int send_dhcp_reply(int fd, struct sockaddr_in *client_sock, dhcp_msg *reply)
 	//client_sock->sin_addr.s_addr = inet_addr("172.16.1.255");
 	client_sock->sin_addr.s_addr = dhcp_pool[idx].broadcast;
 	
-	debug(YELLOW, "index=%d, broadcast=%s\n", idx, ip_to_str(client_sock->sin_addr.s_addr));
+	//debug(YELLOW, "index=%d, broadcast=%s\n", idx, ip_to_str(client_sock->sin_addr.s_addr));
 
 	client_sock->sin_port = htons(DHCP_CLIENT_PORT);
 	if ((ret = sendto(fd, &reply->hdr, len, 0, (struct sockaddr *)client_sock, sizeof(*client_sock))) < 0) {
-		error("sendto failed");
+		printf("send dhcp reply failed\n");
 		return -1;
 	}
 
@@ -703,7 +701,6 @@ void get_bridge_name(listen_dev_stru *dev)
 	char **p = bridge_list;
 	char desc[VNET_BUFFERSIZE] = {0};
 
-	//memset(dev, 0, sizeof(dev));
 	int n = 0;
 	int m = 0;
 	while (*(p+n)) {
@@ -712,7 +709,6 @@ void get_bridge_name(listen_dev_stru *dev)
 	
 		if (strstr(desc, "bvm-nat")) {
 			strcpy(dev[m].name, *(p+n));
-			//printf("desc=%s\t%d.%s\n", desc, n, dev[m].name);
 			++m;
 		}
 		++n;
@@ -743,36 +739,27 @@ void get_packet(u_char *dev, const struct pcap_pkthdr *hdr, const u_char *packet
  
 	eth_header = (struct ether_header*)packet; 
 	if (ntohs(eth_header->ether_type) != ETHERTYPE_IP) { 
-		printf("not ethernet packet\n"); 
+		debug(DEFAULT_COLOR, "not ethernet packet\n"); 
 		return; 
 	} 
 
 	//上锁
 	pthread_mutex_lock(&mux_callback);
 
-	/*
-	//通过网桥的mac地址确定网桥名称
-	uint8_t if_mac[16];
-
-	ptr = eth_header->ether_dhost;
-	memcpy(if_mac, ptr, ETHER_ADDR_LEN);
-	debug(YELLOW, "if_mac: %s\n", mac_to_str(if_mac));
-	*/
-
 	host_mac_stru host;
 	strcpy(host.ifname, (char*)dev);
-	//strcpy(host.ifname, (char*)get_bridge_by_mac(if_mac));
-	//debug(YELLOW, "host.ifname = %s\n", host.ifname);
 
 	ptr = eth_header->ether_shost;
 	memcpy(host.mac, ptr, ETHER_ADDR_LEN);
 
 	//添加到客户列表中
-	debug(YELLOW, "get package on %s\n", dev);
-	if (find_client(&host) == (host_mac_stru*)NULL) {
-		debug(YELLOW, "add client list\n");
-		add_client_list(&host);
-		print_client_list();
+	uint8_t if_mac[16] = {0};
+	get_interfaces_mac(host.ifname, if_mac);
+	if (memcmp(if_mac, host.mac, ETHER_ADDR_LEN) != 0) {
+		if (find_client(&host) == (host_mac_stru*)NULL) {
+			add_client_list(&host);
+			//print_client_list();
+		}
 	}
 
 
@@ -796,7 +783,6 @@ void *listen_bridge(void *net_dev)
 	static int ok = 0, fail = -1;
  
 	//char filter[] = "port 68"; 
-	//char filter[] = "udp and (port bootpc or port bootps)"; 
 	char filter[] = "udp and port bootps"; 
  
 	/*
@@ -816,11 +802,10 @@ void *listen_bridge(void *net_dev)
 	}
 	*/
 
-	//pthread_mutex_lock(&(mux));
 	//获取网桥的ip地址和掩码
 	while (1) {
 		if (pcap_lookupnet((char*)net_dev, &net, &mask, errbuf) == -1) { 
-			printf("get net error:%s\n", errbuf); 
+			debug(RED, "get net error:%s\n", errbuf); 
 			continue;
 			//return &fail; 
 		} 
@@ -830,11 +815,10 @@ void *listen_bridge(void *net_dev)
 	//输出IP地址和掩码
 	struct in_addr addr;
 	addr.s_addr = net;
-	debug(0, "ip: %s\n", inet_ntoa(addr));
+	//debug(0, "ip: %s\n", inet_ntoa(addr));
 	addr.s_addr = mask;
-	debug(0, "mask: %s\n", inet_ntoa(addr));
-	debug(0, "dev: %s\n", net_dev);
-	//pthread_mutex_unlock(&(mux));
+	//debug(0, "mask: %s\n", inet_ntoa(addr));
+	//debug(0, "dev: %s\n", net_dev);
 
 	sniffer_des = pcap_open_live((char*)net_dev, 65535, 1, 50, errbuf); 
 	if (sniffer_des == NULL) { 
@@ -853,11 +837,14 @@ void *listen_bridge(void *net_dev)
 	} 
  
 
-	debug(YELLOW, "开始抓包 %s\n", net_dev);
+	//防止网桥传递错误
+	char bridge[16] = {0};
+	strcpy(bridge, net_dev);
+
 	//开始抓包
-	ret = pcap_loop(sniffer_des, -1, get_packet, net_dev); 
+	ret = pcap_loop(sniffer_des, -1, get_packet, (void*)bridge); 
 	if (ret == -1 || ret == -2) { 
-		printf("cannot get the pcaket\n"); 
+		debug(0, "cannot get the pcaket\n"); 
 		return &fail; 
 	} 
 
@@ -867,7 +854,6 @@ void *listen_bridge(void *net_dev)
 	pcap_freecode(&fp);
 	pcap_close(sniffer_des);
 
-	debug(YELLOW, "listen clean\n");
 	return &ok; 
 } 
 
@@ -875,11 +861,12 @@ void *listen_bridge(void *net_dev)
 int add_client_list(host_mac_stru *host)
 {
 	debug(RED, "add client list ==> %s %s\n", host->ifname, mac_to_str(host->mac));
+	debug(DEFAULT_COLOR, "FOUND %s on %s\n", mac_to_str(host->mac), host->ifname);
 	host_mac_list *new;
 	new = (host_mac_list*)malloc(sizeof(host_mac_list));
 
 	if (new == NULL) {
-		error("malloc error\n");
+		printf("malloc error\n");
 		return -1;
 	}
 	
@@ -954,19 +941,7 @@ host_mac_stru *find_client(host_mac_stru *host)
 
 	host_mac_list *p = client_list;
 	while (p) {
-		/*
-		int find = 1;
-		for (int i=0; i<ETHER_ADDR_LEN; i++) {
-			if (host->mac[i] != p->host.mac[i]) {
-				find = 0;
-				break;
-			}
-		}
-		if (find)
-			return &p->host;
-		*/
 		if (memcmp(host->mac, p->host.mac, ETHER_ADDR_LEN) == 0) {
-			debug(YELLOW, "found client %s\n", mac_to_str(host->mac));
 			return &(p->host);
 		}
 		p = p->next;
@@ -1056,27 +1031,12 @@ void print_dhcp_pool(int server_idx, int bind_idx)
 // 返回网桥的索引值
 int find_bridge_in_pool(char *dev)
 {
-	debug(YELLOW, "find_bridge_in_pool(%s)\n", dev);
 	for (int i=0; i<VNET_LISTSIZE; i++) {
-		debug(RED, "%s %s\n", dev, dhcp_pool[i].ifname);
 		if (strcmp(dhcp_pool[i].ifname, dev) == 0)
 			return i;
 	}
 
 	return -1; 
-}
-
-// 通过mac地址获得网桥名称
-char *get_bridge_by_mac(uint8_t *mac)
-{
-	for (int i=0; i<VNET_LISTSIZE; i++) {
-		if (memcmp(dhcp_pool[i].if_mac, mac, ETHER_ADDR_LEN) == 0) {
-			debug(0, "mac : %s, if_mac: %s\n", mac_to_str(mac), mac_to_str(dhcp_pool[i].if_mac));
-			return dhcp_pool[i].ifname;
-		}
-	}
-
-	return NULL;
 }
 
 // 在地址池中查找指定mac
@@ -1137,7 +1097,7 @@ void fill_bind_in_pool(int server_idx, int bind_idx, int status, dhcp_msg *reque
 	dhcp_pool[idx].bind[ip_idx].status = status;
 
 	#ifdef BVM_DEBUG
-	print_dhcp_pool(idx, bind_idx);
+	//print_dhcp_pool(idx, bind_idx);
 	#endif
 }
 
@@ -1198,17 +1158,11 @@ void set_reply_options(dhcp_msg *reply, int dhcp_type, int server_idx, int bind_
 // DHCP_DISCOVER 报文处理
 int dhcp_discover_proc(dhcp_msg *request, dhcp_msg *reply)
 {
-	debug(YELLOW, "********************************\n");
-	debug(YELLOW, "        DISCOVER 报文处理       \n");
-	debug(YELLOW, "********************************\n");
-
-	debug(0, "request->hdr.chaddr = %s\n", mac_to_str(request->hdr.chaddr));
-
 	//通过请求报文中的mac来确定dhcp服务器索引
 	int idx = get_server_index(request->hdr.chaddr);
 
-	debug(0, "server index = %d\n", idx);
-
+	debug(DEFAULT_COLOR, "DHCPDISCOVER on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
+	
 	//对于没有得到索引值的无效报文不做处理
 	if (idx < 0) return DHCP_INVALID;
 
@@ -1257,21 +1211,14 @@ int dhcp_discover_proc(dhcp_msg *request, dhcp_msg *reply)
 // DHCP_REQUEST 报文处理
 int dhcp_request_proc(dhcp_msg *request, dhcp_msg *reply)
 {
-	debug(YELLOW, "********************************\n");
-	debug(YELLOW, "        REQUEST 报文处理        \n");
-	debug(YELLOW, "********************************\n");
-
-	debug(0, "request->hdr.chaddr = %s\n", mac_to_str(request->hdr.chaddr));
 
 	//通过请求报文中的mac来确定dhcp服务器索引
 	int idx = get_server_index(request->hdr.chaddr);
 
-	debug(0, "server index = %d\n", idx);
+	debug(DEFAULT_COLOR, "DHCPREQUEST on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
 
 	//对于没有得到索引值的无效报文不做处理
 	if (idx < 0) return DHCP_INVALID;
-
-	//memcpy(reply->hdr.chaddr, request->hdr.chaddr, ETHER_ADDR_LEN);
 
 	//首先根据请求报文request中的mac地址在地址池dhcp_pool中查找有没有相对应记录
 	//如果找到还需要检测这个ip的状态是否为PENDING（首次申请）或ASSOCIATED（续租）
@@ -1305,16 +1252,11 @@ int dhcp_request_proc(dhcp_msg *request, dhcp_msg *reply)
 // DHCP_DECLINE 报文处理
 int dhcp_decline_proc(dhcp_msg *request, dhcp_msg *reply)
 {
-	debug(YELLOW, "********************************\n");
-	debug(YELLOW, "        DECLINE 报文处理        \n");
-	debug(YELLOW, "********************************\n");
-
-	debug(0, "request->hdr.chaddr = %s\n", mac_to_str(request->hdr.chaddr));
-
+	
 	//通过请求报文中的mac来确定dhcp服务器索引
 	int idx = get_server_index(request->hdr.chaddr);
 
-	debug(0, "server index = %d\n", idx);
+	debug(DEFAULT_COLOR, "DHCPDECLINE on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
 
 	//对于没有得到索引值的无效报文不做处理
 	if (idx < 0) return DHCP_INVALID;
@@ -1339,16 +1281,11 @@ int dhcp_decline_proc(dhcp_msg *request, dhcp_msg *reply)
 // DHCP_RELEASE 报文处理
 int dhcp_release_proc(dhcp_msg *request, dhcp_msg *reply)
 {
-	debug(YELLOW, "********************************\n");
-	debug(YELLOW, "        RELEASE 报文处理        \n");
-	debug(YELLOW, "********************************\n");
-
-	debug(0, "request->hdr.chaddr = %s\n", mac_to_str(request->hdr.chaddr));
 
 	//通过请求报文中的mac来确定dhcp服务器索引
 	int idx = get_server_index(request->hdr.chaddr);
 
-	debug(0, "server index = %d\n", idx);
+	debug(DEFAULT_COLOR, "DHCPRELEASE on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
 
 	//对于没有得到索引值的无效报文不做处理
 	if (idx < 0) return DHCP_INVALID;
@@ -1373,16 +1310,10 @@ int dhcp_release_proc(dhcp_msg *request, dhcp_msg *reply)
 // DHCP_INFORM 报文处理
 int dhcp_inform_proc(dhcp_msg *request, dhcp_msg *reply)
 {
-	debug(YELLOW, "********************************\n");
-	debug(YELLOW, "        INFORM 报文处理         \n");
-	debug(YELLOW, "********************************\n");
-
-	debug(0, "request->hdr.chaddr = %s\n", mac_to_str(request->hdr.chaddr));
-
 	//通过请求报文中的mac来确定dhcp服务器索引
 	int idx = get_server_index(request->hdr.chaddr);
 
-	debug(0, "server index = %d\n", idx);
+	debug(DEFAULT_COLOR, "DHCPINFORM on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
 
 	//对于没有得到索引值的无效报文不做处理
 	if (idx < 0) return DHCP_INVALID;
@@ -1442,8 +1373,8 @@ void message_controller(int fd, struct sockaddr_in server_sock)
 		if(request.hdr.op != BOOTREQUEST) continue;
 
 		#ifdef BVM_DEBUG
-		debug(YELLOW, "--- 接收到的报文 request ---\n\n");
-		print_dhcp_msg(&request);
+		//debug(YELLOW, "--- 接收到的报文 request ---\n\n");
+		//print_dhcp_msg(&request);
 		#endif
 
 		//读取报文类型
@@ -1485,18 +1416,27 @@ void message_controller(int fd, struct sockaddr_in server_sock)
 
 		//发送应答报文
 		if(ret >  0) {
-			#ifdef BVM_DEBUG
-			debug(YELLOW, "--- 发送的报文 reply ---\n\n");
-			print_dhcp_msg(&reply);
-			debug(YELLOW, "A message of %d bytes has been sent\n", send_dhcp_reply(fd, &client_sock, &reply));
-			#else
+			//debug(YELLOW, "--- 发送的报文 reply ---\n\n");
+			//print_dhcp_msg(&reply);
+			//debug(YELLOW, "A message of %d bytes has been sent\n", send_dhcp_reply(fd, &client_sock, &reply));
+
 			send_dhcp_reply(fd, &client_sock, &reply);
-			#endif
+
+			char str[16] = {0};
+			if (ret == DHCP_OFFER)
+				strcpy(str, "DHCPOFFER");
+			if (ret == DHCP_ACK)
+				strcpy(str, "DHCPACK");
+			if (ret == DHCP_NAK)
+				strcpy(str, "DHCPNAK");
+			debug(DEFAULT_COLOR, "%s to %s (%s)\n", str, mac_to_str(reply.hdr.chaddr), ip_to_str(reply.hdr.yiaddr));
+
 		}
 		
 		destroy_option_list(request.opts_list);
 		destroy_option_list(reply.opts_list);
-
+		
+		sleep(1);
 	}
 }
 
@@ -1516,14 +1456,14 @@ int main(int argc, char **argv)
 	//创建扫描网桥线程
 	err = pthread_create(&tid_scanif, NULL, scan_if, NULL);
 	if (err) {
-		error("can't create pthread scan_bridge\n");
+		printf("can't create pthread scan_bridge\n");
 		exit(1);
 	}
 
 	//创建dhcp线程
 	err = pthread_create(&tid_dhcp, NULL, dhcp_server, NULL);
 	if (err) {
-		error("can't create pthread dhcp\n");
+		printf("can't create pthread dhcp\n");
 		exit(1);
 	}
 	pthread_join(tid_dhcp, NULL);
@@ -1560,9 +1500,6 @@ void *scan_if()
 		//打印客户机列表
 		//print_client_list();
 
-		static int a = 0;	
-		//debug(YELLOW, "%d-", a++);
-		//getchar();
 	}
 }
 
@@ -1594,7 +1531,7 @@ void bridge_cmp(listen_dev_stru *cur_dev, listen_dev_stru *new_dev)
 			host_mac_stru host;
 			strcpy(host.ifname, cur_dev[i].name);
 			debug(YELLOW, "remove %d clients from list\n", remove_client(REMOVE_BRIDGE, &host));
-			print_client_list();
+			//print_client_list();
 		}
 	}
 
@@ -1624,8 +1561,6 @@ void bridge_cmp(listen_dev_stru *cur_dev, listen_dev_stru *new_dev)
 	
 	for (i=0; i<get_bridge_num(new_dev); i++) {
 		memcpy(&cur_dev[i], &new_dev[i], sizeof(new_dev[i]));
-		//debug(YELLOW, "new_dev[%d].name=%s, status=%d\n", i, new_dev[i].name, new_dev[i].status);
-		//debug(YELLOW, "cur_dev[%d].name=%s, status=%d\n", i, cur_dev[i].name, cur_dev[i].status);
 	}
 	cur_dev[i].name[0] = '\0';
 }
@@ -1638,34 +1573,13 @@ void create_listen(listen_dev_stru *dev)
 	strcpy(arg, dev->name);
 	
 	//创建线控
-	debug(YELLOW, "listen %s ...\n", dev->name);
+	//debug(YELLOW, "listen %s ...\n", dev->name);
 	err = pthread_create(&dev->tid, NULL, listen_bridge, (void*)arg);
 	if (err) {
-		error("can't create pthread listen_bridge\n");
+		printf("can't create pthread listen_bridge\n");
 		exit(1);
 	}
 	
-	//获得网桥的ip
-	struct in_addr *ip = NULL;
-	ip = get_interfaces_ip(dev->name);
-	uint32_t bridge_ip = ip->s_addr;
-	free(ip);
-
-
-	//通过ip地址确定dhcp服务器索引值
-	//同时填写上网桥的IP地址和MAC地址
-	int n = 0;
-	while (strlen(dhcp_pool[n].nat) > 0) {
-		if (dhcp_pool[n].ip == bridge_ip) {
-			strcpy(dhcp_pool[n].ifname, dev->name);
-			get_interfaces_mac(dev->name, dhcp_pool[n].if_mac);
-			break;
-		}
-		++n;
-	}
-
-	debug(YELLOW, "%s %s\n", dhcp_pool[n].ifname, mac_to_str(dhcp_pool[n].if_mac));
-
 	sleep(1);
 	//pthread_join(dev->tid, NULL);
 }
@@ -1681,17 +1595,17 @@ void *dhcp_server()
 
 	// 初始化
 	if ((ss = getservbyname("bootps", "udp")) == 0) {
-		error("server: getservbyname() error\n");
+		printf("server: getservbyname() error\n");
 		exit(1);
 	}
 
 	if ((pp = getprotobyname("udp")) == 0) {
-		error("server: getprotobyname() error\n");
+		printf("server: getprotobyname() error\n");
 		exit(1);
 	}
 
 	if ((fd = socket(AF_INET, SOCK_DGRAM, pp->p_proto)) == -1) {
-		error("server: socket() error\n");
+		printf("server: socket() error\n");
 		exit(1);
 	}
 
@@ -1711,12 +1625,12 @@ void *dhcp_server()
         }
 
 	if (bind(fd, (struct sockaddr *) &server_sock, sizeof(server_sock)) == -1) {
-		error("server: bind()\n");
+		printf("server: bind()\n");
 		close(fd);
 		exit(1);
 	}
 
-	debug(0, "dhcp server: listening on %d\n", ntohs(server_sock.sin_port));
+	//debug(0, "dhcp server: listening on %d\n", ntohs(server_sock.sin_port));
 
 	// 对接收到的报文进行处理
 	message_controller(fd, server_sock);
@@ -1815,16 +1729,7 @@ void init_dhcp_pool()
 			if (i == 0 || i == 255 || dhcp_pool[n].bind[i].ip == dhcp_pool[n].ip)
 				dhcp_pool[n].bind[i].status = DISABLE;
 
-			//printf("%d , %u, %d\n", i, ntohl(dhcp_pool[n].bind[i].ip), dhcp_pool[n].bind[i].status);
 		}
-
-		/*	
-		printf("name=%s\n", 		nat_list[n]->name);
-		printf("lease_time=%u\n", 	htonl(dhcp_pool[n].lease_time));
-		printf("first_ip=%s\n", 	ip_to_str(dhcp_pool[n].first_ip));
-		printf("last_ip=%s\n", 		ip_to_str(dhcp_pool[n].last_ip));
-		printf("current_ip=%s\n", 	ip_to_str(dhcp_pool[n].current_ip));
-		*/
 
 		++n;
 	}
@@ -1838,19 +1743,10 @@ int get_server_index(uint8_t *mac)
 	host_mac_stru host;
 	memcpy(host.mac, mac, ETHER_ADDR_LEN);
 
-	static int cnt = 0;
-	//debug(YELLOW, "cnt=%d\n", ++cnt);
-	//error("---print client list--\n");print_client_list();
-
 	host_mac_stru *p = find_client(&host);
 	if (p == NULL) {
-		//debug(YELLOW, "not found bridge-name\n");
 		return -1;
-		//exit(1);
 	}
-
-	static int rr=0;
-	debug(RED, "find ok , times=%d\n", ++rr);
 
 	//获得网桥的ip
 	struct in_addr *ip = NULL;
