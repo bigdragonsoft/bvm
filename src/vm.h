@@ -58,7 +58,7 @@
 #define MAX_BOOT_NUM	32	//最大自动启动数量
 #define NAT_ORDER	1029	//防火墙规则中nat的序列号
 
-#define BVM_DEBUG
+//#define BVM_DEBUG
 
 extern char *osdir;
 extern char vmdir[];
@@ -307,6 +307,7 @@ int  support_grub(char *os);
 int  disk_offset(vm_stru *vm);
 int  check_vm_disks(vm_stru *vm);
 int  select_disk(vm_stru *vm);
+int  bvm_get_pid(char *name);
 int  get_vm_pid(vm_stru *vm);
 int  get_vmx(vm_stru *vm);
 void file_lock(char *file, int flag);

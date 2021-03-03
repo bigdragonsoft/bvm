@@ -1179,6 +1179,15 @@ void vm_start(char *vm_name)
 
 		//等待虚拟机启动成功
 		waitting_boot(vm_name);
+
+		//开启dhcp服务
+		if (bvm_get_pid("bvmdhcp") == -1) {
+			char *fn = "/usr/local/bin/bvmdhcp";
+			char *arg = "9250b212ea95c6897aeef888c0b6611c18682957";
+			sprintf(shell, "/usr/local/bin/tmux -2 -u new -d -s dhcp %s %s", fn, arg);
+			run_cmd(shell);
+		}
+
 	}
 	else  {
 		error("can't start the vm!\n");
@@ -3049,6 +3058,27 @@ int  check_spell(char *vm_name)
 	}
 	return RET_SUCCESS;
 }
+
+// 获得某个进程id
+int bvm_get_pid(char *name)
+{
+	int pid;
+	char cmd[BUFFERSIZE];
+	sprintf(cmd, "ps | grep \"%s\" | grep -v csh | grep -v grep | awk '{print $1}'", name);
+	char buf[16];
+	FILE *fp = popen(cmd, "r");
+	if (fgets(buf, 16, fp)) {
+		buf[strlen(buf)-1] = '\0';
+		pid = atoi(buf);
+	}
+	else
+		pid = -1;
+
+	pclose(fp);
+
+	return pid;
+}
+
 
 // 获得vm的进程id
 int get_vm_pid(vm_stru *vm)

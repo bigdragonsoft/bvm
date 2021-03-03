@@ -5,8 +5,7 @@ booter_name = bvmb
 booter_objs = booter.o $(objs)
 dhcp_name = bvmdhcp
 dhcp_objs = dhcp.o $(objs)
-#opt = -O
-opt = -g
+opt = -O
 
 all: $(name) $(booter_name) $(dhcp_name)
 

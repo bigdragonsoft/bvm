@@ -1444,6 +1444,13 @@ void message_controller(int fd, struct sockaddr_in server_sock)
 // 查看进程号为pid的所有线程 top -p <pid> -H
 int main(int argc, char **argv)
 {
+	#ifndef BVM_DEBUG
+	if (argc < 2 || strcmp(argv[1], "9250b212ea95c6897aeef888c0b6611c18682957") != 0) {
+		debug(RED, "cannot run this program\n");
+		exit(1);
+	}
+	#endif
+
 	init_dhcp_pool();
 
 	int err;
@@ -1492,7 +1499,12 @@ void *scan_if()
 	while(1) {
 		//反复读取网桥放入new_dev
 		get_bridge_name(new_dev);
-		//printf("new dev 长度:%d\n", get_bridge_num(new_dev));
+
+		//检测new_dev中网桥数量
+		if (get_bridge_num(new_dev) == 0) {
+			debug(RED, "cannot scan bridge and exit\n");
+			exit(1);
+		}
 
 		//对比网桥
 		bridge_cmp(cur_dev, new_dev);
