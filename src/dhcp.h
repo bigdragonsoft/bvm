@@ -27,11 +27,43 @@
 #ifndef BVM_DHCP_H
 #define BVM_DHCP_H
 
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <sys/errno.h>
+#include <time.h>
+#include <ctype.h>
+#include <regex.h>
+#include <unistd.h>
+#include <pthread.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netinet/if_ether.h>  
+#include <ifaddrs.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <pcap.h>  
+
+#include <sys/ioctl.h>
+#include <net/if_arp.h>
+#include <net/if.h>
+#include <net/if_dl.h>
+
 #include "vnet.h"
+#include "config.h"
 
 #define DHCP_BROADCAST_FLAG 	0x8000
 #define DHCP_INVALID 		-1
 #define DHCP_NONE		0
+
+//地址池输出类型
+enum OUTPUT_TYPE_ENUM {
+	OUTPUT_TO_CONSOLE = 0,
+	OUTPUT_TO_FILE = 1,
+};
 
 // 报文类型
 enum DHCP_MSSAGE_TYPES_ENUM {
@@ -66,6 +98,9 @@ enum DHCP_OPTIONS_ENUM {
 
 	//DHCP Client填充自己的主机名，可以是本地域名限定，也可以不限定，长度最小为1
 	HOST_NAME = 12,
+
+	//客户端通过域名系统解析主机名
+	DOMAIN_NAME = 15,
 
 	//客户端请求（DHCPDISCOVER）中，客户端请求分配特定的IP地址
 	REQUESTED_IP_ADDRESS = 50,		
@@ -211,9 +246,12 @@ struct _dhcp_server_stru {
 	uint32_t ip;		// 服务器ip
 	uint32_t netmask;	// 服务器掩码
 	uint32_t broadcast;	// 服务器广播域
+	uint32_t gateway;	// 网关
+	char dns[128];		// DNS
+	char domain_name[128];	// DOMAIN_NAME
 	char ifname[16];	// 网卡（网桥）名称
 	char nat[16];		// nat名称
-	time_t lease_time;	// 租赁时间长度
+	uint32_t lease_time;	// 租赁时间长度
 	uint32_t first_ip;	// 动态ip开始
 	uint32_t last_ip;	// 动态ip结束
 	uint32_t current_ip;	// 当前要分配的动态ip
@@ -279,8 +317,11 @@ int  find_bridge_in_pool(char *dev);
 int  find_mac_in_pool(int server_id, uint8_t *mac);
 int  find_empty_ip_in_pool(int server_id);
 int  get_ip_status_in_pool(int server_id, uint32_t *ip, int *bind_idx);
+int  fresh_pool(int server_id);
+void init_address_bind(address_bind *bind);
 void fill_bind_in_pool(int server_idx, int bind_idx, int status, dhcp_msg *request);
-void print_dhcp_pool(int server_idx, int bind_idx);
+void print_dhcp_pool(int output, int server_idx, int bind_idx);
+void print_dhcp_pool_used(int output);
 
 
 //报文处理 ----------
@@ -344,6 +385,7 @@ int print_client_list();
 char *ip_to_str(uint32_t ip);
 char *mac_to_str(uint8_t *mac);
 char *status_to_str(int status);
+char *time_to_str(time_t time);
 
 void test();
 

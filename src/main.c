@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2019, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2021 Qiang Guo (guoqiang_cn@126.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -29,7 +29,7 @@
 
 pro_stru program = {
 	"bvm", 
-	"1.2.4", 
+	"1.3.0", 
 	"Qiang Guo",
 	"guoqiang_cn@126.com",
 	"https://github.com/bigdragonsoft/bvm",
@@ -42,7 +42,7 @@ void version()
 	printf("author: %s\n", program.author);
 	printf("email: %s\n", program.email);
 	printf("%s\n", program.website);
-	printf("Copyright (C) 2017~2019 ChinaFreeBSD.cn, BigDragonSoft.com\n");
+	printf("Copyright (C) 2017~2021 ChinaFreeBSD.cn, GuoQiang.org, BigDragon.cn\n");
 }
 
 // 程序用法
@@ -83,6 +83,7 @@ void usage()
 		"	--showdev	Show device",
 		"	--showdevall	Show all devices in class mode",
 		"	--showdevuse	Show all devices in simple mode",
+		"	--showdhcp	Show all DHCP clients",
 		"	--showsnap	Show snapshots list of the vm",
 		"	--showsnapall	Show snapshots list of the all vm",
 		"	--snapshot	Generating snapshots for vm",
@@ -165,6 +166,7 @@ int main(int argc, char *argv[])
 		{"showdev",		0, 	NULL, 	'9'},
 		{"showdevall",		0, 	NULL, 	'T'},
 		{"showdevuse",		0, 	NULL, 	'm'},
+		{"showdhcp",		0, 	NULL, 	'g'},
 		{"showsnap",		1, 	NULL, 	'w'},
 		{"showsnapall",		0, 	NULL, 	'V'},
 		{"snapshot",		1, 	NULL, 	'W'},
@@ -189,148 +191,208 @@ int main(int argc, char *argv[])
 				destroy_all_tap();
 			}
 			break;
+
 		case 'C': //create
 			vm_create(optarg);
 			break;
+
 		case 'e': //config
 			vm_config(optarg);
 			break;
+
 		case 's': //start
 			vm_start(optarg);
 			break;
+
 		case 'B': //autoboot
 			vm_autoboot();
 			break;
+
 		case 'b': //abinfo
 			vm_autoboot_list();
 			break;
+
 		case 'L': //login
 			vm_login(optarg);
 			break;
+
 		case 'S': //stop
 			vm_stop(optarg);
 			break;
+		
 		case 'R': //restart
 			vm_restart(optarg);
+		
+			//延迟1秒为防止tap被过早清理掉	
+		       	//执行 bvm --restart 后由于时间差误删除tap
+			//当时在测试 dhcp 时发现非 freebsd 虚拟机，比如 openbsd 
+			//在使用 bvm --restart 后 tap 丢失
+			//最后才发现是清理 tap 模块的执行速度太快了
+			//在虚拟机被复位后还没开始启动这个间隙里，清理 tap 就开始了
+			//所以需要延迟一下，把这个间隙错开
+			sleep(1);	
 			break;
+		
 		case 'p': //poweroff
 			vm_poweroff(optarg, 1);
 			break;
+		
 		case 'c': //clone
 			vm_clone(optarg, argv[optind]);
 			break;
+		
 		case 'd': //remove
 			vm_remove(optarg);
 			break;
+		
 		case '+': //addisk
 			vm_add_disk(optarg);
 			break;
+		
 		case '-': //deldisk
 			vm_del_disk(optarg);
 			break;
+		
 		case 'r': //rename
 			vm_rename(optarg, argv[optind]);
 			break;
+		
 		case 'o': //os
 			vm_os_list();
 			break;
+		
 		case 'i': //vminfo
 			vm_info(optarg);
 			break;
+		
 		case 'I': //vminfoall
 			vm_info_all(optarg);
 			break;
+		
 		case 'n': //natinfo
 			nat_info();
 			break;
+		
 		case 'N': //setnat
 			set_nat(optarg, argv[optind]);
 			break;
+		
 		case 'A': //addnat
 			add_nat(optarg);
 			break;
+		
 		case 'D': //delnat
 			del_nat(optarg);
 			break;
+		
 		case '1': //switchinfo
 			switch_info();
 			break;
+		
 		case '2': //setswitch
 			set_switch(optarg, argv[optind]);
 			break;
+		
 		case '3': //addswitch
 			add_switch(optarg);
 			break;
+		
 		case '4': //delswitch
 			del_switch(optarg);
 			break;
+		
 		case 'u': //unset
 			unset_switch(optarg);
 			break;
+		
 		case '5': //lock
 			vm_lock(optarg, 1);
 			break;
+		
 		case '6': //unlock
 			vm_lock(optarg, 0);
 			break;
+		
 		case '7': //lockall
 			vm_lock_all(1);
 			break;
+		
 		case '8': //unlockall
 			vm_lock_all(0);
 			break;
+		
 		case 'a': //setpr
 			set_portlist(optarg);
 			break;
+		
 		case 'f': //showpr
 			vm_show_ports(SP_SHOW, NULL);
 			break;
+		
 		case '9': //showdev
 			vm_show_device(NULL, SD_CLASSICAL);
 			break;
+		
 		case 'T': //showdevall(classical)
 			vm_show_device_all(SD_CLASSICAL);
 			break;
+		
 		case 'm': //showdevuse(simple)
 			vm_show_device_all(SD_SIMPLE);
 			break;
+		
+		case 'g': //showdhcp
+			show_dhcp_pool();
+			break;
+		
 		case 'w': //showsnap
 			show_snapshot_list(optarg);
 			break;
+		
 		case 'V': //showsnapall
 			show_snapshot_list_all();
 			break;
+		
 		case 'W': //snapshot
 			vm_snapshot(optarg);
 			break;
+		
 		case 'K': //rollback
 			vm_rollback(optarg);
 			break;
+		
 		case 'H': //hd-booting
 			vm_boot_from_hd(optarg);
 			break;
+		
 		case 'h': //help
 			usage();
 			break;
+		
 		case 'v': //version
 			version();
 			break;
+		
 		case 'l': //ls
 			if (argv[optind])
 				vm_list(VM_SHORT_LIST, argv[optind]);
 			else
 				vm_list(VM_SHORT_LIST, "byname");
 			break;
+		
 		case '(': //ll
 			if (argv[optind])
 				vm_list(VM_LONG_LIST, argv[optind]);
 			else
 				vm_list(VM_LONG_LIST, "byname");
 			break;
+		
 		case 'E': //reload-nat
 			break;
+		
 		case 't': //test
 			break;
+		
 		default:
 			//usage();
 			break;

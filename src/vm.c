@@ -51,6 +51,7 @@
 
 char *osdir = "/usr/local/etc/bvm/";
 char *logfile = "/var/log/bvm";
+char *dhcp_pool_file = ".dhcp_pool";
 FILE *logfp = NULL;
 char vmdir[FN_MAX_LEN];
 vm_node *vms;
@@ -598,8 +599,6 @@ int is_nic(char *nic_name)
 // 清理vm网桥、tap等
 void vm_clean()
 {
-	//warn("clean...\n");
-	
 	get_vnet_list(BRIDGE);
 	int n = 0;
 	char desc[VNET_BUFFERSIZE] = {0};
@@ -3064,7 +3063,7 @@ int bvm_get_pid(char *name)
 {
 	int pid;
 	char cmd[BUFFERSIZE];
-	sprintf(cmd, "ps | grep \"%s\" | grep -v csh | grep -v grep | awk '{print $1}'", name);
+	sprintf(cmd, "ps | grep \"%s\" | grep -v grep | awk '{print $1}'", name);
 	char buf[16];
 	FILE *fp = popen(cmd, "r");
 	if (fgets(buf, 16, fp)) {
@@ -3255,6 +3254,24 @@ void delay(int sec)
 
 }
 
+//输出最新的地址池分配情况
+void show_dhcp_pool()
+{
+	char fn[FN_MAX_LEN];
+	sprintf(fn, "%s/%s", vmdir, dhcp_pool_file);
+
+     	FILE *fp;
+	if ((fp = fopen(fn, "r")) == NULL) return;
+
+	char line[BUFFERSIZE];
+	while (fgets(line , BUFFERSIZE, fp)) {
+		printf("%s", line);
+	}
+
+	fclose(fp);
+
+}
+
 // 错误信息（红色高亮）
 int error(char *fmt, ...)
 {
@@ -3291,7 +3308,7 @@ int debug(unsigned color, char *fmt, ...)
 	va_list argptr;
 	int cnt;
 
-	if (color == DEFAULT_COLOR)
+	if (color == NOCOLOR)
 		printf("\033[m");
 	if (color == RED)
 		printf("\033[1;31m");

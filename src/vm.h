@@ -62,9 +62,10 @@
 
 extern char *osdir;
 extern char vmdir[];
+extern char *dhcp_pool_file;
 
 enum DEBUG_COLOR_ENUM {
-	DEFAULT_COLOR = 0,
+	NOCOLOR = 0,
 	RED,
 	GREEN,
 	YELLOW,
@@ -277,6 +278,8 @@ int  is_integer(double num);
 int  write_vm_device_map(vm_stru *vm);
 //int  copy_vm_disk(char *src_vm_name, char *dst_vm_name);
 int  copy_vm_disk(copy_stru *name);
+
+void show_dhcp_pool();
 
 void create_vm_list();
 void destroy_vm_list();

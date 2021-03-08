@@ -56,6 +56,7 @@ Options:
         --showdev       Show device
         --showdevall    Show all devices in class mode
         --showdevuse    Show all devices in simple mode
+	--showdhcp	Show all DHCP clients
         --showsnap      Show snapshots list of the vm
         --showsnapall   Show snapshots list of the all vm
         --snapshot      Generating snapshots for vm

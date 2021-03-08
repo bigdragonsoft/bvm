@@ -24,33 +24,7 @@
    OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  *---------------------------------------------------------------------------*/
 
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <sys/errno.h>
-#include <time.h>
-#include <ctype.h>
-#include <regex.h>
-#include <unistd.h>
-#include <pthread.h>
-
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/if_ether.h>  
-#include <ifaddrs.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <pcap.h>  
-
-#include <sys/ioctl.h>
-#include <net/if_arp.h>
-#include <net/if.h>
-#include <net/if_dl.h>
-
 #include "dhcp.h"
-#include "config.h"
 
 
 pthread_mutex_t mux = PTHREAD_MUTEX_INITIALIZER;
@@ -60,6 +34,8 @@ pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 dhcp_server_stru dhcp_pool[VNET_LISTSIZE] = {0};
 host_mac_list *client_list = NULL;
 
+int output_to_file_flag = 1;
+int print_dhcp_pool_head = 1;
 const uint8_t option_magic[4] = { 0x63, 0x82, 0x53, 0x63 };
 
 // DHCP选项和解析函数之间的映射表
@@ -76,6 +52,7 @@ static struct {
 	[ROUTER] = { "ROUTER", parse_ip_list },
 	[DOMAIN_NAME_SERVER] = { "DOMAIN_NAME_SERVER", parse_ip_list },
 	[HOST_NAME] = { "HOST_NAME", parse_string },
+	[DOMAIN_NAME] = { "DOMAIN_NAME", parse_string },
 	[REQUESTED_IP_ADDRESS] = { "REQUESTED_IP_ADDRESS", NULL },
 	[IP_ADDRESS_LEASE_TIME] = { "IP_ADDRESS_LEASE_TIME", parse_long },
 	[DHCP_MESSAGE_TYPE] = { "DHCP_MESSAGE_TYPE", parse_byte },
@@ -128,6 +105,27 @@ char *status_to_str(int status)
 		default:
 			return NULL;
 	}
+}
+
+// 将时间转换成字符串
+char *time_to_str(time_t time)
+{
+	struct tm *p;
+	static char str[64] = {0};
+
+	if (time > 0) {
+		p = localtime(&time);
+		sprintf(str, "%02d/%02d %02d:%02d:%02d",
+				p->tm_mon + 1,
+				p->tm_mday,
+				p->tm_hour,
+				p->tm_min,
+				p->tm_sec);
+	}
+	else
+		strcpy(str, "");
+
+	return str;
 }
 
 int parse_byte(char *s, void **p)
@@ -565,29 +563,30 @@ struct in_addr *get_interfaces_netmask(const char *ifname)
 		return NULL;
 
 
-	while (ifaddrs_ptr) {
+	struct ifaddrs *ifa = ifaddrs_ptr;
+	while (ifa) {
 
-		if (strncmp(ifaddrs_ptr->ifa_name, ifname, strlen(ifname))) {
-			ifaddrs_ptr = ifaddrs_ptr->ifa_next;
+		if (strncmp(ifa->ifa_name, ifname, strlen(ifname))) {
+			ifa = ifa->ifa_next;
 			continue;
 		}
 
-		if(!ifaddrs_ptr->ifa_netmask){
-			ifaddrs_ptr = ifaddrs_ptr->ifa_next;
+		if(!ifa->ifa_netmask){
+			ifa = ifa->ifa_next;
 			continue;
 		}
 
-		if (ifaddrs_ptr->ifa_addr->sa_family == AF_INET){
+		if (ifa->ifa_addr->sa_family == AF_INET){
 			p = calloc(1, sizeof(struct in_addr));
 			if(!p)
 				return NULL;
 
-			memcpy(p, &((struct sockaddr_in *)ifaddrs_ptr->ifa_netmask)->sin_addr, sizeof(struct in_addr));
+			memcpy(p, &((struct sockaddr_in *)ifa->ifa_netmask)->sin_addr, sizeof(struct in_addr));
     			freeifaddrs (ifaddrs_ptr);
 			return p;
 		}
 
-		ifaddrs_ptr = ifaddrs_ptr->ifa_next;
+		ifa = ifa->ifa_next;
 	}
 
     	freeifaddrs (ifaddrs_ptr);
@@ -603,34 +602,34 @@ struct in_addr *get_interfaces_ip(const char *ifname)
 	struct ifaddrs * ifaddrs_ptr;
 	int status;
 
-	status = getifaddrs (& ifaddrs_ptr);
+	status = getifaddrs(&ifaddrs_ptr);
 	if (status == -1) 
 		return NULL;
 
+	struct ifaddrs *ifa = ifaddrs_ptr;
+	while (ifa) {
 
-	while (ifaddrs_ptr) {
-
-		if (strncmp(ifaddrs_ptr->ifa_name, ifname, strlen(ifname))) {
-			ifaddrs_ptr = ifaddrs_ptr->ifa_next;
+		if (strncmp(ifa->ifa_name, ifname, strlen(ifname))) {
+			ifa = ifa->ifa_next;
 			continue;
 		}
 
-		if(!ifaddrs_ptr->ifa_addr){
-			ifaddrs_ptr = ifaddrs_ptr->ifa_next;
+		if(!ifa->ifa_addr){
+			ifa = ifa->ifa_next;
 			continue;
 		}
 
-		if (ifaddrs_ptr->ifa_addr->sa_family == AF_INET){
+		if (ifa->ifa_addr->sa_family == AF_INET){
 			p = calloc(1, sizeof(struct in_addr));
 			if(!p)
 				return NULL;
 
-			memcpy(p, &((struct sockaddr_in *)ifaddrs_ptr->ifa_addr)->sin_addr, sizeof(struct in_addr));
+			memcpy(p, &((struct sockaddr_in *)ifa->ifa_addr)->sin_addr, sizeof(struct in_addr));
     			freeifaddrs (ifaddrs_ptr);
 			return p;
 		}
 
-		ifaddrs_ptr = ifaddrs_ptr->ifa_next;
+		ifa = ifa->ifa_next;
 	}
 
     	freeifaddrs (ifaddrs_ptr);
@@ -739,7 +738,7 @@ void get_packet(u_char *dev, const struct pcap_pkthdr *hdr, const u_char *packet
  
 	eth_header = (struct ether_header*)packet; 
 	if (ntohs(eth_header->ether_type) != ETHERTYPE_IP) { 
-		debug(DEFAULT_COLOR, "not ethernet packet\n"); 
+		debug(NOCOLOR, "not ethernet packet\n"); 
 		return; 
 	} 
 
@@ -815,10 +814,10 @@ void *listen_bridge(void *net_dev)
 	//输出IP地址和掩码
 	struct in_addr addr;
 	addr.s_addr = net;
-	//debug(0, "ip: %s\n", inet_ntoa(addr));
+	//debug(NOCOLOR, "ip: %s\n", inet_ntoa(addr));
 	addr.s_addr = mask;
-	//debug(0, "mask: %s\n", inet_ntoa(addr));
-	//debug(0, "dev: %s\n", net_dev);
+	//debug(NOCOLOR, "mask: %s\n", inet_ntoa(addr));
+	//debug(NOCOLOR, "dev: %s\n", net_dev);
 
 	sniffer_des = pcap_open_live((char*)net_dev, 65535, 1, 50, errbuf); 
 	if (sniffer_des == NULL) { 
@@ -844,7 +843,7 @@ void *listen_bridge(void *net_dev)
 	//开始抓包
 	ret = pcap_loop(sniffer_des, -1, get_packet, (void*)bridge); 
 	if (ret == -1 || ret == -2) { 
-		debug(0, "cannot get the pcaket\n"); 
+		debug(NOCOLOR, "cannot get the pcaket\n"); 
 		return &fail; 
 	} 
 
@@ -861,7 +860,7 @@ void *listen_bridge(void *net_dev)
 int add_client_list(host_mac_stru *host)
 {
 	debug(RED, "add client list ==> %s %s\n", host->ifname, mac_to_str(host->mac));
-	debug(DEFAULT_COLOR, "FOUND %s on %s\n", mac_to_str(host->mac), host->ifname);
+	debug(NOCOLOR, "FOUND %s on %s\n", mac_to_str(host->mac), host->ifname);
 	host_mac_list *new;
 	new = (host_mac_list*)malloc(sizeof(host_mac_list));
 
@@ -1004,13 +1003,73 @@ int remove_client(int type, host_mac_stru *host)
 	return cnt;
 }
 
+// 打印地址池中所有已使用的ip
+void print_dhcp_pool_used(int output)
+{
+	output_to_file_flag = 1;
+	print_dhcp_pool_head = 1;
+
+	for (int i=0; i<VNET_LISTSIZE; i++) {
+		if (dhcp_pool[i].ip > 0)
+			print_dhcp_pool(output, i, -1);
+	}
+
+	print_dhcp_pool_head = 0;
+	output_to_file_flag = 0;
+}
+
 // 打印地址池数据
 // bind_idx=-1 打印全部ip
-void print_dhcp_pool(int server_idx, int bind_idx)
+void print_dhcp_pool(int output, int server_idx, int bind_idx)
 {
-	warn("server index : %d\n", server_idx);
-	warn("id\tip\tmac\txid\tbind_time\tstatus\n");
-	warn("--\t--\t---\t---\t---------\t------\n");
+	set_vmdir();
+
+	char fn[FN_MAX_LEN];
+	sprintf(fn, "%s/%s", vmdir, dhcp_pool_file);
+
+     	FILE *fp = NULL;
+
+	const int LINE = 2;
+	char msg[LINE][64] = {0};
+	/*
+	sprintf(msg[0], "DHCP server index: %d\n", server_idx);
+	sprintf(msg[1], "DHCP server: %s", ip_to_str(dhcp_pool[server_idx].ip));
+	sprintf(msg[2], " netmask: %s\n", ip_to_str(dhcp_pool[server_idx].netmask));
+	sprintf(msg[3], "Lease time: %us\n", htonl(dhcp_pool[server_idx].lease_time));
+	sprintf(msg[4], "ip\t\tmac\t\t\txid\t\tbind_time\tstatus\n");
+	sprintf(msg[5], "--\t\t---\t\t\t---\t\t---------\t------\n");
+	*/
+	sprintf(msg[0], "ip\t\tmac\t\t\tbind_time\t\t\t\tstatus\n");
+	sprintf(msg[1], "--\t\t---\t\t\t---------\t\t\t\t------\n");
+
+
+	//输出到文件
+	if (output == OUTPUT_TO_FILE) {
+		if (output_to_file_flag) {
+			fp = fopen(fn, "w+");
+			output_to_file_flag = 0;
+		}
+		else {
+			fp = fopen(fn, "a");
+		}
+
+		if (fp == NULL) {
+			printf("open file error\n");
+			return;
+		}
+
+		if (print_dhcp_pool_head) {
+			for (int i=0; i<LINE; i++)
+				fprintf(fp, "%s", msg[i]);
+			print_dhcp_pool_head = 0;
+		}
+	}
+
+	//输出到控制台
+	if (output == OUTPUT_TO_CONSOLE && print_dhcp_pool_head) {
+		for (int i=0; i<LINE; i++)
+			warn("%s", msg[i]);
+	}
 	
 	int first = 0, last = 256;
 	if (bind_idx != -1) {
@@ -1018,13 +1077,48 @@ void print_dhcp_pool(int server_idx, int bind_idx)
 		last = bind_idx + 1;
 	}
 
-	for (int i=first; i<last; i++)
-	printf("%3d|%s|%s|%u|%ld|%s\n", 	bind_idx, 
+	//struct tm *p;
+	char bind_time[64];
+
+	for (int i=first; i<last; i++) {
+		if (dhcp_pool[server_idx].bind[i].status == ASSOCIATED) {
+			if (dhcp_pool[server_idx].bind[i].bind_time > 0) {
+				time_t end_time = dhcp_pool[server_idx].bind[i].bind_time + ntohl(dhcp_pool[server_idx].lease_time);
+				sprintf(bind_time, "%s - ", 
+						time_to_str(dhcp_pool[server_idx].bind[i].bind_time));
+				strcat(bind_time, time_to_str(end_time));
+				/*p = localtime(&dhcp_pool[server_idx].bind[i].bind_time);
+				sprintf(bind_time, "%02d/%02d %02d:%02d:%02d",
+						p->tm_mon + 1,
+						p->tm_mday,
+						p->tm_hour,
+						p->tm_min,
+						p->tm_sec);*/
+				}
+			else
+				sprintf(bind_time, "%-30c", '-');
+
+			char str[BUFFERSIZE];
+			sprintf(str, "%s\t%s\t%s\t\t%s\n", 	
 						ip_to_str(dhcp_pool[server_idx].bind[i].ip), 
 						mac_to_str(dhcp_pool[server_idx].bind[i].mac),
-						dhcp_pool[server_idx].bind[i].xid,
-						dhcp_pool[server_idx].bind[i].bind_time,
+						//dhcp_pool[server_idx].bind[i].xid,
+						bind_time,
+						//dhcp_pool[server_idx].bind[i].bind_time,
 						status_to_str(dhcp_pool[server_idx].bind[i].status));
+
+			if (output == OUTPUT_TO_FILE)
+				fprintf(fp, "%s", str);
+
+			if (output == OUTPUT_TO_CONSOLE)
+				printf("%s", str);
+		}
+	}
+
+	if (output == OUTPUT_TO_FILE) {
+		fclose(fp);
+	}
+	
 }
 
 // 在地址池中寻找指定的网桥
@@ -1072,6 +1166,40 @@ int find_empty_ip_in_pool(int server_id)
 	return -1;
 }
 
+// 根据租赁到期情况刷新地址池
+// 主要是为了排除客户端未续约就关机或发生故障
+// 导致ip一直被占用
+int fresh_pool(int server_id)
+{
+	int idx = server_id;
+
+	int cnt = 0;
+	for (int i=0; i<256; i++) {
+		if ((dhcp_pool[idx].bind[i].status == ASSOCIATED) && 
+			(dhcp_pool[idx].bind[i].bind_time + htonl(dhcp_pool[idx].lease_time)) < time(NULL)) {
+
+			uint32_t ip = dhcp_pool[idx].bind[i].ip;
+			
+			memset((address_bind*)&dhcp_pool[idx].bind[i], 0, sizeof(address_bind));
+			
+			dhcp_pool[idx].bind[i].ip = ip;
+
+			++cnt;
+
+		}
+	}
+
+	return cnt;
+}
+
+// 初始化一条地址绑定信息
+void init_address_bind(address_bind *bind)
+{
+	uint32_t ip = bind->ip;
+	memset((address_bind*)bind, 0, sizeof(address_bind));
+	bind->ip = ip;
+}
+
 // 获取地址池中指定ip地址的状态
 // 参数bind_idx为查找到ip地址的索引号
 int get_ip_status_in_pool(int server_id, uint32_t *ip, int *bind_idx)
@@ -1095,6 +1223,7 @@ void fill_bind_in_pool(int server_idx, int bind_idx, int status, dhcp_msg *reque
 	memcpy(dhcp_pool[idx].bind[ip_idx].mac, request->hdr.chaddr, ETHER_ADDR_LEN);
 	dhcp_pool[idx].bind[ip_idx].xid = request->hdr.xid;
 	dhcp_pool[idx].bind[ip_idx].status = status;
+	dhcp_pool[idx].bind[ip_idx].bind_time = time(NULL);
 
 	#ifdef BVM_DEBUG
 	//print_dhcp_pool(idx, bind_idx);
@@ -1118,33 +1247,46 @@ void set_reply_options(dhcp_msg *reply, int dhcp_type, int server_idx, int bind_
 	//DHCP_MESSAGE_TYPE 报文类型
 	dhcp_option t;
 	sprintf(str, "%d", dhcp_type);
-	set_option(&t, DHCP_MESSAGE_TYPE, str);
-	add_option_list(&t, &reply->opts_list);
+	if (set_option(&t, DHCP_MESSAGE_TYPE, str) >= 0)
+		add_option_list(&t, &reply->opts_list);
 
 	//SERVER_IDENTIFIER 服务器ip
 	strcpy(str, ip_to_str(dhcp_pool[idx].ip));
-        set_option(&t, SERVER_IDENTIFIER, str);
-        add_option_list(&t, &reply->opts_list);
+        if (set_option(&t, SERVER_IDENTIFIER, str) >= 0)
+	        add_option_list(&t, &reply->opts_list);
 
 	//IP_ADDRESS_LEASE_TIME 租赁时间
 	sprintf(str, "%u", htonl(dhcp_pool[idx].lease_time));
-	set_option(&t, IP_ADDRESS_LEASE_TIME, str);
-        add_option_list(&t, &reply->opts_list);
+	if (set_option(&t, IP_ADDRESS_LEASE_TIME, str) >= 0)
+	        add_option_list(&t, &reply->opts_list);
 
 	//RENEWAL_T1_TIME_VALUE T1时间为租赁时间的1/2
 	sprintf(str, "%u", htonl(dhcp_pool[idx].lease_time)/2);
-	set_option(&t, RENEWAL_T1_TIME_VALUE, str);
-        add_option_list(&t, &reply->opts_list);
+	if (set_option(&t, RENEWAL_T1_TIME_VALUE, str) >= 0)
+	        add_option_list(&t, &reply->opts_list);
 
 	//REBINDING_T2_TIME_VALUE T2时间为租赁时间的87.5%
 	sprintf(str, "%u", (uint32_t)(htonl(dhcp_pool[idx].lease_time) * 0.875));
-	set_option(&t, REBINDING_T2_TIME_VALUE, str);
-	add_option_list(&t, &reply->opts_list);
+	if (set_option(&t, REBINDING_T2_TIME_VALUE, str) >= 0)
+		add_option_list(&t, &reply->opts_list);
 
 	//SUBNET_MASK 掩码
 	strcpy(str, ip_to_str(dhcp_pool[idx].netmask));
-	set_option(&t, SUBNET_MASK, str);
-	add_option_list(&t, &reply->opts_list);
+	if (set_option(&t, SUBNET_MASK, str) >= 0)
+		add_option_list(&t, &reply->opts_list);
+	
+	//ROUTER 网关
+	strcpy(str, ip_to_str(dhcp_pool[idx].ip));
+        if (set_option(&t, ROUTER, str) >= 0)
+	        add_option_list(&t, &reply->opts_list);
+
+	//DOMAIN_NAME_SERVER 域名服务器
+	if (set_option(&t, DOMAIN_NAME_SERVER, dhcp_pool[idx].dns) >= 0)
+		add_option_list(&t, &reply->opts_list);
+
+	//DOMAIN_NAME 通过域名解析主机名
+	if (set_option(&t, DOMAIN_NAME, dhcp_pool[idx].domain_name) >= 0)
+		add_option_list(&t, &reply->opts_list);
 	
 	//END 结束标志
         set_option(&t, END, NULL);
@@ -1158,20 +1300,34 @@ void set_reply_options(dhcp_msg *reply, int dhcp_type, int server_idx, int bind_
 // DHCP_DISCOVER 报文处理
 int dhcp_discover_proc(dhcp_msg *request, dhcp_msg *reply)
 {
+	debug(YELLOW, " *** discover ***\n");
+
 	//通过请求报文中的mac来确定dhcp服务器索引
 	int idx = get_server_index(request->hdr.chaddr);
 
-	debug(DEFAULT_COLOR, "DHCPDISCOVER on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
+	debug(NOCOLOR, "DHCPDISCOVER on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
 	
 	//对于没有得到索引值的无效报文不做处理
 	if (idx < 0) return DHCP_INVALID;
+
+	//刷新地址池，回收过期地址
+	//如果客户端关机后，网桥上还有其他主机
+	//等这个客户端主机在租赁时间过期后开机会再次发送DISCOVER报文
+	//而此时地址池中还存在这个客户端主机的mac
+	//导致发送DHCP_INVALID，使客户端无法获得ip
+	//所以需要在处理DISCOVER报文前，先刷新一下地址池
+	//int n = fresh_pool(idx);
+	//if (n > 0)
+	//	debug(RED, "Release %d expired ip addresses\n", n);
 
 	//查找一个可供分配的ip地址
 	//首先看一下报文options中是否存在50代码REQUESTED_IP_ADDRESS
 	//如果存在的话，就先看一下这个ip是否可用
 	//若不可用则从地址池中选取
 	//从地址池中选取的时候先扫描地址池中是否存在相同的客户端mac
-	//若存在mac则不处理
+	//若存在mac则需要看跟地址池中的记录的xid是否相同
+	//相同的话说明是二次发报不处理
+	//不同的话将此记录的ip地址直接分配给客户端并发送OFFER
 	//若不存在mac则需要逐一扫描dhcp_pool中未使用过的ip地址
 	//找到ip后，将报文中的客户端mac地址chaddr和校验码xid存入对应的dhcp_pool记录中
 	//并且将状态status设置为PENDING状态，说明这是一个尚未完成分配的对话
@@ -1189,8 +1345,19 @@ int dhcp_discover_proc(dhcp_msg *request, dhcp_msg *reply)
 		}
 	}
 
-	if (find_mac_in_pool(idx, request->hdr.chaddr) >= 0)
+	int i = find_mac_in_pool(idx, request->hdr.chaddr);
+	if (i >= 0) {
+		//if (dhcp_pool[idx].bind[i].xid == request->hdr.xid)
+		//	return DHCP_INVALID;
+
+		if ((dhcp_pool[idx].bind[i].bind_time + htonl(dhcp_pool[idx].lease_time)) < time(NULL)) {
+			fill_bind_in_pool(idx, i, PENDING, request);
+			set_reply_options(reply, DHCP_OFFER, idx, i);
+		
+			return DHCP_OFFER;
+		}
 		return DHCP_INVALID;
+	}
 
 	int ip_idx = find_empty_ip_in_pool(idx);
 	if (ip_idx == -1) {
@@ -1211,14 +1378,21 @@ int dhcp_discover_proc(dhcp_msg *request, dhcp_msg *reply)
 // DHCP_REQUEST 报文处理
 int dhcp_request_proc(dhcp_msg *request, dhcp_msg *reply)
 {
-
+	debug(YELLOW, " *** request ***\n");
+	
 	//通过请求报文中的mac来确定dhcp服务器索引
 	int idx = get_server_index(request->hdr.chaddr);
 
-	debug(DEFAULT_COLOR, "DHCPREQUEST on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
+	debug(NOCOLOR, "DHCPREQUEST on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
 
 	//对于没有得到索引值的无效报文不做处理
 	if (idx < 0) return DHCP_INVALID;
+
+	//刷新地址池
+	//过滤掉租赁期过期的DHCP_REQUEST
+	//int n = fresh_pool(idx);
+	//if (n > 0)
+	//	debug(RED, "Release %d expired ip addresses\n", n);
 
 	//首先根据请求报文request中的mac地址在地址池dhcp_pool中查找有没有相对应记录
 	//如果找到还需要检测这个ip的状态是否为PENDING（首次申请）或ASSOCIATED（续租）
@@ -1252,11 +1426,12 @@ int dhcp_request_proc(dhcp_msg *request, dhcp_msg *reply)
 // DHCP_DECLINE 报文处理
 int dhcp_decline_proc(dhcp_msg *request, dhcp_msg *reply)
 {
+	debug(YELLOW, " *** decline ***\n");
 	
 	//通过请求报文中的mac来确定dhcp服务器索引
 	int idx = get_server_index(request->hdr.chaddr);
 
-	debug(DEFAULT_COLOR, "DHCPDECLINE on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
+	debug(NOCOLOR, "DHCPDECLINE on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
 
 	//对于没有得到索引值的无效报文不做处理
 	if (idx < 0) return DHCP_INVALID;
@@ -1281,11 +1456,12 @@ int dhcp_decline_proc(dhcp_msg *request, dhcp_msg *reply)
 // DHCP_RELEASE 报文处理
 int dhcp_release_proc(dhcp_msg *request, dhcp_msg *reply)
 {
+	debug(YELLOW, " *** release ***\n");
 
 	//通过请求报文中的mac来确定dhcp服务器索引
 	int idx = get_server_index(request->hdr.chaddr);
 
-	debug(DEFAULT_COLOR, "DHCPRELEASE on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
+	debug(NOCOLOR, "DHCPRELEASE on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
 
 	//对于没有得到索引值的无效报文不做处理
 	if (idx < 0) return DHCP_INVALID;
@@ -1310,10 +1486,12 @@ int dhcp_release_proc(dhcp_msg *request, dhcp_msg *reply)
 // DHCP_INFORM 报文处理
 int dhcp_inform_proc(dhcp_msg *request, dhcp_msg *reply)
 {
+	debug(YELLOW, " *** inform ***\n");
+
 	//通过请求报文中的mac来确定dhcp服务器索引
 	int idx = get_server_index(request->hdr.chaddr);
 
-	debug(DEFAULT_COLOR, "DHCPINFORM on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
+	debug(NOCOLOR, "DHCPINFORM on %s from %s\n", idx<0?"unknow":dhcp_pool[idx].ifname, mac_to_str(request->hdr.chaddr));
 
 	//对于没有得到索引值的无效报文不做处理
 	if (idx < 0) return DHCP_INVALID;
@@ -1373,13 +1551,14 @@ void message_controller(int fd, struct sockaddr_in server_sock)
 		if(request.hdr.op != BOOTREQUEST) continue;
 
 		#ifdef BVM_DEBUG
-		//debug(YELLOW, "--- 接收到的报文 request ---\n\n");
-		//print_dhcp_msg(&request);
+		debug(YELLOW, "--- 接收到的报文 request ---\n\n");
+		print_dhcp_msg(&request);
 		#endif
 
 		//读取报文类型
 		uint8_t type = get_dhcp_message_type(&request);
 
+		debug(NOCOLOR, "message type: %d\n", type);
 		int ret;
 
 		//初始化应答报文
@@ -1416,8 +1595,10 @@ void message_controller(int fd, struct sockaddr_in server_sock)
 
 		//发送应答报文
 		if(ret >  0) {
-			//debug(YELLOW, "--- 发送的报文 reply ---\n\n");
-			//print_dhcp_msg(&reply);
+			#ifdef BVM_DEBUG
+			debug(YELLOW, "--- 发送的报文 reply ---\n\n");
+			print_dhcp_msg(&reply);
+			#endif
 			//debug(YELLOW, "A message of %d bytes has been sent\n", send_dhcp_reply(fd, &client_sock, &reply));
 
 			send_dhcp_reply(fd, &client_sock, &reply);
@@ -1429,10 +1610,17 @@ void message_controller(int fd, struct sockaddr_in server_sock)
 				strcpy(str, "DHCPACK");
 			if (ret == DHCP_NAK)
 				strcpy(str, "DHCPNAK");
-			debug(DEFAULT_COLOR, "%s to %s (%s)\n", str, mac_to_str(reply.hdr.chaddr), ip_to_str(reply.hdr.yiaddr));
+			debug(NOCOLOR, "%s to %s (%s)\n", str, mac_to_str(reply.hdr.chaddr), ip_to_str(reply.hdr.yiaddr));
 
 		}
 		
+
+		#ifdef BVM_DEBUG
+		print_dhcp_pool_used(OUTPUT_TO_CONSOLE);
+		#endif
+		
+		print_dhcp_pool_used(OUTPUT_TO_FILE);
+
 		destroy_option_list(request.opts_list);
 		destroy_option_list(reply.opts_list);
 		
@@ -1502,6 +1690,14 @@ void *scan_if()
 
 		//检测new_dev中网桥数量
 		if (get_bridge_num(new_dev) == 0) {
+
+			set_vmdir();
+
+			char fn[FN_MAX_LEN];
+			sprintf(fn, "%s/%s", vmdir, dhcp_pool_file);
+		
+			remove(fn);
+
 			debug(RED, "cannot scan bridge and exit\n");
 			exit(1);
 		}
@@ -1642,7 +1838,7 @@ void *dhcp_server()
 		exit(1);
 	}
 
-	//debug(0, "dhcp server: listening on %d\n", ntohs(server_sock.sin_port));
+	//debug(NOCOLOR, "dhcp server: listening on %d\n", ntohs(server_sock.sin_port));
 
 	// 对接收到的报文进行处理
 	message_controller(fd, server_sock);
@@ -1702,7 +1898,7 @@ void init_dhcp_pool()
 		if ((value = get_value_by_name("lease_time")) != NULL) {
 			uint32_t *p;
 			parse_long(value, (void **)&p);
-			dhcp_pool[n].lease_time = *p;
+			dhcp_pool[n].lease_time = (*p);
 			free(p);
 		}
 		
@@ -1710,7 +1906,7 @@ void init_dhcp_pool()
 		if ((value = get_value_by_name(str)) != NULL) {
 			uint32_t *p;
 			parse_long(value, (void **)&p);
-			dhcp_pool[n].lease_time = *p;
+			dhcp_pool[n].lease_time = (*p);
 			free(p);
 		}
 
@@ -1724,6 +1920,27 @@ void init_dhcp_pool()
 			dhcp_pool[n].last_ip = *(p + 1);
 			free(p);
 		}
+
+		//dns
+		if ((value = get_value_by_name("dns")) != NULL) {
+			strcpy(dhcp_pool[n].dns, value);
+		}
+		
+		sprintf(str, "%s_dns", dhcp_pool[n].nat);
+		if ((value = get_value_by_name(str)) != NULL) {
+			strcpy(dhcp_pool[n].dns, value);
+		}
+
+		//domain_name
+		if ((value = get_value_by_name("domain_name")) != NULL) {
+			strcpy(dhcp_pool[n].domain_name, value);
+		}
+		
+		sprintf(str, "%s_domain_name", dhcp_pool[n].nat);
+		if ((value = get_value_by_name(str)) != NULL) {
+			strcpy(dhcp_pool[n].domain_name, value);
+		}
+
 
 
 		free_config();
@@ -1764,6 +1981,7 @@ int get_server_index(uint8_t *mac)
 	struct in_addr *ip = NULL;
 	ip = get_interfaces_ip(p->ifname);
 
+	if (ip == NULL) return -1;
 	uint32_t net_ip = ip->s_addr;
 	
 	free(ip);
