@@ -1183,7 +1183,7 @@ void vm_start(char *vm_name)
 		if (bvm_get_pid("bvmdhcp") == -1) {
 			char *fn = "/usr/local/bin/bvmdhcp";
 			char *arg = "9250b212ea95c6897aeef888c0b6611c18682957";
-			sprintf(shell, "/usr/local/bin/tmux -2 -u new -d -s dhcp %s %s", fn, arg);
+			sprintf(shell, "/usr/local/bin/tmux -2 -u new -d -s bvmdhcp %s %s", fn, arg);
 			run_cmd(shell);
 		}
 

@@ -26,7 +26,6 @@
 
 #include "dhcp.h"
 
-
 pthread_mutex_t mux = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t mux_callback = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
@@ -1599,7 +1598,6 @@ void message_controller(int fd, struct sockaddr_in server_sock)
 			debug(YELLOW, "--- 发送的报文 reply ---\n\n");
 			print_dhcp_msg(&reply);
 			#endif
-			//debug(YELLOW, "A message of %d bytes has been sent\n", send_dhcp_reply(fd, &client_sock, &reply));
 
 			send_dhcp_reply(fd, &client_sock, &reply);
 
@@ -1610,6 +1608,7 @@ void message_controller(int fd, struct sockaddr_in server_sock)
 				strcpy(str, "DHCPACK");
 			if (ret == DHCP_NAK)
 				strcpy(str, "DHCPNAK");
+
 			debug(NOCOLOR, "%s to %s (%s)\n", str, mac_to_str(reply.hdr.chaddr), ip_to_str(reply.hdr.yiaddr));
 
 		}
@@ -1627,6 +1626,42 @@ void message_controller(int fd, struct sockaddr_in server_sock)
 		sleep(1);
 	}
 }
+
+/*-------------------------------------------------------------------------------
+                            -=- BVMDHCP 实现流程 -=-
+                           BVMDHCP implementation process
+  -------------------------------------------------------------------------------
+  
+     主线程 --------------+-------------------------------------+ 
+                          |                                     | 
+                   +------+------+                       +------+------+
+	           |   子线程    |                       |    子线程   |
+		   |             |                       |             |
+	           | scan bridge |                       | DHCP SERVER |
+		   |  扫描网桥   |                       | 处理dhcp信息|
+		   +-------------+                       +-------------+
+                          |
+	          +-------+-------+
+		  |  发现NAT网桥  |
+	          +-------+-------+
+		          |
+                          +--------------------+--------------------+
+			  |                    |                    |
+	          +-------+-------+    +-------+-------+    +-------+-------+
+                  |    子线程	  |    |    子线程     |    |    子线程     |
+                  |               |    |               |    |               |
+                  | Listen bridge |    | Listen bridge |    | Listen bridge |
+		  |   监控网桥    |    |   监控网桥    |    |   监控网桥    |
+		  +---------------+    +---------------+    +---------------+
+
+     1. 一个子线程负责扫描网桥，发现NAT网桥后就会马上创建监控这个网桥的子线程，发现了
+        几个NAT网桥就会相应的创建几个子线程，监控网桥的子线程负责采集途径这个网桥DHCP
+        客户端主机的信息，建立客户端主机与网桥的对应关系，这个对应关系会在后面的DHCP
+        服务器应答时作为广播域的依据。
+     2. 接下来的事情就全部交给DHCP服务器那个线程来处理。
+     3. 到扫描网桥子线程扫描不到任何NAT网桥时，便会结束整个DHCP的处理流程。
+  -------------------------------------------------------------------------------*/
+
 
 // 主流程
 // 查看进程号为pid的所有线程 top -p <pid> -H
