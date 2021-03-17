@@ -2325,8 +2325,13 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 
 	if ((value = get_value_by_name("vm_network_interface")) != NULL)
 		strcpy(vm->network_interface, value);
+	else
+		strcpy(vm->network_interface, "e1000");
+
 	if ((value = get_value_by_name("vm_storage_interface")) != NULL)
 		strcpy(vm->storage_interface, value);
+	else
+		strcpy(vm->storage_interface, "ahci-hd");
 
 
 	free_config();
