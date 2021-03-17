@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2019, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2021, Qiang Guo (guoqiang_cn@126.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -45,6 +45,12 @@ void disk_config_init()
 		}
 		add_item(diskmenu, "ZFS support",  (char*)&new_vm.zfs,		enter_vm_zfs,		0, 1, 0);
 		add_item(diskmenu, "ZFS pool",     (char*)&new_vm.zpool,	enter_vm_zpool, 	0, 1, 0);
+
+		add_item(diskmenu, "interface",	
+				  (char*)&new_vm.storage_interface, 
+				  enter_vm_storage_interface, 	
+				  0, 1, 0);
+
 		add_item(diskmenu, "add a disk",   NULL, 			add_disk,    		0, 1, 1);
 		add_item(diskmenu, "delete a disk",NULL, 			delete_disk, 		0, 1, 1);
 		add_item(diskmenu, "go back", 	   NULL, 	     		goback_mainmenu, 	0, 1, 1);
@@ -117,7 +123,7 @@ void edit_disk_config()
 // 设置磁盘菜单项的编辑属性
 void set_disk_edit(int type, int edit)
 {
-	int n = DISK_NUM + 3;	//+3是3个菜单项(vm_disks,vm_zfs,vm_zpool)
+	int n = DISK_NUM + 4;	//+3是3个菜单项(vm_disks,vm_zfs,vm_zpool,vm_network_interface)
 	if (type == DISKETTE)
 		for (int i=0; i<n; i++)
 			diskmenu[i].edit = edit;
@@ -134,6 +140,9 @@ int check_disk_enter_valid()
 		if (strlen(new_vm.vdisk[i].size) == 0)
 			return -1;
 	}
+
+	if (strlen(new_vm.storage_interface) == 0) return -1;
+
 	return 1;
 }
 
@@ -144,15 +153,7 @@ void show_disk_config()
 	int index = 0;
 	while (diskmenu[n].func) {
 		if ((diskmenu[n].func == enter_vm_vdisk_size && atoi(new_vm.disks) < diskmenu[n].arg + 1) ||
-		/*		
-		if ((diskmenu[n].func == enter_vm_img1size && atoi(new_vm.disks) < 2) ||
-		   (diskmenu[n].func == enter_vm_img2size && atoi(new_vm.disks) < 3) ||
-		   (diskmenu[n].func == enter_vm_img3size && atoi(new_vm.disks) < 4) ||
-		   (diskmenu[n].func == enter_vm_img4size && atoi(new_vm.disks) < 5) ||
-		   (diskmenu[n].func == enter_vm_img5size && atoi(new_vm.disks) < 6) ||
-		   (diskmenu[n].func == enter_vm_img6size && atoi(new_vm.disks) < 7) ||
-		   (diskmenu[n].func == enter_vm_img7size && atoi(new_vm.disks) < 8) ||
-		  */
+
 		   (diskmenu[n].func == enter_vm_zfs && !support_zfs()) ||
 		   (diskmenu[n].func == enter_vm_zpool && strcmp(new_vm.zfs, "on") != 0));
 		else {

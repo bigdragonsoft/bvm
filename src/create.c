@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2019, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2021, Qiang Guo (guoqiang_cn@126.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -107,6 +107,7 @@ void create_init()
 
 	add_item(tbl, "disk config",  NULL,				enter_vm_disk_config,	0,	1,	1);
 	add_item(tbl, "network config", NULL,				enter_vm_network_config,0,	1,	1);
+	//add_item(tbl, "driver config", NULL,				enter_vm_driver_config,	0,	1,	1);
 
 	add_item(tbl, "cancel",		NULL,				exit_the_menu,		0,	1,	1);
 
@@ -125,14 +126,21 @@ void set_const_config()
 	strcpy(new_vm.lock,	  "0");
 
 	if (strcmp(new_vm.ostype, "OpenBSD") != 0)
-		//*new_vm.version = NULL;
 		strcpy(new_vm.version, "");
 	for (int n=0; n<atoi(new_vm.nics); n++) {
 		//strcpy(new_vm.nic[n].ip, "dhcp");
 		if (strcmp(new_vm.nic[n].netmode, "NAT") != 0)
-			//*new_vm.nic[n].nat = NULL;
 			strcpy(new_vm.nic[n].nat, "");
 	}
+}
+
+// 设置驱动配置的默认值
+void set_default_driver_config()
+{
+	if (strlen(new_vm.network_interface) == 0) 
+		strcpy(new_vm.network_interface, "e1000");
+	if (strlen(new_vm.storage_interface) == 0)
+		strcpy(new_vm.storage_interface, "ahci-hd");
 }
 
 // 添加菜单项
@@ -704,6 +712,17 @@ void enter_vm_network_config(int not_use)
 	network_config_init();
 	create_network_config();
 }
+
+// 驱动配置
+/*
+void enter_vm_driver_config(int not_use)
+{
+	set_default_driver_config();
+
+	driver_config_init();
+	create_driver_config();
+}
+*/
 
 // 退出菜单系统
 void exit_the_menu(int not_use)
@@ -1381,6 +1400,50 @@ void enter_vm_iso(int not_use)
 		if (dir_desc[n]) free(dir_desc[n]);
 		--n;
 	}
+}
+
+// vm_network_interface
+// 输入网络接口驱动
+void enter_vm_network_interface(int not_use)
+{
+	char *msg = "Enter network interface: ";
+	char *opt[] = {
+		"e1000",
+		"virtio-net",
+		NULL,
+	};
+
+	char *desc[] = {
+		"Intel e82545 network interface [e1000]",
+		"Virtio network interface [virtio-net]",
+		NULL,
+	};
+
+	enter_options(msg, opt, desc, (char*)&new_vm.network_interface);
+
+}
+
+// vm_storage_interface
+// 输入存储接口驱动
+void enter_vm_storage_interface(int not_use)
+{
+	char *msg = "Enter storage interface: ";
+	char *opt[] = {
+		"ahci-hd",
+		"virtio-blk",
+		"virtio-scsi",
+		NULL,
+	};
+
+	char *desc[] = {
+		"SATA hard-drive [ahci-hd]",
+		"Virtio block storage interface [virtio-blk]",
+		"Virtio SCSI interface [virtio-scsi]",
+		NULL,
+	};
+
+	enter_options(msg, opt, desc, (char*)&new_vm.storage_interface);
+
 }
 
 // 获得目录中文件列表

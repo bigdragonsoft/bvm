@@ -1391,6 +1391,7 @@ void vm_info_all(char *vm_name)
 	}
 
 	welcome();
+
 	char str[BUFFERSIZE];
 	printf("%-13s = %s\n", 	"vm_name", 	p->vm.name);
 	printf("%-13s = %s\n", 	"vm_profile", 	p->vm.profile);
@@ -1471,24 +1472,25 @@ void vm_info(char *vm_name)
 	}
 
 	welcome();
-	printf("%-13s : \033[4m%s\n\033[0m", "name", 	p->vm.name);
-	printf("%-13s : %s\n", "os type", p->vm.ostype);
+	printf("%-14s : \033[4m%s\n\033[0m", "name", 	p->vm.name);
+	printf("%-14s : %s\n", "os type", p->vm.ostype);
 	if (strlen(p->vm.version) > 0)
-		printf("%-13s : %s\n", "version", 	p->vm.version);	
-	printf("%-13s : %s\n", "ram", 			p->vm.ram);
-	printf("%-13s : %s\n", "cpus", 			p->vm.cpus);
-	printf("%-13s : %s\n", "disk numbers",		p->vm.disks);
+		printf("%-14s : %s\n", "version", 	p->vm.version);	
+	printf("%-14s : %s\n", "ram", 			p->vm.ram);
+	printf("%-14s : %s\n", "cpus", 			p->vm.cpus);
+	printf("%-14s : %s\n", "disk interface",	p->vm.storage_interface);
+	printf("%-14s : %s\n", "disk numbers",		p->vm.disks);
 
 	if (support_zfs()) {
-		printf("|-%-11s : %s\n", "ZFS support",	p->vm.zfs);
+		printf("|-%-12s : %s\n", "ZFS support",	p->vm.zfs);
 		if( strcmp(p->vm.zfs, "on") == 0) {
-			printf("|-%-11s : %s\n", "zpool",	p->vm.zpool);
+			printf("|-%-12s : %s\n", "zpool",	p->vm.zpool);
 		}
 	}
 	for (int n=0; n<atoi(p->vm.disks); n++) {
 		char t[32];
 		sprintf(t, "disk(%d) size", n);
-		printf("|-%-11s: %s\n", t,              p->vm.vdisk[n].size);
+		printf("|-%-12s : %s\n", t,              p->vm.vdisk[n].size);
 	}
 
 	/*
@@ -1502,43 +1504,44 @@ void vm_info(char *vm_name)
 	//------------
 	*/
 
-	printf("%-13s : %s\n", "cd status", 		p->vm.cdstatus);
+	printf("%-14s : %s\n", "cd status", 		p->vm.cdstatus);
 	if (strcmp(p->vm.cdstatus, "on") == 0)
-		printf("|-%-11s : %s\n", "iso path",	p->vm.iso);
-	printf("%-13s : %s\n", "boot from", 		p->vm.bootfrom);
-	printf("%-13s : %s\n", "hostbridge", 		p->vm.hostbridge);
-	printf("%-13s : %s\n", "uefi", 			p->vm.uefi);
+		printf("|-%-12s : %s\n", "iso path",	p->vm.iso);
+	printf("%-14s : %s\n", "boot from", 		p->vm.bootfrom);
+	printf("%-14s : %s\n", "hostbridge", 		p->vm.hostbridge);
+	printf("%-14s : %s\n", "uefi", 			p->vm.uefi);
 	if (support_uefi(p->vm.ostype) && strcmp(p->vm.uefi, "none") != 0) {
-		printf("|-%-11s : %s\n", "vnc status", 	p->vm.vncstatus);
-		printf("|-%-11s : %s\n", "vnc port", 	p->vm.vncport);
-		printf("|-%-11s : %s\n", "width", 	p->vm.vncwidth);
-		printf("|-%-11s : %s\n", "height", 	p->vm.vncheight);
+		printf("|-%-12s : %s\n", "vnc status", 	p->vm.vncstatus);
+		printf("|-%-12s : %s\n", "vnc port", 	p->vm.vncport);
+		printf("|-%-12s : %s\n", "width", 	p->vm.vncwidth);
+		printf("|-%-12s : %s\n", "height", 	p->vm.vncheight);
 	}
 
-	printf("%-13s : %s\n", "auto boot",		p->vm.autoboot);
+	printf("%-14s : %s\n", "auto boot",		p->vm.autoboot);
 	if (strcmp(p->vm.autoboot, "yes") == 0) {
-		printf("|-%-11s : %s\n", "index",	p->vm.bootindex);
-		printf("|-%-11s : %s sec.\n", "time",	p->vm.bootdelay);
+		printf("|-%-12s : %s\n", "index",	p->vm.bootindex);
+		printf("|-%-12s : %s sec.\n", "time",	p->vm.bootdelay);
 	}
 
-	printf("%-13s : %s\n", "nic numbers", 		p->vm.nics);
+	printf("%-14s : %s\n", "nic interface",		p->vm.network_interface);
+	printf("%-14s : %s\n", "nic numbers", 		p->vm.nics);
 	for (int n=0; n<atoi(p->vm.nics); n++) {
 		printf("%s\n", p->vm.nic[n].name);
-		printf("|-%-11s: %s\n", "network mode",		p->vm.nic[n].netmode);
+		printf("|-%-12s : %s\n", "network mode",		p->vm.nic[n].netmode);
 		if (strcmp(p->vm.nic[n].netmode, "NAT") == 0) 
-			printf("|-%-11s : %s\n", "wan",		p->vm.nic[n].bind);
+			printf("|-%-12s : %s\n", "wan",		p->vm.nic[n].bind);
 		else
-			printf("|-%-11s : %s\n", "bind",		p->vm.nic[n].bind);
+			printf("|-%-12s : %s\n", "bind",		p->vm.nic[n].bind);
 		if (strcmp(p->vm.nic[n].netmode, "NAT") == 0) {
-			printf("|-%-11s : %s", "gateway", 		p->vm.nic[n].nat);
+			printf("|-%-12s : %s", "gateway", 		p->vm.nic[n].nat);
 			get_nat_info(p->vm.nic[n].nat);
 			printf(" [GW %s]\n", nat.ip);
-			printf("|-%-11s : %s\n", "redirect",	p->vm.nic[n].rpstatus);
+			printf("|-%-12s : %s\n", "redirect",	p->vm.nic[n].rpstatus);
 			if (strcmp(p->vm.nic[n].rpstatus, "enable") == 0) {
 				for (int m=0; m<p->vm.nic[n].rpnum; m++) {
 					char t[16];
 					sprintf(t, "port(%d)", m);
-					printf("  |-%-9s : %s %d:%d\n", t, 	p->vm.nic[n].ports[m].proto,	
+					printf("  |-%-10s : %s %d:%d\n", t, 	p->vm.nic[n].ports[m].proto,	
 										p->vm.nic[n].ports[m].vm_port, 
 									      	p->vm.nic[n].ports[m].host_port);
 				}
@@ -1554,18 +1557,19 @@ void vm_info(char *vm_name)
 			//printf("\n");
 		}
 		if (strlen(p->vm.nic[n].bridge) > 0)
-		printf("|-%-11s : %s\n", "bridge", 		p->vm.nic[n].bridge);
+		printf("|-%-12s : %s\n", "bridge", 		p->vm.nic[n].bridge);
 		if (strlen(p->vm.nic[n].tap) > 0)
-		printf("|-%-11s : %s\n", "tap",	 		p->vm.nic[n].tap);
+		printf("|-%-12s : %s\n", "tap",	 		p->vm.nic[n].tap);
 		if (strlen(p->vm.nic[n].ip) > 0)
-		printf("|-%-11s : %s\n", "ip",	 		p->vm.nic[n].ip);
+		printf("|-%-12s : %s\n", "ip",	 		p->vm.nic[n].ip);
 	}
 
 
-	printf("%-13s : ",     "status");
+
+	printf("%-14s : ",     "status");
 	if (get_vm_status(p->vm.name) == VM_ON)  printf("on\n");
 	if (get_vm_status(p->vm.name) == VM_OFF) printf("off\n");
-	printf("%-13s : %s\n", "lock", !strcmp(p->vm.lock, "1")?"yes":"no");
+	printf("%-14s : %s\n", "lock", !strcmp(p->vm.lock, "1")?"yes":"no");
 	
 }
 
@@ -2319,6 +2323,12 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 	else
 		strcpy(vm->booter, "bvmb");
 
+	if ((value = get_value_by_name("vm_network_interface")) != NULL)
+		strcpy(vm->network_interface, value);
+	if ((value = get_value_by_name("vm_storage_interface")) != NULL)
+		strcpy(vm->storage_interface, value);
+
+
 	free_config();
 }
 
@@ -2339,6 +2349,8 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	sprintf(str, "vm_name=%s\n", vm->name);
 	fputs(str, fp);
 	sprintf(str, "vm_profile=%s\n", vm->profile);
+	fputs(str, fp);
+	sprintf(str, "vm_storage_interface=%s\n", vm->storage_interface);
 	fputs(str, fp);
 	sprintf(str, "vm_disks=%s\n", vm->disks);
 	fputs(str, fp);
@@ -2402,6 +2414,8 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	fputs(str, fp);
 	fputs("\n", fp);
 	
+	sprintf(str, "vm_network_interface=%s\n", vm->network_interface);
+	fputs(str, fp);
 	sprintf(str, "vm_nics=%s\n", vm->nics);
 	fputs(str, fp);
 	for (int n=0; n<atoi(vm->nics); n++) {
@@ -2463,6 +2477,8 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	fputs(str, fp);
 	sprintf(str, "vm_booter=%s\n", vm->booter);
 	fputs(str, fp);
+	fputs("\n", fp);
+
 
 	fclose(fp);
 

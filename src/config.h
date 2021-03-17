@@ -37,7 +37,7 @@ extern list_t LIST;
 void init_config(const char *);		//接口函数, 初始化数据结构 ***
 char * get_value_by_name(const char *); //接口函数，根据键值名获取键值 ***
 void free_config(void);			//接口函数，释放动态申请内存 ***
-void print_list(void);			//debug 函数查看所有 key->value ***
+void print_config_list(void);		//查看所有 key->value ***
 //
 //
 //

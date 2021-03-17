@@ -1355,7 +1355,8 @@ int tap_list_count(int flag_nic)
 	int count = 0;
 	int n = 0;
 	while (tap_list[n]) {
-		if (strstr(tap_list[n], "tap")) ++count;
+		//if (strstr(tap_list[n], "tap")) ++count;
+		if (strstr(tap_list[n], "vmnet")) ++count;
 		else if (flag_nic) ++count;
 		++n;
 	}
@@ -1388,7 +1389,8 @@ void get_vnet_list(int type)
 	if (type == BRIDGE)
 		strcpy(cmd, "ifconfig -g bridge");
 	if (type == TAP)
-		strcpy(cmd, "ifconfig -g tap");
+		//strcpy(cmd, "ifconfig -g tap");
+		strcpy(cmd, "ifconfig -g vmnet");
 
 	FILE *fp;
 	if ((fp=popen(cmd, "r")) == NULL) {
@@ -1457,8 +1459,10 @@ int get_vnet_name_ord(char *name)
 	if (strstr(name, "bridge"))
 		return atoi(name+strlen("bridge"));
 
-	else if (strstr(name, "tap"))
-		return atoi(name+strlen("tap"));
+	//else if (strstr(name, "tap"))
+	else if (strstr(name, "vmnet"))
+		//return atoi(name+strlen("tap"));
+		return atoi(name+strlen("vmnet"));
 
 	else
 		return -1;
@@ -1477,7 +1481,8 @@ void get_new_vnet_name(int type, char *name)
 	}
 	if (type == TAP) {
 		p = tap_list;
-		strcpy(name ,"tap");
+		//strcpy(name ,"tap");
+		strcpy(name ,"vmnet");
 	}
 
 	int index = 0;

@@ -404,12 +404,12 @@ void copy_data(key_type * dst, key_type src)
 
 
 //打印整个链表
-void print_list(void)
+void print_config_list(void)
 {
 	key_type * curr = list->head;
 
 	while(curr != NULL){
-		printf("name: %s\t value:%s\n", curr->name, curr->value);
+		printf("%s = %s\n", curr->name, curr->value);
 		curr = curr->next;
 	}
 }

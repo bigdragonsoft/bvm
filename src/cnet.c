@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2019, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2021, Qiang Guo (guoqiang_cn@126.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -53,6 +53,12 @@ void network_config_init()
 			sprintf(desc, "nic-%d ip", n);
 			add_item(networkmenu, desc,     (char*)&new_vm.nic[n].ip, 	enter_vm_ip_proc,  	n, 1, 0);
 		}
+
+		add_item(networkmenu, 	"interface",	
+				  	(char*)&new_vm.network_interface, 
+				  	enter_vm_network_interface,    	
+				  	0, 1, 0);
+
 		add_item(networkmenu, "add a nic",	NULL,			add_nic,		0, 1, 1);
 		add_item(networkmenu, "delete a nic", 	NULL,			delete_nic,		0, 1, 1);
 		add_item(networkmenu, "go back",	NULL,			goback_mainmenu,	0, 1, 1);
@@ -127,7 +133,7 @@ void edit_network_config()
 // 设置网络菜单项的编辑属性
 void set_network_edit(int type, int edit)
 {
-	int n = NIC_NUM * NIC_MENU_ITEM_NUM + 1;
+	int n = NIC_NUM * NIC_MENU_ITEM_NUM + 2;
 	if (type == BVMNETWORK)
 		for (int i=0; i<n; i++)
 			networkmenu[i].edit = edit;
@@ -142,10 +148,7 @@ int check_network_enter_valid()
 	for (int i=0; i<atoi(new_vm.nics); i++) {
 		if (strlen(new_vm.nic[i].netmode) == 0) return -1;
 		if (strlen(new_vm.nic[i].ip) == 0) return -1;
-		/*
-		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0 && strlen(new_vm.nic[i].nat) == 0) return -1;
-		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0 && strlen(new_vm.nic[i].rpstatus) == 0) return -1;
-		*/
+		
 		if (strlen(new_vm.nic[i].bind) == 0) return -1;
 		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0) {
 			if (strlen(new_vm.nic[i].nat) == 0) return -1;
@@ -157,6 +160,9 @@ int check_network_enter_valid()
 		}
 		//if (strcmp(new_vm.nic[i].netmode, "Bridged") == 0 && strlen(new_vm.nic[i].bind) == 0) return -1;
 	}
+
+	if (strlen(new_vm.network_interface) == 0) return -1;
+
 	return 1;
 }
 

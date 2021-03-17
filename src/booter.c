@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2019, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2021, Qiang Guo (guoqiang_cn@126.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -121,9 +121,12 @@ void grub_booter(vm_node *p)
 
 		int slot = 3;
 		int id = 0;
+
 		for (int n=0; n<atoi(p->vm.disks); n++) {
-			//sprintf(t, "-s 3:%d,ahci-hd,${vm_disk%d} ", n, n);
-			sprintf(t, "-s %d:%d,ahci-hd,${vm_disk%d} ", slot, id, n);
+			if (strlen(p->vm.storage_interface) == 0)
+				sprintf(t, "-s %d:%d,ahci-hd,${vm_disk%d} ", slot, id, n);
+			else
+				sprintf(t, "-s %d:%d,${vm_storage_interface},${vm_disk%d} ", slot, id, n);
 			strcat(cmd, t);
 			if (++id == 8) slot++;
 		}
@@ -131,7 +134,10 @@ void grub_booter(vm_node *p)
 		
 		for (int n=0; n<atoi(p->vm.nics); n++) {
 			if (host_version() >= EM0_VER)
-				sprintf(t, "-s 10:%d,e1000,${vm_tap%d} ", n, n);
+				if (strlen(p->vm.network_interface) == 0)
+					sprintf(t, "-s 10:%d,e1000,${vm_tap%d} ", n, n);
+				else
+					sprintf(t, "-s 10:%d,${vm_network_interface},${vm_tap%d} ", n, n);
 			else
 				sprintf(t, "-s 10:%d,virtio-net,${vm_tap%d} ", n, n);
 			strcat(cmd, t);
@@ -255,6 +261,8 @@ void convert(char *code, vm_node *p)
 	str_replace(str, "${vm_vncport}", 	p->vm.vncport);
 	str_replace(str, "${vm_vncwidth}", 	p->vm.vncwidth);
 	str_replace(str, "${vm_vncheight}", 	p->vm.vncheight);
+	str_replace(str, "${vm_network_interface}", 	p->vm.network_interface);
+	str_replace(str, "${vm_storage_interface}", 	p->vm.storage_interface);
 	if (strcmp(p->vm.uefi, "uefi") == 0)
 		str_replace(str, "${vm_bhyve_uefi_fd}", "BHYVE_UEFI.fd");
 	if (strcmp(p->vm.uefi, "uefi_csm")== 0)
