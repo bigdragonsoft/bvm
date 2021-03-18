@@ -193,7 +193,17 @@ int main(int argc, char *argv[])
 			break;
 
 		case 'C': //create
-			vm_create(optarg);
+			if (argv[optind]) {
+				if (strcmp(strtolower(argv[optind]), "from") == 0)
+					if (argv[optind + 1]) {
+						vm_create(optarg, argv[optind + 1]);
+						break;
+					}
+				error("Invalid parameters.\n");
+				err_exit();
+			}
+			else
+				vm_create(optarg, NULL);
 			break;
 
 		case 'e': //config

@@ -41,7 +41,6 @@
 #define MM_MAX	32	//Main Menu Max
 #define DM_MAX	40	//Disk Menu Max
 #define NM_MAX	64	//Network Menu Max
-#define DRM_MAX	10	//Drivers Menu Max
 
 struct _create_stru {
 	char desc[128];
@@ -98,7 +97,7 @@ void enter_vm_storage_interface(int);
 
 void enter_vm_disk_config(int);
 void enter_vm_network_config(int);
-void enter_vm_driver_config(int);
+//void enter_vm_driver_config(int);
 
 void exit_the_menu(int);
 

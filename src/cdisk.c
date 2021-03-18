@@ -27,6 +27,10 @@
 #include "cdisk.h"
 #include "zfs.h"
 
+const int disk_enter_items = DISK_NUM + 4;		//输入菜单数量
+const int disk_submenu_items = 3;			//子菜单数量
+const int disk_delete_item_pos = disk_enter_items + 1;	//delete菜单的偏移量
+
 create_stru diskmenu[DM_MAX] = {0};
 create_stru *disk_sel[DM_MAX] = {0};
 //void (*disk_sel[DM_MAX])() = {0};
@@ -37,6 +41,7 @@ void disk_config_init()
 	static int flag = 1;
 	if (flag) {
 		flag = 0;
+		/*-------table-----desc------------value------------------------func--------------------arg-edit-submenu*/
 		add_item(diskmenu, "disk number",  (char*)&new_vm.disks, 	enter_vm_disks,    	0, 1, 0);
 		for (int n=0; n<DISK_NUM; n++) {
 			char desc[BUFFERSIZE];
@@ -82,6 +87,7 @@ void edit_disk_config()
 	else {
 		set_disk_edit(DISKETTE, 1);
 		set_disk_edit(DISKFUNC, -1);
+		diskmenu[disk_enter_items + disk_submenu_items - 1].edit = 1;
 	}
 
 	char *msg = "Enter an number: ";
@@ -123,12 +129,14 @@ void edit_disk_config()
 // 设置磁盘菜单项的编辑属性
 void set_disk_edit(int type, int edit)
 {
-	int n = DISK_NUM + 4;	//+3是3个菜单项(vm_disks,vm_zfs,vm_zpool,vm_network_interface)
+	int n = disk_enter_items;
+
 	if (type == DISKETTE)
 		for (int i=0; i<n; i++)
 			diskmenu[i].edit = edit;
+	
 	if (type == DISKFUNC)
-		for (int i=n; i<n+2; i++)
+		for (int i=n; i<n+disk_submenu_items; i++)
 			diskmenu[i].edit = edit;
 }
 
@@ -149,6 +157,10 @@ int check_disk_enter_valid()
 // 显示磁盘配置
 void show_disk_config()
 {
+	//磁盘数为1的时候屏蔽掉删除磁盘的菜单选项
+	if (atoi(new_vm.disks) <= 1)
+		diskmenu[disk_delete_item_pos].edit = -1;
+
 	int n = 0;
 	int index = 0;
 	while (diskmenu[n].func) {
@@ -177,6 +189,9 @@ void add_disk(int not_use)
 	warn("... add disk ...\n");
 	vm_add_disk(new_vm.name);
 	load_vm_info(new_vm.name, &new_vm);
+
+	//开启delete菜单
+	diskmenu[disk_delete_item_pos].edit = 1;
 }
 
 // 删除磁盘
@@ -185,6 +200,10 @@ void delete_disk(int not_use)
 	warn("... delete disk ...\n");
 	vm_del_disk(new_vm.name);
 	load_vm_info(new_vm.name, &new_vm);
+
+	//只有1块磁盘时关闭delete菜单
+	if (atoi(new_vm.disks) <= 1)
+		diskmenu[disk_delete_item_pos].edit = -1;
 }
 
 

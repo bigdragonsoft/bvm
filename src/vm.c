@@ -214,6 +214,15 @@ void file_lock(char *file, int flag)
 // bvm runtime environment 
 void check_bre()
 {
+	/**************************
+	 * virtualization detection
+	 **************************/
+
+	if (get_vmx(NULL) != 1) {
+		error("This machine does not support virtualization.\n");
+		return;
+	}
+
 	/********************************
 	 * Dependency package detection 
 	 * 1. bhyve-firmware
@@ -285,7 +294,7 @@ void check_bre()
 		error("bvm can't run, you need to add the following lines to /etc/sysctl.conf\n");
 		warn("net.link.tap.up_on_open=1\n");
 
-		exit(0);
+		//exit(0);
 	}
 
 	/**************************
@@ -452,7 +461,7 @@ void vm_list(int list_type, char *index_key)
 	else if (strcmp(index_key, "bystatus") == 0)
 		sort_vm_list(LS_BY_STATUS);
 	else {
-		error("Incorrect parameters.\n");
+		error("Invalid parameters.\n");
 		err_exit();
 	}
 
@@ -864,7 +873,8 @@ void vm_autoboot_list()
 }
 
 // 新建vm
-void vm_create(char *vm_name)
+// template_vm_name为模板虚拟机名称
+void vm_create(char *vm_name, char *template_vm_name)
 {
 	vm_node *p;
 	if ((p = find_vm_list(vm_name)) != NULL) {
@@ -872,9 +882,21 @@ void vm_create(char *vm_name)
 		return;
 	}
 
+	if (template_vm_name && (find_vm_list(template_vm_name) == NULL)) {
+		error("%s does not exist\n", template_vm_name);
+		return;
+	}
+
 	create_init();
 	welcome();
-	enter_vm(vm_name);
+
+	if (template_vm_name) {
+		load_vm_info(template_vm_name, &new_vm);
+		strcpy(new_vm.name, vm_name);
+		edit_vm(vm_name);
+	}
+	else
+		enter_vm(vm_name);
 
 	//新建vm文件夹
 	char dir[FN_MAX_LEN];

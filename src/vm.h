@@ -233,7 +233,7 @@ void check_bre();
 void vm_init();
 void vm_end();
 
-void vm_create(char *vm_name);
+void vm_create(char *vm_name, char *template_vm_name);
 void vm_config(char *vm_name);
 void vm_start(char *vm_name);
 void vm_login(char *vm_name);

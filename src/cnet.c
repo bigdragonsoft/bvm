@@ -25,7 +25,11 @@
  *---------------------------------------------------------------------------*/
 
 #include "cnet.h"
-#define	NIC_MENU_ITEM_NUM	6
+
+const int nic_menu_item_num = 6;				//每块网卡所需的菜单项数量
+const int nic_enter_items = NIC_NUM * nic_menu_item_num + 2;	//输入菜单数量
+const int nic_submenu_items = 3;				//子菜单数量
+const int nic_delete_item_pos = nic_enter_items + 1;		//delete菜单的偏移量
 
 create_stru networkmenu[NM_MAX] = {0};
 create_stru *network_sel[NM_MAX] = {0};
@@ -90,7 +94,7 @@ void edit_network_config()
 	}
 	else {
 		set_network_edit(BVMNETWORK, 1);
-		set_network_edit(BVMNETWORKFUNC, -1);
+		set_network_edit(BVMNETWORKFUNC, 1);
 	}
 
 	char *msg = "Enter an number: ";
@@ -133,12 +137,14 @@ void edit_network_config()
 // 设置网络菜单项的编辑属性
 void set_network_edit(int type, int edit)
 {
-	int n = NIC_NUM * NIC_MENU_ITEM_NUM + 2;
+	int n = nic_enter_items;
+
 	if (type == BVMNETWORK)
 		for (int i=0; i<n; i++)
 			networkmenu[i].edit = edit;
+
 	if (type == BVMNETWORKFUNC)
-		for (int i=n; i<n+2; i++)
+		for (int i=n; i<n+nic_submenu_items; i++)
 			networkmenu[i].edit = edit;
 }
 
@@ -169,8 +175,11 @@ int check_network_enter_valid()
 // 显示网络配置
 void show_network_config()
 {
+	//网卡数为1的时候屏蔽掉删除网卡的菜单选项
 	if (atoi(new_vm.nics) <= 1)
-		networkmenu[NIC_NUM * NIC_MENU_ITEM_NUM + 2].edit = -1;
+		networkmenu[nic_delete_item_pos].edit = -1;
+	else
+		networkmenu[nic_delete_item_pos].edit = 1;
 
 	int n = 0;
 	int index = 0;
@@ -209,7 +218,7 @@ void show_network_config()
 	}
 }
 
-// 增加网络
+// 增加网卡
 void add_nic(int not_use)
 {
 	warn("... add nic ...\n");
@@ -218,10 +227,6 @@ void add_nic(int not_use)
 		err_exit();
 	}
 	sprintf(new_vm.nics, "%d", atoi(new_vm.nics) + 1);
-	//开启delete菜单
-	networkmenu[26].edit = 1;
-	//vm_add_nic(new_vm.name);
-	//load_vm_info(new_vm.name, &new_vm);
 }
 
 // 删除网卡
@@ -229,9 +234,6 @@ void delete_nic(int not_use)
 {
 	warn("... delete nic ...\n");
 	vm_del_nic();
-	if (atoi(new_vm.nics) <= 1)
-		networkmenu[26].edit = -1;
-	//load_vm_info(new_vm.name, &new_vm);
 }
 
 // 删除一块网卡
@@ -244,7 +246,9 @@ void vm_del_nic()
 	for (int i=n+1; i<atoi(new_vm.nics); i++) {
 		new_vm.nic[i-1] = new_vm.nic[i];
 	}
+
 	int num = atoi(new_vm.nics) - 1;
+	
 	strcpy(new_vm.nic[num].netmode, "");
 	strcpy(new_vm.nic[num].nat, "");
 	strcpy(new_vm.nic[num].bind, "");
@@ -259,8 +263,10 @@ int select_nic()
 	char *msg = "Which network card: ";
 	char *opts[NIC_NUM] = {"0", "1", "2", "3", "4", "5", "6", "7"};
 	char *desc[NIC_NUM] = {0};
+	
 	int nic_num = atoi(new_vm.nics);
 	opts[nic_num] = NULL;
+	
 	for(int n=0; n<nic_num; n++) {
 		desc[n] = (char*)malloc(BUFFERSIZE * sizeof(char));
 		memset(desc[n], 0, BUFFERSIZE * sizeof(char)); 

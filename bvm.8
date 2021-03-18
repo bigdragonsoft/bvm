@@ -13,6 +13,7 @@
 .Nm
 .Cm --create
 .Ar name
+.Op Cm from Ar template-name
 .Nm
 .Cm --config
 .Ar name
@@ -24,10 +25,10 @@
 .Pp
 .Nm
 .Cm --ls
-.Op Ar byname|byos|bystatus
+.Op Ar byname | byos | bystatus
 .Nm
 .Cm --ll
-.Op Ar byname|byip|byos|bystatus
+.Op Ar byname | byip | byos | bystatus
 .Nm
 .Cm --login
 .Ar name
@@ -202,7 +203,7 @@ it may cause the web service to be abnormal!
 
 The correct way to use this option is to add the startup script:
 .Bd -literal -offset indent
-# syrc bvmd_enable=yes
+# sysrc bvmd_enable=yes
 .Ed 
 .It Cm --clone Ar name Ar new-name
 Clone a new virtual machine from an existing virtual machine.
@@ -255,8 +256,12 @@ shortcut command.
 This option allows you to configure the networking or networking of 
 virtual machines.
 .El
-.It Cm --create Ar name
+.It Cm --create Ar name Op Cm from Ar template-name
 Create a new virtual machine.
+.Bd -literal -offset indent
+# bvm --create vm1
+# bvm --create vm2 from vm1
+.Ed
 .It Cm --deldisk Ar name
 Delete the disks in the virtual machine.
 .It Cm --help
@@ -265,7 +270,7 @@ Show all options and descriptions.
 Login to a running virtual machine from console, the boot loader of this 
 virtual machine must be grub, and the uefi mode needs to log in using 
 the VNC client.
-.It Cm --ls Op Ar byname|byos|bystatus
+.It Cm --ls Op Ar byname | byos | bystatus
 Show a list and status of all virtual machines.
 By default, the output is sorted in ascending order by name, 
 or one of the following options is specified.
@@ -313,7 +318,7 @@ and the capacity is the sum of all disk capacities.
 The state of the virtual machine, off or on, if the virtual machine is locked, 
 a symbol '*' is also displayed.
 .El
-.It Cm --ll Op Ar byname|byip|byos|bystatus
+.It Cm --ll Op Ar byname | byip | byos | bystatus
 Show a list and status of all virtual machines in long format.
 By default, the output is sorted in ascending order by name,
 or one of the following options is specified.
@@ -462,6 +467,12 @@ switch4=
 switch5=
 switch6=
 switch7=
+.Ed
+.Pp
+.Pa /usr/local/etc/bvm/dhcp.conf
+.Bd -literal -offset indent
+This file records DHCP configuration information, including lease time,
+DNS, IP address pool, etc.
 .Ed
 .\" ============ SEE ALSO =============
 .Sh SEE ALSO
