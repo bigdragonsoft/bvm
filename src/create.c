@@ -95,7 +95,7 @@ void create_init()
 	add_item(tbl, "CD",	      (char*)&new_vm.cdstatus,      	enter_vm_cdstatus, 	0,	1,	0);
 	add_item(tbl, "iso path",     (char*)&new_vm.iso,      		enter_vm_iso, 		0,	1,	0);
 	add_item(tbl, "boot from",    (char*)&new_vm.bootfrom, 		enter_vm_bootfrom, 	0,	1,	0);
-	add_item(tbl, "uefi", 	      (char*)&new_vm.uefi,     		enter_vm_uefi, 		0,	0,	0);
+	add_item(tbl, "uefi type",    (char*)&new_vm.uefi,     		enter_vm_uefi, 		0,	0,	0);
 	add_item(tbl, "VNC", 	      (char*)&new_vm.vncstatus,  	enter_vm_vncstatus,	0,	1,	0);
 	add_item(tbl, "VNC port",     (char*)&new_vm.vncport,  		enter_vm_vncport,	0,	1,	0);
 	add_item(tbl, "VNC width",    (char*)&new_vm.vncwidth, 		enter_vm_vncwidth, 	0,	1,	0);
@@ -560,7 +560,7 @@ void enter_vm_uefi(int not_use)
 		return;
 	}
 
-	char *msg = "Enter efi: ";
+	char *msg = "Enter uefi type: ";
 	char *opts_grub_and_uefi[] = {
 		"none",
 		"uefi",
@@ -1541,6 +1541,67 @@ int check_version(char *value)
 		return RET_SUCCESS;
 }
 
+// 在原有字符串的基础上编辑输入
+int bvm_gets(char *s, int len)
+{
+	const int key_esc = 27;
+	const int key_back = 8;
+	const int key_del = 127;
+	const int key_return = 10;
+	/*左箭头 27 91 68 [D
+	  右箭头 27 91 67 [C
+	  上箭头 27 91 65 [A
+	  下箭头 27 91 66 [B
+	*/
+
+	static struct termios oldt, newt;
+	tcgetattr(STDIN_FILENO, &oldt);
+	newt = oldt;
+	newt.c_lflag &= ~ICANON;
+	newt.c_lflag &= ~ECHO;
+	tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+	int ch;
+	int i = 0;
+	int j;
+
+	i = strlen(s);
+	printf("%s", s);
+	while (1) {
+
+		ch = getchar();
+		if (ch == key_return) { printf("\n"); break;} //Enter
+		if (!isdigit(ch) && !isalpha(ch) && ch != key_back && ch != key_del && ch != key_esc) continue;
+		
+		switch (ch) {
+		case key_esc: //ESC
+			j = i;
+			while (j-- > 0) printf("\b \b");
+			i = 0;
+			s[i] = 0;
+			break;
+		case key_back: //BACKSPACE
+		case key_del: //DEL
+			if (i > 0) {
+				s[--i] = 0;
+				printf("\b \b");
+			}
+			break;
+		default:
+			if (i < len - 1) {
+				s[i++] = ch;
+				s[i] = 0;
+				putchar(ch);
+			}
+			break;
+		}
+
+	}
+
+	tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+	
+	return strlen(s);
+}
 
 // 用于数字的输入处理
 //   msg： 输入提示 

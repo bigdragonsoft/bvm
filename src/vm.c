@@ -893,7 +893,7 @@ void vm_create(char *vm_name, char *template_vm_name)
 	if (template_vm_name) {
 		load_vm_info(template_vm_name, &new_vm);
 		strcpy(new_vm.name, vm_name);
-		edit_vm(vm_name);
+		edit_vm(NULL);
 	}
 	else
 		enter_vm(vm_name);
@@ -1194,7 +1194,6 @@ void vm_start(char *vm_name)
 
 	if (ret) {
 		char shell[FN_MAX_LEN];
-		//sprintf(shell, "/usr/local/bin/tmux -2 -u new -d -s %s \"/bin/sh /tmp/start_%s.sh\"", vm_name, vm_name);
 		sprintf(shell, "/usr/local/bin/tmux -2 -u new -d -s %s \"bvmb %s\"", vm_name, vm_name);
 		run_cmd(shell);
 
