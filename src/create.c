@@ -1431,14 +1431,14 @@ void enter_vm_storage_interface(int not_use)
 	char *opt[] = {
 		"ahci-hd",
 		"virtio-blk",
-		"virtio-scsi",
+		//"virtio-scsi",
 		NULL,
 	};
 
 	char *desc[] = {
 		"SATA hard-drive [ahci-hd]",
 		"Virtio block storage interface [virtio-blk]",
-		"Virtio SCSI interface [virtio-scsi]",
+		//"Virtio SCSI interface [virtio-scsi]",
 		NULL,
 	};
 
@@ -1542,7 +1542,7 @@ int check_version(char *value)
 }
 
 // 在原有字符串的基础上编辑输入
-int bvm_gets(char *s, int len)
+int bvm_gets(char *s, int len, char echo)
 {
 	const int key_esc = 27;
 	const int key_back = 8;
@@ -1591,7 +1591,10 @@ int bvm_gets(char *s, int len)
 			if (i < len - 1) {
 				s[i++] = ch;
 				s[i] = 0;
-				putchar(ch);
+				if (!echo)
+					putchar(ch);
+				else
+					putchar(echo);
 			}
 			break;
 		}

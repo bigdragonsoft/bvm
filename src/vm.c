@@ -210,6 +210,124 @@ void file_lock(char *file, int flag)
 	close(fd);
 }
 
+// 对虚拟机进行加密处理
+void vm_crypt(char *vm_name, int flag)
+{
+	vm_node *p;
+	if ((p = find_vm_list(vm_name)) == NULL) {
+		error("%s does not exist\n", vm_name);
+		show_vm_name(VM_OFF);
+		return;
+	}
+
+	if (get_vm_status(vm_name) == VM_ON) {
+		error("can't encrypt, %s is running\n", vm_name);
+		return;
+	}
+
+	char succ_msg[32];
+	if (flag > 0) {
+		if (strcmp(p->vm.crypt, "1") == 0) {
+			warn("can't encrypt\n");
+			return;
+		}
+		strcpy(p->vm.crypt, "1");
+		strcpy(succ_msg, "complete the encryption");
+	}
+	else {
+		if (strcmp(p->vm.crypt, "1") != 0) {
+			warn("can't decrypt\n");
+			return;
+		}
+		strcpy(p->vm.crypt, "0");
+		strcpy(succ_msg, "complete the decryption");
+	}
+
+	if (strcmp(p->vm.lock, "1") == 0) {
+		warn("%s locked, can't %s\n", vm_name, flag?"encrypt":"decrypt");
+		return;
+	}
+
+	//输入一个key
+	char key[256] = {0};
+	char *msg = "Enter a key: ";
+	printf("%s", msg);
+	bvm_gets(key, sizeof(key), '*');
+
+	//根据key生成passwd
+	char passwd[256];
+	char *salt = "bvm";
+	strcpy(passwd, crypt(key, salt));
+
+	unsigned char data[CRYPT_BUFFER];
+	char file[FN_MAX_LEN];
+	sprintf(file, "%s%s/disk.img", vmdir, p->vm.name);
+	
+	for (int i=0; i<CRYPT_LEN; i++) {
+
+		//读取数据
+		crypt_read(file, data, i);
+
+		//异或运算
+		bvm_xor(data, passwd);
+	
+		//写回文件
+		crypt_write(file, data, i);
+	}
+
+	save_vm_info(vm_name, &p->vm);
+	printf("\033[1A\033[K");
+	printf("%s\n", succ_msg);
+}
+
+// 将加密后的数据写入虚拟机磁盘
+void crypt_write(char *file, unsigned char *s, int index)
+{
+	FILE *fp = fopen(file, "rb+");
+
+	if (fp) {
+	
+		fseek(fp, index * CRYPT_BUFFER, SEEK_SET);
+		fwrite(s, 1, CRYPT_BUFFER, fp);
+
+		fclose(fp);
+	}
+	else {
+		error("write disk-image error\n");
+		err_exit();
+	}
+}
+
+// 读取虚拟机磁盘部分数据
+void crypt_read(char *file, unsigned char *s, int index)
+{
+	FILE *fp = fopen(file, "rb");
+
+	if (fp) {
+
+		fseek(fp, index * CRYPT_BUFFER, SEEK_SET);
+		fread(s, 1, CRYPT_BUFFER, fp);
+
+		fclose(fp);
+	}
+	else {
+		error("read disk-image error\n");
+		err_exit();
+	}
+}
+
+// 对数据进行异或运算
+void bvm_xor(unsigned char *s, char *passwd)
+{
+	int len = strlen(passwd);
+	int j = 0;
+	for (int i=0; i<CRYPT_BUFFER; i++) {
+		if (j >= len)
+			j = 0;
+		s[i] ^= passwd[j++];
+	}
+}
+
 // 监测bvm运行环境
 // bvm runtime environment 
 void check_bre()
@@ -1184,6 +1302,11 @@ void vm_start(char *vm_name)
 		return;
 	}
 
+	if (atoi(p->vm.crypt)) {
+		error("%s has been encrypted, can't run\n", vm_name);
+		return;
+	}
+
 	if (strcmp(p->vm.cdstatus, "on") == 0 && access(p->vm.iso, 0) == -1) {
 		error("%s not found, can't run\n", p->vm.iso);
 		return;
@@ -1591,6 +1714,7 @@ void vm_info(char *vm_name)
 	if (get_vm_status(p->vm.name) == VM_ON)  printf("on\n");
 	if (get_vm_status(p->vm.name) == VM_OFF) printf("off\n");
 	printf("%-14s : %s\n", "lock", !strcmp(p->vm.lock, "1")?"yes":"no");
+	printf("%-14s : %s\n", "crypt", !strcmp(p->vm.crypt, "1")?"yes":"no");
 	
 }
 
@@ -2339,6 +2463,8 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 
 	if ((value = get_value_by_name("vm_lock")) != NULL)
 		strcpy(vm->lock, value);
+	if ((value = get_value_by_name("vm_crypt")) != NULL)
+		strcpy(vm->crypt, value);
 	if ((value = get_value_by_name("vm_booter")) != NULL)
 		strcpy(vm->booter, value);
 	else
@@ -2497,14 +2623,14 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	fputs("\n", fp);
 
 	sprintf(str, "vm_status=%s\n", get_vm_status(vm->name)==VM_ON?"on":"off");
-	//sprintf(str, "vm_status=%s\n", vm->status);
 	fputs(str, fp);
 	sprintf(str, "vm_lock=%s\n", vm->lock);
+	fputs(str, fp);
+	sprintf(str, "vm_crypt=%s\n", vm->crypt);
 	fputs(str, fp);
 	sprintf(str, "vm_booter=%s\n", vm->booter);
 	fputs(str, fp);
 	fputs("\n", fp);
-
 
 	fclose(fp);
 
@@ -2640,8 +2766,14 @@ void print_vm_list(int list_type)
 		//if (strcmp(p->vm.status, "on") == 0) 
 		//	printf(" (%d)", get_vm_pid(&p->vm));
 
+		/* LOCK */
 		if (strcmp(p->vm.lock, "1") == 0)
 			warn(" *");
+
+		/* CRYPT */
+		if (strcmp(p->vm.crypt, "1") == 0)
+			error(" *");
+
 		printf("\n");
 		p = p->next;
 	}

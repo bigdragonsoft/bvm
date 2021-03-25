@@ -10,13 +10,13 @@ opt = -O
 all: $(name) $(booter_name) $(dhcp_name)
 
 $(name): $(objects)
-	cc $(opt) -o $(name) $(objects)
+	cc $(opt) -o $(name) $(objects) -lcrypt
 
 $(booter_name): $(booter_objs)
-	cc $(opt) -o $(booter_name)  $(booter_objs)
+	cc $(opt) -o $(booter_name)  $(booter_objs) -lcrypt
 
 $(dhcp_name): $(dhcp_objs)
-	cc $(opt) -o $(dhcp_name) $(dhcp_objs) -lpcap -lpthread
+	cc $(opt) -o $(dhcp_name) $(dhcp_objs) -lpcap -lpthread -lcrypt
 
 main.o: main.c main.h
 	cc $(opt) -c main.c -o main.o

@@ -50,13 +50,15 @@
 #define FN_MAX_LEN 	512
 #define CMD_MAX_LEN 	256
 #define PORT_LIST_LEN	256
-#define PROTO_LEN	4	//协议字符最大长度 tcp/udp
-#define OS_NUM		32	//最大操作系统类型数量
-#define DISK_NUM	8	//最大磁盘数量
-#define NIC_NUM		8	//最大网卡数量
-#define PORT_NUM	16	//最大端口转发数量
-#define MAX_BOOT_NUM	32	//最大自动启动数量
-#define NAT_ORDER	1029	//防火墙规则中nat的序列号
+#define PROTO_LEN	4		//协议字符最大长度 tcp/udp
+#define OS_NUM		32		//最大操作系统类型数量
+#define DISK_NUM	8		//最大磁盘数量
+#define NIC_NUM		8		//最大网卡数量
+#define PORT_NUM	16		//最大端口转发数量
+#define MAX_BOOT_NUM	32		//最大自动启动数量
+#define NAT_ORDER	1029		//防火墙规则中nat的序列号
+#define CRYPT_BUFFER	1048576		//加密数据缓冲区大小为1M字节
+#define CRYPT_LEN	100		//加密数据总长度为100M字节
 
 //#define BVM_DEBUG
 
@@ -195,6 +197,7 @@ struct _vm_stru {
 
 	char status[16];		//虚拟机状态 (on/off)
 	char lock[4];			//是否锁定 (0/1)
+	char crypt[4];			//是否加密 (0/1)
 	char booter[16];		//启动器 (bvmb)
 
 	char network_interface[16];	//网络接口驱动
@@ -256,6 +259,7 @@ void vm_info_all(char *vm_name);
 void vm_os_list();
 void vm_lock_all(int flag);
 void vm_lock(char *vm_name, int flag);
+void vm_crypt(char *vm_name, int flag);
 void vm_clean();
 void vm_show_ports(int show_type, scan_redirect_port_stru *check);
 void vm_autoboot();
@@ -317,6 +321,9 @@ int  bvm_get_pid(char *name);
 int  get_vm_pid(vm_stru *vm);
 int  get_vmx(vm_stru *vm);
 void file_lock(char *file, int flag);
+void crypt_read(char *file, unsigned char *s, int index);
+void crypt_write(char *file, unsigned char *s, int index);
+void bvm_xor(unsigned char *s, char *passwd);
 void clean_tap(char *tap_name);
 void clean_bridge(char *bridge_name);
 int  check_spell(char *vm_name);

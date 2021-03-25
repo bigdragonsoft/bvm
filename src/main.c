@@ -63,14 +63,16 @@ void usage()
 	//	"	--delnat	Delete NAT",
 	//	"	--delswitch	Delete Switch",
 	//	"	--swinfo	Output Switch info",
+		"	--decrypt	Decrypt vm",
+		"	--encrypt	Encrypt vm",	
 		"	--login		Login to vm",
 		"	--ls		List vm and status",
 		"	--ll		List vm and status in long format",
 	//	"	--natinfo	Output NAT info",
-		"	--os		Output os lists",
-		"	--poweroff	Force poweroff",
 		"	--lock		Lock vm",
 		"	--lockall	Lock all vms",
+		"	--os		Output os lists",
+		"	--poweroff	Force poweroff",
 		"	--reload-nat	Reload NAT redirect-port",
 		"	--remove	Destroy vm",
 		"	--rename	Rename vm",
@@ -175,6 +177,8 @@ int main(int argc, char *argv[])
 		{"test", 		0, 	NULL, 	't'},
 		{"destroy-bridge", 	0, 	NULL, 	0},
 		{"destroy-tap", 	0, 	NULL, 	0},
+		{"encrypt", 		1, 	NULL, 	0},
+		{"decrypt", 		1, 	NULL, 	0},
 		{NULL, 			0, 	NULL, 	0}
 	};
 
@@ -189,6 +193,12 @@ int main(int argc, char *argv[])
 			}
 			if (strcmp(long_options[option_index].name, "destroy-tap") == 0) {
 				destroy_all_tap();
+			}
+			if (strcmp(long_options[option_index].name, "encrypt") == 0) {
+				vm_crypt(optarg, 1);
+			}
+			if (strcmp(long_options[option_index].name, "decrypt") == 0) {
+				vm_crypt(optarg, 0);
 			}
 			break;
 

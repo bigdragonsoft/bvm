@@ -1346,8 +1346,6 @@ int dhcp_discover_proc(dhcp_msg *request, dhcp_msg *reply)
 
 	int i = find_mac_in_pool(idx, request->hdr.chaddr);
 	if (i >= 0) {
-		//if (dhcp_pool[idx].bind[i].xid == request->hdr.xid)
-		//	return DHCP_INVALID;
 
 		if ((dhcp_pool[idx].bind[i].bind_time + htonl(dhcp_pool[idx].lease_time)) < time(NULL)) {
 			fill_bind_in_pool(idx, i, PENDING, request);
@@ -1355,6 +1353,14 @@ int dhcp_discover_proc(dhcp_msg *request, dhcp_msg *reply)
 		
 			return DHCP_OFFER;
 		}
+
+		if (dhcp_pool[idx].bind[i].xid != request->hdr.xid) {
+			fill_bind_in_pool(idx, i, PENDING, request);
+			set_reply_options(reply, DHCP_OFFER, idx, i);
+		
+			return DHCP_OFFER;
+		}
+
 		return DHCP_INVALID;
 	}
 

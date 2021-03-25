@@ -117,7 +117,7 @@ int  set_portlist(char *ip);
 
 int  get_filelist(char *dir, char **opt, char **opt_desc);
 int  check_numbers(char *value, char *unit);
-int  bvm_gets(char *s, int len);
+int  bvm_gets(char *s, int len, char echo);
 void enter_numbers(char *msg, char *unit, char *value);
 int  check_version(char *value);
 void enter_version(char *msg, char *value);

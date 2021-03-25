@@ -56,6 +56,13 @@
 .Ar name new-name
 .Pp
 .Nm
+.Cm --encrypt
+.Ar name
+.Nm
+.Cm --decrypt
+.Ar name
+.Pp
+.Nm
 .Cm --lock
 .Ar name
 .Nm
@@ -264,6 +271,10 @@ Create a new virtual machine.
 .Ed
 .It Cm --deldisk Ar name
 Delete the disks in the virtual machine.
+.It Cm --decrypt Ar name
+Decrypt the virtual machine.
+.It Cm --encrypt Ar name
+Encrypt the virtual machine.
 .It Cm --help
 Show all options and descriptions.
 .It Cm --login Ar name
@@ -316,7 +327,8 @@ Disk capacity, the number in square brackets represents the number of disks,
 and the capacity is the sum of all disk capacities.
 .It Ar STATE
 The state of the virtual machine, off or on, if the virtual machine is locked, 
-a symbol '*' is also displayed.
+a yellow symbol '*' is also displayed, if the virtual machine is encrypted, 
+a red symbol '*' is also displayed.
 .El
 .It Cm --ll Op Ar byname | byip | byos | bystatus
 Show a list and status of all virtual machines in long format.
