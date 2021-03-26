@@ -37,26 +37,28 @@ Options:
         --config        Configure for vm
         --create        Create new vm
         --deldisk       Delete a disk
+        --decrypt       Decrypt vm
+        --encrypt       Encrypt vm
         --login         Login to vm
         --ls            List vm and status
         --ll            List vm and status in long format
-        --os            Output os lists
-        --poweroff      Force poweroff
         --lock          Lock vm
         --lockall       Lock all vms
-	--reload-nat    Reload NAT redirect-port
+        --os            Output os lists
+        --poweroff      Force poweroff
+        --reload-nat    Reload NAT redirect-port
         --remove        Destroy vm
         --rename        Rename vm
         --restart       Restart vm
         --rollback      Roll back to the snapshot point
         --setnat        Setting NAT's IP-addr
         --setsw         Setting Switch's IP-addr
-	--setpr         Setting the port redirection list
-	--showpr        Show port redirection list
+        --setpr         Setting the port redirection list
+        --showpr        Show port redirection list
         --showdev       Show device
         --showdevall    Show all devices in class mode
         --showdevuse    Show all devices in simple mode
-	--showdhcp	Show all DHCP clients
+        --showdhcp      Show all DHCP clients
         --showsnap      Show snapshots list of the vm
         --showsnapall   Show snapshots list of the all vm
         --snapshot      Generating snapshots for vm

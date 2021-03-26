@@ -1542,6 +1542,10 @@ int check_version(char *value)
 }
 
 // 在原有字符串的基础上编辑输入
+// 参数echo：
+// 	BVM_NOECHO 不回显
+// 	BVM_ECHO   回显
+// 	其他字符   回显此字符
 int bvm_gets(char *s, int len, char echo)
 {
 	const int key_esc = 27;
@@ -1571,12 +1575,13 @@ int bvm_gets(char *s, int len, char echo)
 
 		ch = getchar();
 		if (ch == key_return) { printf("\n"); break;} //Enter
-		if (!isdigit(ch) && !isalpha(ch) && ch != key_back && ch != key_del && ch != key_esc) continue;
+		//if (!isdigit(ch) && !isalpha(ch) && ch != key_back && ch != key_del && ch != key_esc) continue;
 		
 		switch (ch) {
 		case key_esc: //ESC
 			j = i;
-			while (j-- > 0) printf("\b \b");
+			if (echo != BVM_NOECHO)
+				while (j-- > 0) printf("\b \b");
 			i = 0;
 			s[i] = 0;
 			break;
@@ -1584,14 +1589,17 @@ int bvm_gets(char *s, int len, char echo)
 		case key_del: //DEL
 			if (i > 0) {
 				s[--i] = 0;
-				printf("\b \b");
+				if (echo != BVM_NOECHO)
+					printf("\b \b");
 			}
 			break;
 		default:
 			if (i < len - 1) {
 				s[i++] = ch;
 				s[i] = 0;
-				if (!echo)
+				if (echo == BVM_NOECHO)
+					break;
+				if (echo == BVM_ECHO)
 					putchar(ch);
 				else
 					putchar(echo);

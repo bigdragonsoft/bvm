@@ -43,6 +43,9 @@
 #define DM_MAX	40	//Disk Menu Max
 #define NM_MAX	64	//Network Menu Max
 
+#define BVM_ECHO   0	//Echo
+#define BVM_NOECHO 1	//No Echo
+
 struct _create_stru {
 	char desc[128];
 	char *value;

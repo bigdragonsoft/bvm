@@ -225,14 +225,14 @@ void vm_crypt(char *vm_name, int flag)
 		return;
 	}
 
-	char succ_msg[32];
+	char succ_msg[64];
 	if (flag > 0) {
 		if (strcmp(p->vm.crypt, "1") == 0) {
 			warn("can't encrypt\n");
 			return;
 		}
 		strcpy(p->vm.crypt, "1");
-		strcpy(succ_msg, "complete the encryption");
+		strcpy(succ_msg, "complete the encryption and don't forget this key");
 	}
 	else {
 		if (strcmp(p->vm.crypt, "1") != 0) {
@@ -250,13 +250,22 @@ void vm_crypt(char *vm_name, int flag)
 
 	//输入一个key
 	char key[256] = {0};
-	char *msg = "Enter a key: ";
+	char *msg = "Enter key: ";
 	printf("%s", msg);
 	bvm_gets(key, sizeof(key), '*');
 
+	if (strlen(key) < 6) {
+		warn("password length must be greater than 6 characters\n");
+		return;
+	}
+
+	//生成盐值
+	char salt[3] = {0};
+	salt[0] = toupper(key[0]);
+	salt[1] = key[strlen(key) - 1];
+
 	//根据key生成passwd
 	char passwd[256];
-	char *salt = "bvm";
 	strcpy(passwd, crypt(key, salt));
 
 	unsigned char data[CRYPT_BUFFER];
