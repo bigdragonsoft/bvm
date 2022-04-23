@@ -319,6 +319,7 @@ int  check_vm_disks(vm_stru *vm);
 int  select_disk(vm_stru *vm);
 int  bvm_get_pid(char *name);
 int  get_vm_pid(vm_stru *vm);
+int  exist_hw_vmm_vmx_initialized(vm_stru *vm);
 int  get_vmx(vm_stru *vm);
 void file_lock(char *file, int flag);
 void crypt_read(char *file, unsigned char *s, int index);

@@ -345,7 +345,7 @@ void check_bre()
 	 * virtualization detection
 	 **************************/
 
-	if (get_vmx(NULL) != 1) {
+	if (!exist_hw_vmm_vmx_initialized(NULL) || get_vmx(NULL) != 1) {
 		error("This machine does not support virtualization.\n");
 		return;
 	}
@@ -3283,6 +3283,23 @@ int get_vm_pid(vm_stru *vm)
 	return pid;
 }
 
+// 获取是否存在参数hw.vmm.vmx.initialized(存在:1,不存在:0)
+int exist_hw_vmm_vmx_initialized(vm_stru *vm)
+{
+	int value;
+	char cmd[BUFFERSIZE];
+	sprintf(cmd, "sysctl -a | grep hw.vmm.vmx.initialized");
+	char buf[16];
+	FILE *fp = popen(cmd, "r");
+	if (fgets(buf, 16, fp))
+		value = 1;
+	else
+		value = 0;
+	pclose(fp);
+
+	return value;
+}
+
 // 获取是否支持虚拟化
 int get_vmx(vm_stru *vm)
 {
@@ -3302,7 +3319,6 @@ int get_vmx(vm_stru *vm)
 
 	return value;
 }
-
 
 // 获得bvm支持os的启动状态
 void get_bvm_os(os_stru *os)
