@@ -229,7 +229,14 @@ void uefi_booter(vm_node *p)
 
 		ret = run(cmd, p);
 
-		if (ret) break;
+		/*********** bhyve EXIT STATUS ***********
+		  0	     rebooted
+     		  1	     powered off
+     		  2	     halted
+     		  3	     triple fault
+     		  4	     exited due	to an error
+		*******************************************/
+		if (ret > 0 && ret < 4) break;
 		strcpy(cmd, "/usr/sbin/bhyvectl --destroy --vm=${vm_name}");
 		run(cmd, p);
 		boot = 1;
