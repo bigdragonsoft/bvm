@@ -29,7 +29,7 @@
 
 pro_stru program = {
 	"bvm", 
-	"1.3.2", 
+	"1.3.3", 
 	"Qiang Guo",
 	"guoqiang_cn@126.com",
 	"https://github.com/bigdragonsoft/bvm",
@@ -42,7 +42,7 @@ void version()
 	printf("author: %s\n", program.author);
 	printf("email: %s\n", program.email);
 	printf("%s\n", program.website);
-	printf("Copyright (C) 2017~2021 ChinaFreeBSD.cn, GuoQiang.org, BigDragon.cn\n");
+	printf("Copyright (C) 2017~2022 ChinaFreeBSD.cn, GuoQiang.org, BigDragon.cn\n");
 }
 
 // 程序用法
