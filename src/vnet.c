@@ -940,7 +940,7 @@ int check_ip(char *ip)
 		}
 		mask++;
 	}
-	int mask_ret = (n % 8 == 0) && (n <= 32);
+	int mask_ret = (n >= 0 && n <= 32);
 
 	//检测ip
 	struct in_addr addr; //IPv4地址结构体
