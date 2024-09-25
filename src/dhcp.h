@@ -362,7 +362,7 @@ uint8_t parse_option(dhcp_option *opt, char *name, char *value);
 
 
 //监控网桥 ----------
-void get_bridge_name();
+void get_bridge_name(listen_dev_stru *dev);
 int  get_bridge_num(listen_dev_stru *dev);
 void bridge_cmp(listen_dev_stru *cur_dev, listen_dev_stru *new_dev);
 

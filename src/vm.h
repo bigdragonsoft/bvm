@@ -28,6 +28,7 @@
 #define BVM_VM_H
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>

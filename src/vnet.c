@@ -1551,6 +1551,25 @@ void get_wlan_name(char *name)
 	pclose(fp);
 }
 
+// 获取lagg名称
+void get_lagg_name(char *name)
+{
+	FILE *fp;
+	fp = popen("ifconfig -g lagg | awk '{print $1}'", "r");
+	if (fp == NULL) {
+		error("can't get nic name\n");
+		err_exit();
+	}
+	
+	char buf[VNET_BUFFERSIZE];
+	while (fgets(buf, VNET_BUFFERSIZE, fp)) {
+		buf[strlen(buf)-1] = '\0';
+		strcpy(name, buf);
+		break;
+	}
+
+	pclose(fp);
+}
 
 // 获取lo名称
 void get_lo_name(char *name)
@@ -1593,6 +1612,10 @@ int get_nic_list(int type)
 	if (type != CABLE)
 		get_wlan_name(wlan);
 
+	//lagg列表
+	char lagg[VNET_BUFFERSIZE] = {0};
+	get_lagg_name(lagg);
+
 	int n = 0;
 	char buf[VNET_BUFFERSIZE];
 	while (fgets(buf, VNET_BUFFERSIZE, fp)) {
@@ -1604,6 +1627,7 @@ int get_nic_list(int type)
 			break;
 	}
 	
+	if (strlen(lagg) > 0) strcpy(nic_list[n], lagg);
 	if (strlen(wlan) > 0) strcpy(nic_list[n], wlan);
 
 	pclose(fp);
