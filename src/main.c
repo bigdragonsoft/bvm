@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2021 Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2024, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@ pro_stru program = {
 	"bvm", 
 	"1.3.3", 
 	"Qiang Guo",
-	"guoqiang_cn@126.com",
+	"bigdragonsoft@gmail.com",
 	"https://github.com/bigdragonsoft/bvm",
 };
 
@@ -42,7 +42,7 @@ void version()
 	printf("author: %s\n", program.author);
 	printf("email: %s\n", program.email);
 	printf("%s\n", program.website);
-	printf("Copyright (C) 2017~2022 ChinaFreeBSD.cn, GuoQiang.org, BigDragon.cn\n");
+	printf("Copyright (C) 2017~2024 BigDragonSoft.com, ChinaFreeBSD.cn\n");
 }
 
 // 程序用法
@@ -127,45 +127,48 @@ int main(int argc, char *argv[])
 	int opt;
 	char *short_options = "hvl";
 
+	//未使用的字母
+	//j, k, q, x, y, z
+	//F, G, J, M, O, P, Q, U, X, Y, Z
 	struct option long_options[] = {
-		{"help", 		0,	NULL, 	'h'},
+		{"help", 			0,	NULL, 	'h'},
 		{"version", 		0, 	NULL, 	'v'},
-		{"ls", 			0, 	NULL, 	'l'},
-		{"ll", 			0, 	NULL, 	'('},
-		{"os", 			0, 	NULL, 	'o'},
-		{"create", 		1, 	NULL, 	'C'},
-		{"config", 		1, 	NULL, 	'e'},
-		{"start", 		1, 	NULL, 	's'},
+		{"ls", 				0, 	NULL, 	'l'},
+		{"ll", 				0, 	NULL, 	'('},
+		{"os", 				0, 	NULL, 	'o'},
+		{"create", 			1, 	NULL, 	'C'},
+		{"config", 			1, 	NULL, 	'e'},
+		{"start", 			1, 	NULL, 	's'},
 		{"autoboot", 		0, 	NULL, 	'B'},
-		{"abinfo", 		0, 	NULL, 	'b'},
-		{"login", 		1, 	NULL, 	'L'},
-		{"stop", 		1, 	NULL, 	'S'},
+		{"abinfo", 			0, 	NULL, 	'b'},
+		{"login", 			1, 	NULL, 	'L'},
+		{"stop", 			1, 	NULL, 	'S'},
 		{"restart", 		1, 	NULL, 	'R'},
 		{"poweroff", 		1, 	NULL, 	'p'},
-		{"clone", 		1, 	NULL, 	'c'},
-		{"rename", 		1, 	NULL, 	'r'},
-		{"remove", 		1, 	NULL, 	'd'},
-		{"addisk", 		1, 	NULL, 	'+'},
+		{"clone", 			1, 	NULL, 	'c'},
+		{"rename", 			1, 	NULL, 	'r'},
+		{"remove", 			1, 	NULL, 	'd'},
+		{"addisk", 			1, 	NULL, 	'+'},
 		{"deldisk", 		1, 	NULL, 	'-'},
-		{"vminfo", 		1, 	NULL, 	'i'},
+		{"vminfo", 			1, 	NULL, 	'i'},
 		{"vminfoall", 		1, 	NULL, 	'I'},
 	//	{"natinfo", 		0, 	NULL, 	'n'},
-		{"setnat", 		1, 	NULL, 	'N'},
-		{"addnat", 		1, 	NULL, 	'A'},
-	//	{"delnat", 		1, 	NULL, 	'D'},
-	//	{"swinfo", 		0, 	NULL, 	'1'},
-		{"setsw", 		1, 	NULL, 	'2'},
+		{"setnat", 			1, 	NULL, 	'N'},
+		{"addnat", 			1, 	NULL, 	'A'},
+	//	{"delnat", 			1, 	NULL, 	'D'},
+	//	{"swinfo", 			0, 	NULL, 	'1'},
+		{"setsw", 			1, 	NULL, 	'2'},
 	//	{"addswitch", 		1, 	NULL, 	'3'},
 	//	{"delswitch", 		1, 	NULL, 	'4'},
 		{"unsetsw", 		1, 	NULL, 	'u'},
 		{"reload-nat", 		0, 	NULL, 	'E'},
-		{"lock", 		1, 	NULL, 	'5'},
-		{"unlock", 		1, 	NULL, 	'6'},
+		{"lock", 			1, 	NULL, 	'5'},
+		{"unlock", 			1, 	NULL, 	'6'},
 		{"lockall", 		0, 	NULL, 	'7'},
 		{"unlockall",		0, 	NULL, 	'8'},
-		{"setpr", 		1, 	NULL, 	'a'},
-		{"showpr", 		0, 	NULL, 	'f'},
-		{"showdev",		0, 	NULL, 	'9'},
+		{"setpr", 			1, 	NULL, 	'a'},
+		{"showpr", 			0, 	NULL, 	'f'},
+		{"showdev",			0, 	NULL, 	'9'},
 		{"showdevall",		0, 	NULL, 	'T'},
 		{"showdevuse",		0, 	NULL, 	'm'},
 		{"showdhcp",		0, 	NULL, 	'g'},
@@ -174,12 +177,12 @@ int main(int argc, char *argv[])
 		{"snapshot",		1, 	NULL, 	'W'},
 		{"rollback",		1, 	NULL, 	'K'},
 		{"hd-booting",		1, 	NULL, 	'H'},
-		{"test", 		0, 	NULL, 	't'},
+		{"test", 			0, 	NULL, 	't'},
 		{"destroy-bridge", 	0, 	NULL, 	0},
 		{"destroy-tap", 	0, 	NULL, 	0},
 		{"encrypt", 		1, 	NULL, 	0},
 		{"decrypt", 		1, 	NULL, 	0},
-		{NULL, 			0, 	NULL, 	0}
+		{NULL, 				0, 	NULL, 	0}
 	};
 
 	int option_index = 0;
@@ -255,6 +258,7 @@ int main(int argc, char *argv[])
 		
 		case 'p': //poweroff
 			vm_poweroff(optarg, 1);
+			vm_killsession(optarg);
 			break;
 		
 		case 'c': //clone

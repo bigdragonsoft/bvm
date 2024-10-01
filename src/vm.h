@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2021, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2024, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -243,6 +243,7 @@ void vm_start(char *vm_name);
 void vm_login(char *vm_name);
 void vm_stop(char *vm_name);
 void vm_restart(char *vm_name);
+void vm_killsession(char *vm_name);
 void vm_poweroff(char *vm_name, int flag_msg);
 int  vm_clone(char *src_vm_name, char *dst_vm_name);
 int  vm_rename(char *old_vm_name, char *new_vm_name);
@@ -320,6 +321,7 @@ int  check_vm_disks(vm_stru *vm);
 int  select_disk(vm_stru *vm);
 int  bvm_get_pid(char *name);
 int  get_vm_pid(vm_stru *vm);
+int  get_bvmb_pid(vm_stru *vm);
 int  exist_hw_vmm_vmx_initialized(vm_stru *vm);
 int  get_vmx(vm_stru *vm);
 void file_lock(char *file, int flag);

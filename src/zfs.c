@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2019, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2024, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without

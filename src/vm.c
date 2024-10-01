@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2021, Qiang Guo (guoqiang_cn@126.com)
+   BVM Copyright (c) 2018-2024, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -777,7 +777,7 @@ void clean_bridge(char *bridge_name)
 // 检测并销毁指定tap
 void clean_tap(char *tap_name)
 {
-	if (strstr(tap_name, "tap") == NULL) return;
+	if (strstr(tap_name, "vmnet") == NULL) return;
 
 	strcpy(tap, tap_name);
 	vm_node *p = vms;
@@ -1460,6 +1460,34 @@ int waitting_boot(char *vm_name)
 	while (1) {
 		if (get_vm_status(vm_name) == VM_ON) return 1;
 	}
+}
+
+// 删除tmux session
+// 仅用于vm无法正常启动后，执行 --poweroff 后的清理
+void vm_killsession(char *vm_name)
+{
+	vm_node *p;
+	if ((p = find_vm_list(vm_name)) == NULL) {
+		error("%s does not exist\n", vm_name);
+		show_vm_name(VM_ON);
+		return;
+	}
+
+	if (get_vm_status(vm_name) == VM_ON) {
+		error("%s is running...\n", vm_name);
+		return;
+	}
+
+	char cmd[CMD_MAX_LEN];
+	//删除tmux窗口
+	if (strcmp(p->vm.uefi, "none") == 0) {
+		sprintf(cmd, "tmux kill-session -t %s >> /dev/null 2>&1", vm_name);
+		run_cmd(cmd);
+	}
+	
+	//杀掉bvmb进程
+	sprintf(cmd, "ps | grep -w \"bvmb %s\" | grep -v \"c bvmb %s\" | grep -v grep | awk '{print $1}' | xargs kill", vm_name, vm_name);
+	run_cmd(cmd);
 }
 
 // 关闭电源
@@ -3269,6 +3297,27 @@ int get_vm_pid(vm_stru *vm)
 	char cmd[BUFFERSIZE];
 	//sprintf(cmd, "ps | grep \"bvmb %s\" | grep -v csh | grep -v grep | awk '{print $1}'", vm->name);
 	sprintf(cmd, "ifconfig %s | grep Opened | awk '{print $4}'", vm->nic[0].tap);
+	char buf[16];
+	FILE *fp = popen(cmd, "r");
+	if (fgets(buf, 16, fp)) {
+		buf[strlen(buf)-1] = '\0';
+		pid = atoi(buf);
+	}
+	else
+		pid = -1;
+
+	pclose(fp);
+
+	return pid;
+}
+
+// 获得bvmb的进程id
+int get_bvmb_pid(vm_stru *vm)
+{
+	int pid;
+	char cmd[BUFFERSIZE];
+	sprintf(cmd, "ps | grep -w \"bvmb %s\" | grep -v \"c bvmb %s\" | grep -v grep | awk '{print $1}'", vm->name, vm->name);
+
 	char buf[16];
 	FILE *fp = popen(cmd, "r");
 	if (fgets(buf, 16, fp)) {
