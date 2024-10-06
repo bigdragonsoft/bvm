@@ -3,6 +3,8 @@
 /src/bvmdhcp
 /src/*.o
 /src/*~
+/src/.DS_Store
+/.DS_Store
 /*~
 /pkg/bin/*.txz
 /port/
