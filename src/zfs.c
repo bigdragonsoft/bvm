@@ -34,10 +34,16 @@
 char zpool_list[ZPOOL_LISTSIZE][ZPOOL_BUFFERSIZE] = {0};
 char snapshot_list[SNAPSHOT_LISTSIZE][SNAPSHOT_BUFFERSIZE] = {0};
 
-// 检测宿主机是否支持zfs
+// 是否支持zfs
+int  support_zfs()
+{
+	return is_zfs_supported_by_kldstat();
+}
+
+// 检测宿主机是否支持zfs(通过配置文件)
 // 1：支持
 // 0：不支持
-int support_zfs()
+int is_zfs_supported_by_config()
 {
 	int f1 = 0;
 	int f2 = 0;
@@ -60,6 +66,35 @@ int support_zfs()
 
 	if (f1 && f2) return 1;
 	else return 0;
+}
+
+// 检测宿主机是否支持zfs
+// 1：支持
+// 0：不支持
+// -1：错误
+int is_zfs_supported_by_kldstat() 
+{
+    FILE *fp;
+    char line[BUFFERSIZE];
+    int supported = 0;
+
+    // 执行 kldstat 命令并读取输出
+    fp = popen("kldstat", "r");
+    if (fp == NULL) {
+        error("Failed to execute the kldstat command\n");
+        return -1;
+    }
+
+    // 检查输出中是否包含 zfs.ko 模块
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        if (strstr(line, "zfs.ko") != NULL) {
+            supported = 1;
+            break;
+        }
+    }
+
+    pclose(fp);
+    return supported;
 }
 
 // 获取所有zpool存储池列表

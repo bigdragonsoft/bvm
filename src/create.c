@@ -561,16 +561,20 @@ void enter_vm_uefi(int not_use)
 	}
 
 	char *msg = "Enter uefi type: ";
+	
+	// 检查 UEFI CSM 固件文件是否存在
+	int has_csm = (access("/usr/local/share/uefi-firmware/BHYVE_UEFI_CSM.fd", F_OK) == 0);
+	
 	char *opts_grub_and_uefi[] = {
 		"none",
 		"uefi",
-		"uefi_csm",
+		has_csm ? "uefi_csm" : NULL,
 		NULL,
 	};
 
 	char *opts_only_uefi[] = {
 		"uefi",
-		"uefi_csm",
+		has_csm ? "uefi_csm" : NULL,
 		NULL,
 	};
 	

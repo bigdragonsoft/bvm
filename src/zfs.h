@@ -43,6 +43,8 @@ enum SNAPSHOT_ENUM {
 extern char zpool_list[][ZPOOL_BUFFERSIZE];
 extern char snapshot_list[][SNAPSHOT_BUFFERSIZE];
 
+int  is_zfs_supported_by_kldstat();
+int  is_zfs_supported_by_config();
 int  support_zfs();
 int  get_zpool_list();
 int  exist_zvol(char *zvol);

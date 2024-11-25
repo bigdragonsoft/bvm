@@ -358,8 +358,10 @@ void check_bre()
 	 ********************************/
 	
 	//bhyve-firmware
-	if (access("/usr/local/share/uefi-firmware/BHYVE_UEFI.fd", 0) == -1 ||
-	    access("/usr/local/share/uefi-firmware/BHYVE_UEFI_CSM.fd", 0) == -1) {
+	//bhyve-firmware移除了 BHYVE_UEFI_CSM.fd
+	/*if (access("/usr/local/share/uefi-firmware/BHYVE_UEFI.fd", 0) == -1 ||
+	    access("/usr/local/share/uefi-firmware/BHYVE_UEFI_CSM.fd", 0) == -1) {*/
+	if (access("/usr/local/share/uefi-firmware/BHYVE_UEFI.fd", 0) == -1) {
 		warn("unable to support UEFI\n");
 		warn("please use 'pkg install bhyve-firmware' to install first\n\n");
 	}	
