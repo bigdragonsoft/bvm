@@ -73,5 +73,6 @@ Example:
         bvm --start vmname
         bvm --clone oldname newname
         bvm --ls
+        bvm --ll online
 ```
 

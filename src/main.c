@@ -152,14 +152,14 @@ int main(int argc, char *argv[])
 		{"deldisk", 		1, 	NULL, 	'-'},
 		{"vminfo", 			1, 	NULL, 	'i'},
 		{"vminfoall", 		1, 	NULL, 	'I'},
-	//	{"natinfo", 		0, 	NULL, 	'n'},
+		{"natinfo", 		0, 	NULL, 	'n'},
 		{"setnat", 			1, 	NULL, 	'N'},
 		{"addnat", 			1, 	NULL, 	'A'},
-	//	{"delnat", 			1, 	NULL, 	'D'},
-	//	{"swinfo", 			0, 	NULL, 	'1'},
+		{"delnat", 			1, 	NULL, 	'D'},
+		{"swinfo", 			0, 	NULL, 	'1'},
 		{"setsw", 			1, 	NULL, 	'2'},
-	//	{"addswitch", 		1, 	NULL, 	'3'},
-	//	{"delswitch", 		1, 	NULL, 	'4'},
+		{"addswitch", 		1, 	NULL, 	'3'},
+		{"delswitch", 		1, 	NULL, 	'4'},
 		{"unsetsw", 		1, 	NULL, 	'u'},
 		{"reload-nat", 		0, 	NULL, 	'E'},
 		{"lock", 			1, 	NULL, 	'5'},
@@ -399,16 +399,22 @@ int main(int argc, char *argv[])
 		
 		case 'l': //ls
 			if (argv[optind])
-				vm_list(VM_SHORT_LIST, argv[optind]);
+				if (strcmp(argv[optind], "online") == 0)
+					vm_list(VM_SHORT_LIST, "byname", 1);
+				else
+					vm_list(VM_SHORT_LIST, argv[optind], 0);
 			else
-				vm_list(VM_SHORT_LIST, "byname");
+				vm_list(VM_SHORT_LIST, "byname", 0);
 			break;
 		
 		case '(': //ll
-			if (argv[optind])
-				vm_list(VM_LONG_LIST, argv[optind]);
-			else
-				vm_list(VM_LONG_LIST, "byname");
+			if (argv[optind]) 
+				if (strcmp(argv[optind], "online") == 0)
+					vm_list(VM_LONG_LIST, "byname", 1);
+				else
+					vm_list(VM_LONG_LIST, argv[optind], 0);
+			else 
+				vm_list(VM_LONG_LIST, "byname", 0);
 			break;
 		
 		case 'E': //reload-nat

@@ -574,11 +574,24 @@ void vm_end()
 	destroy_vm_list();
 }
 
+// 返回在线的虚拟机数量
+int vm_online_count()
+{
+	int count = 0;
+	vm_node *p = vms;
+	while (p) {
+		if (get_vm_status(p->vm.name) == VM_ON)
+			count++;
+		p = p->next;
+	}
+	return count;
+}
+
 /*
  * 输出虚拟机列表
  * Output virtual machine list
  */
-void vm_list(int list_type, char *index_key)
+void vm_list(int list_type, char *index_key, int online_only)
 {
 	//先将虚拟机列表按键值排序
 	if (strcmp(index_key, "byname") == 0)
@@ -595,7 +608,7 @@ void vm_list(int list_type, char *index_key)
 	}
 
 	//再开始输出列表
-	print_vm_list(list_type);
+	print_vm_list(list_type, online_only);
 }
 
 // 获的vm最长的名字长度
@@ -2718,9 +2731,10 @@ void select_vm(char *vm_name, int status)
 }
 
 // 输出vm列表
-void print_vm_list(int list_type)
+void print_vm_list(int list_type, int online_only)
 {
 	if (vms == NULL) return;
+	if (online_only && vm_online_count() == 0) return;
 
 	if (list_type == VM_LONG_LIST)
 		title("NAME\t\tIP\t\t\tGUEST\t\tLOADER\tAUTOSTART\tCPU\tMEMORY\tDISK\t\tSTATE\n");
@@ -2728,6 +2742,11 @@ void print_vm_list(int list_type)
 		title("NAME\t\tGUEST\t\tCPU\tMEMORY\tDISK\t\tSTATE\n");
 	vm_node *p = vms;
 	while (p) {
+		if (online_only && strcmp(p->vm.status, "off") == 0) {
+			p = p->next;
+			continue;
+		}
+
 		/* NAME */
 		printf("%s", p->vm.name);
 		for (int n=0; n<(2-strlen(p->vm.name) / TABSTOP); n++) printf("\t");
