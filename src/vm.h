@@ -61,6 +61,8 @@
 #define CRYPT_BUFFER	1048576		//加密数据缓冲区大小为1M字节
 #define CRYPT_LEN	100		//加密数据总长度为100M字节
 
+#define MAX(a,b) ((a) > (b) ? (a) : (b))
+
 //#define BVM_DEBUG
 
 extern char *osdir;
@@ -299,6 +301,7 @@ void save_vm_info(char *vm_name, vm_stru *vm);
 void show_vm_name(int status);
 void select_vm(char *vm_name, int status);
 void print_vm_list(int list_type, int online_only);
+void print_vm_net_stat();
 vm_node* find_vm_list(char *vm_name);
 int  del_from_vm_list(char *vm_name);
 void get_vm_name(char *dir);
@@ -349,4 +352,7 @@ int  success(char *fmt, ...);
 int  red(char *fmt, ...);
 int  green(char *fmt, ...);
 int  title(char *fmt, ...);
+
+
+
 #endif	//BVM_VM_H

@@ -68,6 +68,7 @@ void usage()
 		"	--login		Login to vm",
 		"	--ls		List vm and status",
 		"	--ll		List vm and status in long format",
+		"	--netstat	Show vm netstat",
 	//	"	--natinfo	Output NAT info",
 		"	--lock		Lock vm",
 		"	--lockall	Lock all vms",
@@ -128,13 +129,14 @@ int main(int argc, char *argv[])
 	char *short_options = "hvl";
 
 	//未使用的字母
-	//j, k, q, x, y, z
+	//k, q, x, y, z
 	//F, G, J, M, O, P, Q, U, X, Y, Z
 	struct option long_options[] = {
 		{"help", 			0,	NULL, 	'h'},
 		{"version", 		0, 	NULL, 	'v'},
 		{"ls", 				0, 	NULL, 	'l'},
 		{"ll", 				0, 	NULL, 	'('},
+		{"netstat",			0,	NULL,	'j'},
 		{"os", 				0, 	NULL, 	'o'},
 		{"create", 			1, 	NULL, 	'C'},
 		{"config", 			1, 	NULL, 	'e'},
@@ -418,6 +420,10 @@ int main(int argc, char *argv[])
 			break;
 		
 		case 'E': //reload-nat
+			break;
+		
+		case 'j': //netstat
+			print_vm_net_stat();
 			break;
 		
 		case 't': //test

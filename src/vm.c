@@ -2729,6 +2729,159 @@ void select_vm(char *vm_name, int status)
 	if (n > 0)
 		enter_options(msg, jname, NULL, vm_name);
 }
+// 输出运行中的虚拟机网络信息
+void print_vm_net_stat()
+{
+    if (vms == NULL) return;
+    if (vm_online_count() == 0) return;
+
+    // 定义列宽结构
+    struct {
+        int name;
+        int nic;
+        int mode;
+        int ip;
+        int gateway;
+        int ports;
+        int bridge;
+        int tap;
+    } max_width = {4, 3, 4, 2, 7, 5, 6, 3}; // 设置最小宽度(标题长度)
+
+    // 第一遍遍历计算最大宽度
+    vm_node *p = vms;
+    while (p) {
+        if (get_vm_status(p->vm.name) == VM_OFF) {
+            p = p->next;
+            continue;
+        }
+
+        // 更新name列宽
+        max_width.name = MAX(max_width.name, strlen(p->vm.name));
+
+        for (int i = 0; i < atoi(p->vm.nics); i++) {
+            // 更新nic列宽(数字宽度固定为1)
+            max_width.nic = 3;  // "NIC"的宽度
+
+            // 更新mode列宽
+            max_width.mode = MAX(max_width.mode, 6); // "BRIDGE"/"SWITCH"的宽度
+
+            // 更新ip列宽
+            max_width.ip = MAX(max_width.ip, strlen(p->vm.nic[i].ip));
+
+            // 更新gateway列宽
+            char gateway[64];
+            if (strncmp(p->vm.nic[i].netmode, "NAT", 3) == 0) {
+                get_nat_info(p->vm.nic[i].nat);
+                sprintf(gateway, "%s (%s)", nat.ip, p->vm.nic[i].nat);
+                max_width.gateway = MAX(max_width.gateway, strlen(gateway));
+            }
+            else if (strncmp(p->vm.nic[i].netmode, "SWITCH", 6) == 0) {
+                get_switch_info(p->vm.nic[i].bind);
+                sprintf(gateway, "%s (%s)", Switch.ip, p->vm.nic[i].bind);
+                max_width.gateway = MAX(max_width.gateway, strlen(gateway));
+            }
+
+            // 更新ports列宽
+            if (strcmp(p->vm.nic[i].rpstatus, "enable") == 0) {
+                for (int j = 0; j < p->vm.nic[i].rpnum; j++) {
+                    char port[32];
+                    sprintf(port, "%s %d:%d", 
+                            p->vm.nic[i].ports[j].proto,
+                            p->vm.nic[i].ports[j].vm_port,
+                            p->vm.nic[i].ports[j].host_port);
+                    max_width.ports = MAX(max_width.ports, strlen(port));
+                }
+            }
+
+            // 更新bridge列宽
+            max_width.bridge = MAX(max_width.bridge, strlen(p->vm.nic[i].bridge));
+
+            // 更新tap列宽
+            max_width.tap = MAX(max_width.tap, strlen(p->vm.nic[i].tap));
+
+        }
+        p = p->next;
+    }
+
+    // 打印表头
+    printf("\033[1;4m%-*s\033[24m    \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%s\033[0m\n",
+           max_width.name, "NAME",
+           max_width.nic, "NIC",
+           max_width.mode, "MODE",
+           max_width.ip, "IP",
+           max_width.gateway, "GATEWAY",
+           max_width.ports, "PORTS",
+           max_width.bridge, "BRIDGE",
+           "TAP");
+
+    // 第二遍遍历打印数据
+    p = vms;
+    while (p) {
+        if (get_vm_status(p->vm.name) == VM_OFF) {
+            p = p->next;
+            continue;
+        }
+
+        for (int i = 0; i < atoi(p->vm.nics); i++) {
+            int port_rules = (strcmp(p->vm.nic[i].rpstatus, "enable") == 0) ? p->vm.nic[i].rpnum : 1;
+            
+            for (int port_idx = 0; port_idx < port_rules; port_idx++) {
+                // NAME
+                if (i == 0 && port_idx == 0) {
+                    printf("%-*s", max_width.name, p->vm.name);
+                } else {
+                    printf("%*s", max_width.name, "");
+                }
+                printf("    ");  // 增加到4个空格
+
+                // NIC
+                if (port_idx == 0) {
+                    printf("%-*d", max_width.nic, i);
+                } else {
+                    printf("%*s", max_width.nic, "");
+                }
+                printf("  ");  // 2个空格
+
+                // MODE
+                const char* mode = strncmp(p->vm.nic[i].netmode, "NAT", 3) == 0 ? "NAT" :
+                                 strncmp(p->vm.nic[i].netmode, "SWITCH", 6) == 0 ? "SWITCH" : "BRIDGE";
+                printf("%-*s  ", max_width.mode, mode);  // 2个空格
+
+                // IP
+                printf("%-*s  ", max_width.ip, p->vm.nic[i].ip);  // 2个空格
+
+                // GATEWAY
+                char gateway[64] = "-";
+                if (strncmp(p->vm.nic[i].netmode, "NAT", 3) == 0) {
+                    get_nat_info(p->vm.nic[i].nat);
+                    sprintf(gateway, "%s (%s)", nat.ip, p->vm.nic[i].nat);
+                }
+                else if (strncmp(p->vm.nic[i].netmode, "SWITCH", 6) == 0) {
+                    get_switch_info(p->vm.nic[i].bind);
+                    sprintf(gateway, "%s (%s)", Switch.ip, p->vm.nic[i].bind);
+                }
+                printf("%-*s  ", max_width.gateway, gateway);  // 2个空格
+
+                // PORTS
+                char port[32] = "-";
+                if (strcmp(p->vm.nic[i].rpstatus, "enable") == 0 && p->vm.nic[i].rpnum > 0) {
+                    sprintf(port, "%s %d:%d",
+                            p->vm.nic[i].ports[port_idx].proto,
+                            p->vm.nic[i].ports[port_idx].vm_port,
+                            p->vm.nic[i].ports[port_idx].host_port);
+                }
+                printf("%-*s  ", max_width.ports, port);  // 2个空格
+
+                // BRIDGE
+                printf("%-*s  ", max_width.bridge, p->vm.nic[i].bridge);  // 2个空格
+
+                // TAP
+                printf("%s\n", p->vm.nic[i].tap);
+            }
+        }
+        p = p->next;
+    }
+}
 
 // 输出vm列表
 void print_vm_list(int list_type, int online_only)

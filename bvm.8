@@ -126,6 +126,9 @@
 .Nm
 .Cm --showsnapall
 .Pp
+.Nm
+.Cm --netstat
+.Pp
 .\" ============ DESCRIPTION =============
 .Sh DESCRIPTION
 The
@@ -453,6 +456,10 @@ Show the version number of
 installed.
 .It Cm --vminfo Ar name
 Shows the configuration of the virtual machine.
+.It Cm --netstat
+Show all network configuration information of virtual machines, 
+including NIC, mode, IP address, gateway, port forwarding, bridge, 
+and TAP device, etc.
 .\" ============ CONFIGURE FILES =============
 .Sh CONFIGURE FILES
 .Pa /usr/local/etc/bvm/bvm.conf

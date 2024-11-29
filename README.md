@@ -59,6 +59,7 @@ Options:
         --showdevall    Show all devices in class mode
         --showdevuse    Show all devices in simple mode
         --showdhcp      Show all DHCP clients
+        --netstat       Show all network configuration information of vm
         --showsnap      Show snapshots list of the vm
         --showsnapall   Show snapshots list of the all vm
         --snapshot      Generating snapshots for vm
