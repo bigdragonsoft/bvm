@@ -2004,6 +2004,7 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 		ret = wait_exec((fun)(int*)copy_vm_disk, (copy_stru*)&name);
 	}
 
+	printf("\033[1A");
 	if (ret == RET_FAILURE) {
 		error("cloning disk failure\n");
 		return RET_FAILURE;
@@ -2322,49 +2323,83 @@ int select_disk(vm_stru *vm)
 // 复制vm磁盘文件
 int copy_vm_disk(copy_stru *name)
 {
-	char src[FN_MAX_LEN];
-	char dst[FN_MAX_LEN];
+    char src[FN_MAX_LEN];
+    char dst[FN_MAX_LEN];
+    size_t len_in, len_out;
+    
+    // 首先计算所有磁盘的总大小
+    long total_size = 0;
+    for (int n = 0; n < name->disks; n++) {
+        char disk[32];
+        if (n == 0)
+            strcpy(disk, "/disk.img");
+        else 
+            sprintf(disk, "/disk%d.img", n);
+        sprintf(src, "%s%s%s", vmdir, name->src, disk);
+        
+        FILE *in = fopen(src, "rb");
+        if (in == NULL) {
+            error("open %s error\n", src);
+            return RET_FAILURE;
+        }
+        fseek(in, 0, SEEK_END);
+        total_size += ftell(in);
+        fclose(in);
+    }
+    
+    // 复制所有磁盘文件
+    long total_bytes_copied = 0;
+    int last_percent = -1;
+    char buf[BUFFERSIZE];
+    
+    for (int n = 0; n < name->disks; n++) {
+        char disk[32];
+        if (n == 0)
+            strcpy(disk, "/disk.img");
+        else 
+            sprintf(disk, "/disk%d.img", n);
+        sprintf(src, "%s%s%s", vmdir, name->src, disk);
+        sprintf(dst, "%s%s%s", vmdir, name->dst, disk);
 
-	for (int n=0; n<name->disks; n++) {
-		char disk[32];
-		if (n == 0)
-			strcpy(disk, "/disk.img");
-		else
-			sprintf(disk, "/disk%d.img", n);
-		sprintf(src, "%s%s%s", vmdir, name->src, disk);
-		sprintf(dst, "%s%s%s", vmdir, name->dst, disk);
+        FILE *in = fopen(src, "rb");
+        if (in == NULL) {
+            error("open %s error\n", src);
+            return RET_FAILURE;
+        }
 
-		FILE *in, *out;
-		if ((in = fopen(src, "rb")) == NULL) {
-			error("open %s error\n", src);
-			return RET_FAILURE;
-		}
+        FILE *out = fopen(dst, "wb");
+        if (out == NULL) {
+            error("open %s error\n", dst);
+            fclose(in);
+            return RET_FAILURE;
+        }
 
-		if ((out = fopen(dst, "wb")) == NULL) {
-			error("open %s error\n", dst);
-			return RET_FAILURE;
-		}
+        while ((len_in = fread(buf, 1, BUFFERSIZE, in)) > 0) {
+            if ((len_out = fwrite(buf, 1, len_in, out)) != len_in) {
+                error("write to file '%s' failed!\n", dst);
+                fclose(in);
+                fclose(out);
+                return RET_FAILURE;
+            }
 
-		char buf[BUFFERSIZE];
-		memset(buf, 0, BUFFERSIZE);
-
-		int len_in, len_out;
-
-		while ((len_in = fread(buf, 1, BUFFERSIZE, in)) > 0) {
-			if ((len_out = fwrite(buf, 1, len_in, out)) != len_in) {
-				error("write to file '%s' failed!\n", dst);
-				fclose(in);
-				fclose(out);
-				return RET_FAILURE;
-			}
-			memset(buf, 0, BUFFERSIZE);
-		}
-		
-		fclose(in);
-		fclose(out);
-	}
-
-	return RET_SUCCESS;
+            // 更新总进度
+            total_bytes_copied += len_in;
+            int percent = (int)((float)total_bytes_copied / total_size * 100);
+            
+            // 只在百分比变化时更新显示
+            if (percent != last_percent) {
+                printf("\rcloning ... %d%%  ", percent);
+                fflush(stdout);
+                last_percent = percent;
+            }
+        }
+        
+        fclose(in);
+        fclose(out);
+    }
+    
+    printf("\n");
+    return RET_SUCCESS;
 }
 
 
