@@ -7,16 +7,19 @@ dhcp_name = bvmdhcp
 dhcp_objs = dhcp.o $(objs)
 opt = -O
 
+# Add OpenSSL link libraries
+LDFLAGS = -lcrypt -lssl -lcrypto
+
 all: $(name) $(booter_name) $(dhcp_name)
 
 $(name): $(objects)
-	cc $(opt) -o $(name) $(objects) -lcrypt
+	cc $(opt) -o $(name) $(objects) $(LDFLAGS)
 
 $(booter_name): $(booter_objs)
-	cc $(opt) -o $(booter_name)  $(booter_objs) -lcrypt
+	cc $(opt) -o $(booter_name) $(booter_objs) $(LDFLAGS)
 
 $(dhcp_name): $(dhcp_objs)
-	cc $(opt) -o $(dhcp_name) $(dhcp_objs) -lpcap -lpthread -lcrypt
+	cc $(opt) -o $(dhcp_name) $(dhcp_objs) -lpcap -lpthread $(LDFLAGS)
 
 main.o: main.c main.h
 	cc $(opt) -c main.c -o main.o

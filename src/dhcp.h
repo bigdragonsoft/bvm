@@ -387,6 +387,5 @@ char *mac_to_str(uint8_t *mac);
 char *status_to_str(int status);
 char *time_to_str(time_t time);
 
-void test();
 
 #endif	//BVM_DHCP_H

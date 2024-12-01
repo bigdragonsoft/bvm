@@ -46,6 +46,13 @@
 #include <sys/wait.h>
 #include <spawn.h>
 
+#include <openssl/evp.h>
+#include <openssl/aes.h>
+#include <openssl/sha.h>
+#include <openssl/rand.h>
+#include <openssl/err.h>
+#include <pthread.h>
+
 #define TABSTOP		8
 #define BUFFERSIZE 	512
 #define FN_MAX_LEN 	512
@@ -60,8 +67,12 @@
 #define NAT_ORDER	1029		//防火墙规则中nat的序列号
 #define CRYPT_BUFFER	1048576		//加密数据缓冲区大小为1M字节
 #define CRYPT_LEN	100		//加密数据总长度为100M字节
-
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
+
+// 加密相关常量
+#define MAGIC_MARK "AESMARK!"
+#define HEADER_SIZE (8 + 16) // 8字节标记 + 16字节IV
 
 //#define BVM_DEBUG
 
@@ -332,6 +343,7 @@ void file_lock(char *file, int flag);
 void crypt_read(char *file, unsigned char *s, int index);
 void crypt_write(char *file, unsigned char *s, int index);
 void bvm_xor(unsigned char *s, char *passwd);
+int  bvm_crypt_aes(unsigned char *data, char *passwd, int flag);
 void clean_tap(char *tap_name);
 void clean_bridge(char *bridge_name);
 int  check_spell(char *vm_name);
@@ -353,6 +365,5 @@ int  red(char *fmt, ...);
 int  green(char *fmt, ...);
 int  title(char *fmt, ...);
 
-
-
+void test();
 #endif	//BVM_VM_H

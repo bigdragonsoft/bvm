@@ -210,6 +210,7 @@ void file_lock(char *file, int flag)
 	close(fd);
 }
 
+
 // 对虚拟机进行加密处理
 void vm_crypt(char *vm_name, int flag)
 {
@@ -225,14 +226,14 @@ void vm_crypt(char *vm_name, int flag)
 		return;
 	}
 
-	char succ_msg[64];
+	char succ_msg[128]; 
 	if (flag > 0) {
 		if (strcmp(p->vm.crypt, "1") == 0) {
 			warn("can't encrypt\n");
 			return;
 		}
 		strcpy(p->vm.crypt, "1");
-		strcpy(succ_msg, "complete the encryption and don't forget this key");
+		strcpy(succ_msg, "encryption completed, losing the key will make decryption impossible");
 	}
 	else {
 		if (strcmp(p->vm.crypt, "1") != 0) {
@@ -271,18 +272,42 @@ void vm_crypt(char *vm_name, int flag)
 	unsigned char data[CRYPT_BUFFER];
 	char file[FN_MAX_LEN];
 	sprintf(file, "%s%s/disk.img", vmdir, p->vm.name);
-	
-	for (int i=0; i<CRYPT_LEN; i++) {
 
+	//获取文件大小
+	struct stat st;
+	if (stat(file, &st) != 0) {
+		error("get %s size failed\n", file);
+		return;
+	}
+
+	//计算总块数
+	int total_blocks = st.st_size / CRYPT_BUFFER;
+	
+	// 在开始处打印初始进度
+	printf("Processing: 0%%");
+	fflush(stdout);
+	
+	for (int i=0; i<total_blocks; i++) {
 		//读取数据
 		crypt_read(file, data, i);
 
 		//异或运算
-		bvm_xor(data, passwd);
+		//bvm_xor(data, passwd);
+		//AES-256加密/解密
+		bvm_crypt_aes(data, passwd, flag);
 	
 		//写回文件
 		crypt_write(file, data, i);
+		
+		// 更新百分比
+		printf("\r"); // 回到行首
+		printf("Processing: %d%%", (i * 100) / total_blocks);
+		fflush(stdout);
 	}
+	
+	// 完成后清除进度显示
+	printf("\r"); // 回到行首
+	printf("\033[K"); // 清除该行
 
 	save_vm_info(vm_name, &p->vm);
 	printf("\033[1A\033[K");
@@ -336,6 +361,107 @@ void bvm_xor(unsigned char *s, char *passwd)
 		s[i] ^= passwd[j++];
 	}
 }
+
+// 使用AES-256加密/解密数据
+// data: 要加密/解密的数据
+// passwd: 密码
+// encrypt: 1表示加密,0表示解密
+// 返回: 成功返回1,失败返回0
+int bvm_crypt_aes(unsigned char *data, char *passwd, int encrypt)
+{
+    AES_KEY aes_key;
+    
+    // 从密码生成32字节(256位)密钥
+    unsigned char key[32];
+    unsigned char iv[16];
+
+    // 使用SHA256生成固定长度的密钥
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, passwd, strlen(passwd));
+    SHA256_Final(key, &sha256);
+
+    // 生成固定的IV(在实际应用中应该使用随机IV)
+    memset(iv, 0x00, sizeof(iv));
+    for(int i = 0; i < 16 && i < strlen(passwd); i++) {
+        iv[i] = passwd[i];
+    }
+
+    // 设置加密/解密密钥
+    if (encrypt) {
+        if (AES_set_encrypt_key(key, 256, &aes_key) < 0) {
+            return 0;
+        }
+    } else {
+        if (AES_set_decrypt_key(key, 256, &aes_key) < 0) {
+            return 0;
+        }
+    }
+
+    // 临时IV(因为AES_cbc_encrypt会修改IV)
+    unsigned char tmpiv[16];
+    memcpy(tmpiv, iv, 16);
+
+    // 输出缓冲区
+    unsigned char outbuf[CRYPT_BUFFER];
+    
+    // 执行加密/解密
+    AES_cbc_encrypt(data, outbuf, CRYPT_BUFFER, &aes_key, tmpiv, 
+                    encrypt ? AES_ENCRYPT : AES_DECRYPT);
+
+    // 复制结果回原缓冲区
+    memcpy(data, outbuf, CRYPT_BUFFER);
+
+    return 1;
+}
+
+// 测试AES-256加密/解密
+void test()
+{
+	printf("test AES-256 encryption and decryption\n");
+	int len = 160;
+    unsigned char data[len];
+
+
+    // 初始化测试数据
+    	for (int i = 0; i < len; i++) {
+        data[i] = i;
+    }
+
+    printf("original data:\n");
+    for (int i = 0; i < len; i++) {
+        printf("%02x ", data[i]);
+    }
+    printf("\n");
+
+
+    // 加密
+    if (!bvm_crypt_aes(data, "1234567890", 1)) {
+        printf("encryption failed\n");
+        return;
+    }
+
+    printf("encrypted data:\n");
+    for (int i = 0; i < len; i++) {
+        printf("%02x ", data[i]);
+    }
+    printf("\n");
+
+
+    // 解密
+    if (!bvm_crypt_aes(data, "1234567890", 0)) {
+        printf("decryption failed\n");
+        return;
+    }
+
+    printf("decrypted data:\n");
+    for (int i = 0; i < len; i++) {
+        printf("%02x ", data[i]);
+    }
+    printf("\n");
+
+}
+	
 
 // 监测bvm运行环境
 // bvm runtime environment 
@@ -2029,6 +2155,18 @@ int vm_remove(char *vm_name)
 
 	//directory
 	sprintf(filename, "%s%s", vmdir, vm_name);
+	// 递归删除目录及其内容
+	char cmd[CMD_MAX_LEN];
+	sprintf(cmd, "rm -rf %s", filename);
+	if (run_cmd(cmd) != 0) {
+		error("Failed to remove directory %s\n", filename);
+		return RET_FAILURE;
+	}
+	else {
+		success("Remove success\n");
+		return RET_SUCCESS;
+	}
+	/*
 	if (remove(filename) == 0) {
 		success("Remove success\n");
 		return RET_SUCCESS;
@@ -2036,7 +2174,7 @@ int vm_remove(char *vm_name)
 	else {
 		error("%s can't remove\n", filename);
 		return RET_FAILURE;
-	}
+	}*/
 }
 
 // 增加一块新磁盘
@@ -3634,7 +3772,8 @@ int wait_exec(fun func, void *args)
 	else {
 		int ret;
 		//ret = (func)(args);
-		ret = (int)(func)(args);
+		//ret = (int)(func)(args);
+		ret = (intptr_t)(func)(args); 
 		kill(pid, SIGTERM);
 		printf("\033[100D\033[K\033[?25h\033[0m");
 		//printf("\n");
@@ -3839,3 +3978,4 @@ int title(char *fmt, ...)
 	return cnt;
 
 }
+
