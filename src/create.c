@@ -242,16 +242,16 @@ int check_enter_valid()
 {
 	if (strcmp(new_vm.ostype, "OpenBSD") == 0)
 		if (strlen(new_vm.version) == 0) {
-			warn("version invalid\n");
+			warn("version is invalid\n");
 			return -1;
 		}
 	if (strcmp(new_vm.autoboot, "yes") == 0) {
 		if (strlen(new_vm.bootindex) == 0) {
-		       	warn("booting sequence index invalid\n");
+		       	warn("booting sequence index is invalid\n");
 			return -1;
 		}
 		if (strlen(new_vm.bootdelay) == 0) {
-			warn("booting estimate dealy time invalid\n");
+			warn("booting estimate dealy time is invalid\n");
 			return -1;
 		}		
 	}

@@ -29,7 +29,7 @@
 
 pro_stru program = {
 	"bvm", 
-	"1.3.4", 
+	"1.3.5", 
 	"Qiang Guo",
 	"bigdragonsoft@gmail.com",
 	"https://github.com/bigdragonsoft/bvm",
@@ -51,56 +51,58 @@ void usage()
 	char *help[] = {
 		"Usage:	${name} <options> [args...]",
 		"Options:",
-		"	--abinfo	Output autoboot vms info",
-		"	--addisk	Add an new disk",
-	//	"	--addnat	Add NAT",
-	//	"	--addswitch	Add Switch",
-		"	--autoboot	Auto booting vms",
-		"	--clone		Vm cloning",
-		"	--config	Configure for vm",
-		"	--create	Create new vm",
+		"	--abinfo	Display information about auto-boot VMs",
+		"	--addisk	Add a new disk to VM",
+		"	--addnat	Add NAT",
+		"	--addswitch	Add Switch",
+		"	--autoboot	Auto-boot VMs",
+		"	--clone		Clone VM",
+		"	--config	Configure VM",
+		"	--create	Create new VM",
 		"	--deldisk	Delete a disk",
-	//	"	--delnat	Delete NAT",
-	//	"	--delswitch	Delete Switch",
-	//	"	--swinfo	Output Switch info",
-		"	--decrypt	Decrypt vm",
-		"	--encrypt	Encrypt vm",	
-		"	--login		Login to vm",
-		"	--ls		List vm and status",
-		"	--ll		List vm and status in long format",
-		"	--netstat	Show vm netstat",
-	//	"	--natinfo	Output NAT info",
-		"	--lock		Lock vm",
-		"	--lockall	Lock all vms",
-		"	--os		Output os lists",
-		"	--poweroff	Force poweroff",
-		"	--reload-nat	Reload NAT redirect-port",
-		"	--remove	Destroy vm",
-		"	--rename	Rename vm",
-		"	--restart	Restart vm",
-		"	--rollback	Roll back to the snapshot point",
-		"	--setnat	Setting NAT's IP-addr",
-		"	--setsw		Setting Switch's IP-addr",
-		"	--setpr		Setting the port redirection list",
+		"	--delnat	Delete NAT",
+		"	--delswitch	Delete Switch",
+		"	--swinfo	Output Switch info",
+		"	--decrypt	Decrypt VM",
+		"	--encrypt	Encrypt VM",	
+		"	--login		Log in to VM",
+		"	--ls		List VMs and status",
+		"	--ll		List VMs and status in long format",
+		"	--netstats	Show VM network status",
+		"	--natinfo	Output NAT info",
+		"	--lock		Lock VM",
+		"	--lockall	Lock all VMs",
+		"	--os		Output OS list",
+		"	--poweroff	Force power off",
+		"	--reload-nat	Reload NAT redirect port",
+		"	--remove	Destroy VM",
+		"	--rename	Rename VM",
+		"	--restart	Restart VM",
+		"	--rollback	Roll back to snapshot point",
+		"	--setnat	Set NAT IP address",
+		"	--setsw		Set Switch IP address",
+		"	--setpr		Set port redirection list",
 		"	--showpr	Show port redirection list",
 		"	--showdev	Show device",
 		"	--showdevall	Show all devices in class mode",
 		"	--showdevuse	Show all devices in simple mode",
 		"	--showdhcp	Show all DHCP clients",
-		"	--showsnap	Show snapshots list of the vm",
-		"	--showsnapall	Show snapshots list of the all vm",
-		"	--snapshot	Generating snapshots for vm",
-		"	--start		Start vm",
-		"	--stop		Stop vm",
-		"	--unlock	Unlock vm",
-		"	--unlockall	Unlock all vms",
-		"	--unsetsw	Unset Switch's IP-addr",
-		"	--vminfo	Output vm info",
+		"	--showsnap	Show snapshot list of VM",
+		"	--showsnapall	Show snapshot list of all VMs",
+		"	--showstats	Show VM stats",
+		"	--snapshot	Generate snapshot for VM",
+		"	--start		Start VM",
+		"	--stop		Stop VM",
+		"	--unlock	Unlock VM",
+		"	--unlockall	Unlock all VMs",
+		"	--unsetsw	Unset Switch IP address",
+		"	--vminfo	Output VM info",
 		"	",
 		"Example:",
 		"	${name} --start vmname",
 		"	${name} --clone oldname newname",
 		"	${name} --ls",
+		"	${name} --ll online",
 		NULL};
 
 	int n = 0;
@@ -129,14 +131,14 @@ int main(int argc, char *argv[])
 	char *short_options = "hvl";
 
 	//未使用的字母
-	//k, q, x, y, z
+	//q, x, y, z
 	//F, G, J, M, O, P, Q, U, X, Y, Z
 	struct option long_options[] = {
 		{"help", 			0,	NULL, 	'h'},
 		{"version", 		0, 	NULL, 	'v'},
 		{"ls", 				0, 	NULL, 	'l'},
 		{"ll", 				0, 	NULL, 	'('},
-		{"netstat",			0,	NULL,	'j'},
+		{"netstats",		0,	NULL,	'j'},
 		{"os", 				0, 	NULL, 	'o'},
 		{"create", 			1, 	NULL, 	'C'},
 		{"config", 			1, 	NULL, 	'e'},
@@ -152,6 +154,7 @@ int main(int argc, char *argv[])
 		{"remove", 			1, 	NULL, 	'd'},
 		{"addisk", 			1, 	NULL, 	'+'},
 		{"deldisk", 		1, 	NULL, 	'-'},
+		{"showstats", 		1, 	NULL, 	'k'},
 		{"vminfo", 			1, 	NULL, 	'i'},
 		{"vminfoall", 		1, 	NULL, 	'I'},
 		{"natinfo", 		0, 	NULL, 	'n'},
@@ -285,6 +288,10 @@ int main(int argc, char *argv[])
 		
 		case 'o': //os
 			vm_os_list();
+			break;
+		
+		case 'k': //showstats
+			vm_show_stats(optarg);
 			break;
 		
 		case 'i': //vminfo

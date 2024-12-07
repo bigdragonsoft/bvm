@@ -1,4 +1,4 @@
-.Dd October 1, 2024
+.Dd December 26, 2024
 .Dt BVM 8
 .Os
 .Sh NAME
@@ -19,6 +19,9 @@
 .Ar name
 .Nm
 .Cm --vminfo
+.Ar name
+.Nm
+.Cm --showstats
 .Ar name
 .Nm
 .Cm --os
@@ -379,6 +382,10 @@ this option also prevents the risk of virtual machine files being accidentally d
 .It Cm --lockall
 Lock all virtual machines, behaving the same as 
 .Cm --lock .
+.It Cm --netstat
+Show all network configuration information of virtual machines, 
+including NIC, mode, IP address, gateway, port forwarding, bridge, 
+and TAP device, etc.
 .It Cm --os
 Show a list of operating systems supported by 
 .Nm .
@@ -416,11 +423,11 @@ at any time in the virtual machine on state, and take effect immediately.
 Show all list of port redirect.
 .Bd -literal -offset indent
 # bvm --showpr
-udp 192.168.1.254:53    -> 9953 abc
-tcp 10.10.30.10:22      -> 3322 guo
-tcp 172.16.1.3:622      -> 2224 fb
-tcp 172.16.1.3:80       -> 8888 fb
-tcp 172.16.1.3:23       -> 2003 fb
+PROTO   VM IP:PORT            HOST PORT   VM NAME
+tcp     172.16.1.10:22        2224        freebsd-14
+tcp     172.16.1.10:80        8080        freebsd-14
+udp     192.168.1.254:53      9953        abc
+tcp     10.10.30.10:22        3322        ob
 .Ed
 .It Cm --setsw Ar switch ip/mask
 Set the ip address and mask of the virtual switch.
@@ -438,6 +445,8 @@ Show all DHCP clients.
 Show snapshots list of the virtual machine.
 .It Cm --showsnapall
 Show snapshots list of the all virtual machines.
+.It Cm --showstats Ar name
+Show the statistics of the virtual machine.
 .It Cm --snapshot Ar name
 Generating snapshots for the virtual machine.
 .It Cm --start Ar name
@@ -456,10 +465,6 @@ Show the version number of
 installed.
 .It Cm --vminfo Ar name
 Shows the configuration of the virtual machine.
-.It Cm --netstat
-Show all network configuration information of virtual machines, 
-including NIC, mode, IP address, gateway, port forwarding, bridge, 
-and TAP device, etc.
 .\" ============ CONFIGURE FILES =============
 .Sh CONFIGURE FILES
 .Pa /usr/local/etc/bvm/bvm.conf

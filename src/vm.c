@@ -159,7 +159,7 @@ void vm_lock(char *vm_name, int flag)
 	}
 
 	if (get_vm_status(vm_name) == VM_ON) {
-		error("can't process, %s is running\n", vm_name);
+		error("cannot process, %s is running\n", vm_name);
 		return;
 	}
 	
@@ -203,7 +203,7 @@ void file_lock(char *file, int flag)
 
 	int fd = open(file, O_RDONLY);
 	if (fd == -1) {
-		error("lockion %s has been wrong\n");
+		error("locking %s failed\n", file);
 		err_exit();
 	}
 	fchflags(fd, flag);
@@ -222,14 +222,14 @@ void vm_crypt(char *vm_name, int flag)
 	}
 
 	if (get_vm_status(vm_name) == VM_ON) {
-		error("can't encrypt, %s is running\n", vm_name);
+		error("cannot encrypt, %s is running\n", vm_name);
 		return;
 	}
 
 	char succ_msg[128]; 
 	if (flag > 0) {
 		if (strcmp(p->vm.crypt, "1") == 0) {
-			warn("can't encrypt\n");
+			warn("cannot encrypt\n");
 			return;
 		}
 		strcpy(p->vm.crypt, "1");
@@ -237,7 +237,7 @@ void vm_crypt(char *vm_name, int flag)
 	}
 	else {
 		if (strcmp(p->vm.crypt, "1") != 0) {
-			warn("can't decrypt\n");
+			warn("cannot decrypt\n");
 			return;
 		}
 		strcpy(p->vm.crypt, "0");
@@ -245,7 +245,7 @@ void vm_crypt(char *vm_name, int flag)
 	}
 
 	if (strcmp(p->vm.lock, "1") == 0) {
-		warn("%s locked, can't %s\n", vm_name, flag?"encrypt":"decrypt");
+		warn("%s locked, cannot %s\n", vm_name, flag?"encrypt":"decrypt");
 		return;
 	}
 
@@ -415,6 +415,87 @@ int bvm_crypt_aes(unsigned char *data, char *passwd, int encrypt)
     return 1;
 }
 
+// 使用AES-256加密/解密数据
+void bvm_crypt(unsigned char *data, char *passwd)
+{
+    // 使用SHA-256生成256位密钥
+    unsigned char key[32];
+    unsigned char iv[16];
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, passwd, strlen(passwd));
+    SHA256_Final(key, &sha256);
+
+    // 生成IV (对第一个块使用密码hash的前16字节作为IV)
+    memcpy(iv, key, 16);
+
+    // 初始化加密上下文
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if(!ctx) {
+        return;
+    }
+
+    // 根据数据的前8字节判断是加密还是解密
+    // 如果前8字节是特定标记，则进行解密，否则加密
+    int is_encrypt = memcmp(data, "AESMARK!", 8) != 0;
+
+    int len = 0;
+    int ciphertext_len = 0;
+    unsigned char *temp_buf = malloc(CRYPT_BUFFER + EVP_MAX_BLOCK_LENGTH);
+    if(!temp_buf) {
+        EVP_CIPHER_CTX_free(ctx);
+        return;
+    }
+
+    if(is_encrypt) {
+        // 加密操作
+        // 初始化加密
+        EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv);
+
+        // 添加标记
+        memcpy(temp_buf, "AESMARK!", 8);
+
+        // 加密数据
+        EVP_EncryptUpdate(ctx, temp_buf + 8, &len, data, CRYPT_BUFFER - 8);
+        ciphertext_len = len;
+
+        // 加密最后的块
+        EVP_EncryptFinal_ex(ctx, temp_buf + 8 + len, &len);
+        ciphertext_len += len;
+
+    } else {
+        // 解密操作
+        // 初始化解密
+        EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv);
+
+        // 解密数据
+        EVP_DecryptUpdate(ctx, temp_buf, &len, data + 8, CRYPT_BUFFER - 8);
+        ciphertext_len = len;
+
+        // 解密最后的块
+        EVP_DecryptFinal_ex(ctx, temp_buf + len, &len);
+        ciphertext_len += len;
+    }
+
+    // 复制结果回原缓冲区
+    if(is_encrypt) {
+        memcpy(data, temp_buf, CRYPT_BUFFER);
+    } else {
+        memcpy(data, temp_buf, ciphertext_len);
+        // 如果解密后数据长度小于原缓冲区，填充0
+        if(ciphertext_len < CRYPT_BUFFER) {
+            memset(data + ciphertext_len, 0, CRYPT_BUFFER - ciphertext_len);
+        }
+    }
+
+    // 清理
+    EVP_CIPHER_CTX_free(ctx);
+    free(temp_buf);
+    // 清除敏感数据
+    OPENSSL_cleanse(key, sizeof(key));
+    OPENSSL_cleanse(iv, sizeof(iv));
+}
+
 // 测试AES-256加密/解密
 void test()
 {
@@ -539,15 +620,19 @@ void check_bre()
 	free_config();
 	
 	if (fvmm + fbridge + ftap > 0) {
-		error("bvm can't run, you need to add the following lines to /boot/loader.conf\n");
-		if (fvmm) 	warn("vmm_load=\"YES\"\n");
-		if (fbridge) 	warn("if_bridge_load=\"YES\"\n");
-		if (ftap)	warn("if_tap_load=\"YES\"\n");
+		//error("bvm cannot run, you need to add the following lines to /boot/loader.conf\n");
+		//if (fvmm) 	warn("vmm_load=\"YES\"\n");
+		//if (fbridge) 	warn("if_bridge_load=\"YES\"\n");
+		//if (ftap)	warn("if_tap_load=\"YES\"\n");
+		if (fvmm) 		auto_fix_conf("/boot/loader.conf", "vmm_load", "\"YES\"");
+		if (fbridge) 	auto_fix_conf("/boot/loader.conf", "if_bridge_load", "\"YES\"");
+		if (ftap)		auto_fix_conf("/boot/loader.conf", "if_tap_load", "\"YES\"");
 	}
 
 	if (ftuoo > 0) {
-		error("bvm can't run, you need to add the following lines to /etc/sysctl.conf\n");
-		warn("net.link.tap.up_on_open=1\n");
+		//error("bvm cannot run, you need to add the following lines to /etc/sysctl.conf\n");
+		//warn("net.link.tap.up_on_open=1\n");
+		auto_fix_conf("/etc/sysctl.conf", "net.link.tap.up_on_open", "1");
 
 		//exit(0);
 	}
@@ -579,13 +664,32 @@ void check_bre()
 	free_config();
 
 	if (fipfw + fnat + flib + faccept > 0) {
-		error("In order to help you solve the NAT reflow problem, \nyou need to add the following line to /boot/loader.conf\n");
-		if (fipfw) 	warn("ipfw_load=\"YES\"\n");
-		if (fnat) 	warn("ipfw_nat_load=\"YES\"\n");
-		if (flib) 	warn("libalias_load=\"YES\"\n");
-		if (faccept)	warn("net.inet.ip.fw.default_to_accept=1\n");
+		//error("In order to help you solve the NAT reflow problem, \nyou need to add the following line to /boot/loader.conf\n");
+		//if (fipfw) 	warn("ipfw_load=\"YES\"\n");
+		//if (fnat) 	warn("ipfw_nat_load=\"YES\"\n");
+		//if (flib) 	warn("libalias_load=\"YES\"\n");
+		//if (faccept)	warn("net.inet.ip.fw.default_to_accept=1\n");
+		if (fipfw) 		auto_fix_conf("/boot/loader.conf", "ipfw_load", "\"YES\"");
+		if (fnat) 		auto_fix_conf("/boot/loader.conf", "ipfw_nat_load", "\"YES\"");
+		if (flib) 		auto_fix_conf("/boot/loader.conf", "libalias_load", "\"YES\"");
+		if (faccept)	auto_fix_conf("/boot/loader.conf", "net.inet.ip.fw.default_to_accept", "1");
 	}
 
+}
+
+// 自动修复配置文件
+void auto_fix_conf(char *conf_file, char *key, char *value)	
+{
+	FILE *fp = fopen(conf_file, "a");
+	if (fp == NULL) {
+		error("cannot open %s\n", conf_file);
+		return;
+	}
+
+	fprintf(fp, "\n%s=%s\n", key, value);
+	fclose(fp);
+
+	success("Configuration auto-fixed: %s=%s ==> %s\n", key, value, conf_file);
 }
 
 // 设置vm工作目录
@@ -609,7 +713,7 @@ void set_vmdir()
 
 	if (access(vmdir, 0) == -1) {
 		if (mkdir(vmdir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == -1)
-			error("can't set vmdir\n");
+			error("cannot set vmdir\n");
 	}
 }
 
@@ -1009,24 +1113,34 @@ int scan_port(int scan_type, vm_stru *vm, scan_redirect_port_stru *check)
 // udp 172.16.1.3:1194	-> 1194
 void show_port(vm_stru *vm, int nic_index)
 {
-	int n = nic_index;
+    static int header_printed = 0;
+    int n = nic_index;
+    char ip[32];
+    char proto[PROTO_LEN];
 
-	char ip[32];
-	char proto[PROTO_LEN];
+    // 只打印一次表头
+    if (!header_printed) {
+        //printf("--------------------------------------------------------------\n");
+        title("%-6s  %-20s  %-10s  %-s\n", "PROTO", "VM IP:PORT", "HOST PORT", "VM NAME");
+        //printf("--------------------------------------------------------------\n");
+        header_printed = 1;
+    }
 
-	for (int r = 0; r < vm->nic[n].rpnum; r++) {
-		
-		strcpy(ip, vm->nic[n].ip);
-		get_ip(ip);
+    for (int r = 0; r < vm->nic[n].rpnum; r++) {
+        strcpy(ip, vm->nic[n].ip);
+        get_ip(ip);
+        strcpy(proto, vm->nic[n].ports[r].proto);
+        
+        // 构建 IP:PORT 字符串
+        char ip_port[32];
+        sprintf(ip_port, "%s:%d", ip, vm->nic[n].ports[r].vm_port);
 
-		strcpy(proto, vm->nic[n].ports[r].proto);
-
-		printf("%s %s:%d\t-> %d\t%s\n",	(strlen(proto) > 0) ? proto : "tcp",
-						ip,
-						vm->nic[n].ports[r].vm_port,
-						vm->nic[n].ports[r].host_port,
-						vm->name);
-	}
+        printf("%-6s  %-20s  %-10d  %-s\n",
+            (strlen(proto) > 0) ? proto : "tcp",
+            ip_port,
+            vm->nic[n].ports[r].host_port,
+            vm->name);
+    }
 }
 
 // 端口号是否有效
@@ -1396,7 +1510,7 @@ void vm_config(char *vm_name)
 		p = find_vm_list(vm_name);
 	}
 	if (get_vm_status(vm_name) == VM_ON) {
-		error("%s is running, can't edit\n", vm_name);
+		error("%s is running, cannot edit\n", vm_name);
 		return;
 	}
 	if (atoi(p->vm.lock)) {
@@ -1448,17 +1562,17 @@ void vm_start(char *vm_name)
 	}
 
 	if (atoi(p->vm.lock)) {
-		error("%s has been locked up, can't run\n", vm_name);
+		error("%s has been locked up, cannot run\n", vm_name);
 		return;
 	}
 
 	if (atoi(p->vm.crypt)) {
-		error("%s has been encrypted, can't run\n", vm_name);
+		error("%s has been encrypted, cannot run\n", vm_name);
 		return;
 	}
 
 	if (strcmp(p->vm.cdstatus, "on") == 0 && access(p->vm.iso, 0) == -1) {
-		error("%s not found, can't run\n", p->vm.iso);
+		error("%s not found, cannot run\n", p->vm.iso);
 		return;
 	}
 
@@ -1483,7 +1597,7 @@ void vm_start(char *vm_name)
 
 	}
 	else  {
-		error("can't start the vm!\n");
+		error("failed to start %s\n", vm_name);
 	}
 }
 
@@ -1510,7 +1624,7 @@ void vm_login(char *vm_name)
 		run_cmd(cmd);
 	}
 	else {
-		error("%s does not start\n", vm_name);
+		error("%s is not running\n", vm_name);
 	}
 }
 
@@ -1538,7 +1652,7 @@ void vm_stop(char *vm_name)
 		//warn("pid=%d\n", pid);
 
 		if (pid < 0) {
-			warn("\n%s can't stop, try again later or use 'bvm --poweroff %s' to stop\n", vm_name, vm_name);
+			warn("\nVM '%s' cannot be stopped. Please try again later or use 'bvm --poweroff %s' to force stop.\n", vm_name, vm_name);
 			return;
 		}
 		sprintf(cmd, "kill 15 %d", pid);
@@ -1564,7 +1678,7 @@ void vm_stop(char *vm_name)
 		printf("\n");
 	}
 	else {
-		error("%s does not start\n", vm_name);
+		error("%s is not running\n", vm_name);
 	}
 }
 
@@ -1673,7 +1787,7 @@ void vm_poweroff(char *vm_name,int flag_msg)
 	}
 	else {
 		if (flag_msg) 
-			error("%s does not start\n", vm_name);
+			error("%s is not running\n", vm_name);
 	}
 }
 
@@ -1696,7 +1810,7 @@ void vm_restart(char *vm_name)
 		run_cmd(cmd);
 	}
 	else {
-		error("%s does not start\n", vm_name);
+		error("%s is not running\n", vm_name);
 	}
 }
 
@@ -1918,7 +2032,7 @@ void get_vm_name(char *dir)
 	struct dirent *dirp;
 
 	if ((dp = opendir(dir)) == NULL) {
-		error("can't open %s\n", dir);
+		error("cannot open %s\n", dir);
 		return;
 	}
 
@@ -1950,7 +2064,7 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 		return RET_FAILURE;
 	}
 	if (get_vm_status(src_vm_name) == VM_ON) {
-		error("%s is running, can't clone\n", src_vm_name);
+		error("%s is running, cannot clone\n", src_vm_name);
 		return RET_FAILURE;
 	}
 	if (atoi(p_src->vm.lock)) {
@@ -2035,7 +2149,7 @@ int  vm_rename(char *old_vm_name, char *new_vm_name)
 	}
 
 	if (get_vm_status(old_vm_name) == VM_ON) {
-		error("%s is running, can't rename\n", old_vm_name);
+		error("%s is running, cannot rename\n", old_vm_name);
 		return RET_FAILURE;
 	}
 
@@ -2062,7 +2176,7 @@ int  vm_rename(char *old_vm_name, char *new_vm_name)
 
 	//vm文件夹更名
 	if (rename(old_dir, new_dir) == -1) {
-		error("directory file\n");
+		error("failed to rename directory\n");
 		return RET_FAILURE;
 	}
 
@@ -2073,7 +2187,7 @@ int  vm_rename(char *old_vm_name, char *new_vm_name)
 	sprintf(new, "%s/%s.conf", new_dir, new_vm_name);
 
 	if (rename(old, new) == -1) {
-		error("configure file\n");
+		error("failed to rename config file\n");
 		return RET_FAILURE;
 	}
 
@@ -2134,7 +2248,7 @@ int vm_remove(char *vm_name)
 			remove_zvol(&p->vm, n);
 		
 		if (remove(filename) == -1) {
-			error("%s can't remove\n", filename);
+			error("failed to remove %s\n", filename);
 			return RET_FAILURE;
 		}
 
@@ -2143,14 +2257,14 @@ int vm_remove(char *vm_name)
 	//device.map
 	sprintf(filename, "%s%s/device.map", vmdir, vm_name);
 	if (remove(filename) == -1) {
-	       	error("%s can't remove\n", filename);
+	       	error("failed to remove %s\n", filename);
 		return RET_FAILURE;
 	}
 
 	//config file
 	sprintf(filename, "%s%s/%s.conf", vmdir, vm_name, vm_name);
 	if (remove(filename) == -1) {
-		error("%s can't remove\n", filename);
+		error("failed to remove %s\n", filename);
 		return RET_FAILURE;
 	}
 
@@ -2173,7 +2287,7 @@ int vm_remove(char *vm_name)
 		return RET_SUCCESS;
 	}
 	else {
-		error("%s can't remove\n", filename);
+		error("%s cannot remove\n", filename);
 		return RET_FAILURE;
 	}*/
 }
@@ -2189,7 +2303,7 @@ void vm_add_disk(char *vm_name)
 	}
 
 	if (get_vm_status(vm_name) == VM_ON) {
-		error("%s is running, can't add an new disk\n", vm_name);
+		error("%s is running, cannot add an new disk\n", vm_name);
 		return;
 	}
 
@@ -2229,7 +2343,7 @@ void vm_del_disk(char *vm_name)
 	}
 
 	if (get_vm_status(vm_name) == VM_ON) {
-		error("%s is running, can't del disk\n", vm_name);
+		error("%s is running, cannot del disk\n", vm_name);
 		return;
 	}
 
@@ -2241,7 +2355,7 @@ void vm_del_disk(char *vm_name)
 	//选择盘号
 	int n = select_disk(&p->vm);
 	if (n == 0) {
-		error("can't delete disk(0)\n");
+		error("cannot delete disk(0)\n");
 		err_exit();
 	}
 
@@ -2255,7 +2369,7 @@ void vm_del_disk(char *vm_name)
 		sprintf(disk, "/disk%d.img", n);
 	sprintf(filename, "%s%s%s", vmdir, vm_name, disk);
 	if (remove(filename) == -1) {
-		error("%s can't remove\n", filename);
+		error("%s cannot remove\n", filename);
 		err_exit();
 	}
 
@@ -4014,3 +4128,271 @@ int title(char *fmt, ...)
 
 }
 
+
+// 获取实际的CPU频率
+unsigned long long get_cpu_frequency()
+{
+    unsigned long long freq = 0;
+    size_t size = sizeof(freq);
+    if (sysctlbyname("hw.clockrate", &freq, &size, NULL, 0) == -1) {
+        perror("sysctl");
+        return 2000000000ULL; // 默认值为2GHz
+    }
+    return freq * 1000000ULL; // 将MHz转换为Hz
+}
+
+// 将CPU时钟周期转换为可读的时间格式
+void format_cpu_time(unsigned long long ticks, char *buf, size_t bufsize, unsigned long long cpu_freq)
+{
+    // 将时钟周期转换为秒
+    unsigned long long total_seconds = ticks / cpu_freq;
+    
+    // 计算时、分、秒
+    unsigned long hours = total_seconds / 3600;
+    unsigned long minutes = (total_seconds % 3600) / 60;
+    unsigned long seconds = total_seconds % 60;
+    
+    if (hours > 0) {
+        snprintf(buf, bufsize, "%lu时%lu分%lu秒", hours, minutes, seconds);
+    } else if (minutes > 0) {
+        snprintf(buf, bufsize, "%lu分%lu秒", minutes, seconds);
+    } else {
+        snprintf(buf, bufsize, "%lu秒", seconds);
+    }
+}
+
+// 格式化字节大小为可读格式
+void format_bytes(unsigned long long bytes, char *buf, size_t bufsize)
+{
+    const char* units[] = {"B", "KB", "MB", "GB", "TB"};
+    int i = 0;
+    double size = bytes;
+    
+    while (size >= 1024 && i < 4) {
+        size /= 1024;
+        i++;
+    }
+    
+    if (i == 0) {
+        snprintf(buf, bufsize, "%.0f %s", size, units[i]);
+    } else {
+        snprintf(buf, bufsize, "%.2f %s", size, units[i]);
+    }
+}
+
+void vm_show_stats(const char *vm_name) {
+    vm_node *p;
+    if ((p = find_vm_list(vm_name)) == NULL) {
+        error("VM '%s' not found\n", vm_name);
+        return;
+    }
+
+    if (get_vm_status(vm_name) != VM_ON) {
+        error("VM '%s' is not running\n", vm_name);
+        return;
+    }
+
+    unsigned long long cpu_freq = get_cpu_frequency();
+    char cmd[BUFFERSIZE];
+    FILE *fp;
+    char line[BUFFERSIZE];
+
+    // 打印表头
+    //title("\nVM Status Information: %s\n", vm_name);
+    //printf("----------------------------------------\n");
+
+    // VM 配置信息
+    title("\nVM Configuration:\n"); 
+    //printf("----------------------------------------\n");
+	printf("VM Name: %s\n", vm_name);
+    printf("Allocated CPUs: %s\n", p->vm.cpus);
+    printf("Allocated Memory: %s\n", p->vm.ram);
+    printf("Storage Interface: %s\n", p->vm.storage_interface);
+    printf("Network Interface: %s\n", p->vm.network_interface);
+
+    // 运行时间
+    sprintf(cmd, "ps -o etime= -p `pgrep -f 'bhyve: %s'`", vm_name);
+    fp = popen(cmd, "r");
+    if (fp) {
+        if (fgets(line, sizeof(line), fp)) {
+            line[strcspn(line, "\n")] = 0;
+            printf("Process Runtime: %s\n", line);
+        }
+        pclose(fp);
+    }
+	
+    // CPU 信息
+    title("\nCPU Statistics:\n");
+    //printf("----------------------------------------\n");
+    
+    sprintf(cmd, "bhyvectl --vm=%s --get-stats | grep -E 'total runtime|ticks vcpu was idle|migration|NMIs|ExtINTs'", vm_name);
+    fp = popen(cmd, "r");
+    if (fp) {
+        unsigned long long nmi_count = 0;
+        unsigned long long extint_count = 0;
+        unsigned long long migration_count = 0;
+        unsigned long long total_runtime = 0;  // 纳秒
+        unsigned long long idle_ticks = 0;     // 毫秒级别的ticks
+        
+        while (fgets(line, sizeof(line), fp)) {
+            if (strstr(line, "NMIs delivered")) {
+                sscanf(line, "%*[^0-9]%llu", &nmi_count);
+            }
+            else if (strstr(line, "ExtINTs delivered")) {
+                sscanf(line, "%*[^0-9]%llu", &extint_count);
+            }
+            else if (strstr(line, "migration across")) {
+                sscanf(line, "%*[^0-9]%llu", &migration_count);
+            }
+            else if (strstr(line, "total runtime")) {
+                sscanf(line, "%*[^0-9]%llu", &total_runtime);
+            }
+            else if (strstr(line, "ticks vcpu was idle")) {
+                sscanf(line, "%*[^0-9]%llu", &idle_ticks);
+            }
+        }
+        pclose(fp);
+
+        // 计算运行时间（转换为可读格式）
+        char runtime_str[64] = {0};
+        if (total_runtime > 0) {
+            unsigned long long seconds = total_runtime / 1000000000ULL;
+            unsigned long hours = seconds / 3600;
+            unsigned long minutes = (seconds % 3600) / 60;
+            unsigned long secs = seconds % 60;
+            
+            if (hours > 0) {
+                snprintf(runtime_str, sizeof(runtime_str), "%luh %lum %lus", 
+                        hours, minutes, secs);
+            } else if (minutes > 0) {
+                snprintf(runtime_str, sizeof(runtime_str), "%lum %lus", 
+                        minutes, secs);
+            } else {
+                snprintf(runtime_str, sizeof(runtime_str), "%lus", secs);
+            }
+        } else {
+            strcpy(runtime_str, "0s");
+        }
+
+        // 输出统计信息
+        printf("CPU Runtime: %s\n", runtime_str);
+        
+        // 计算CPU使用率
+        // 假设1个tick = 1毫秒 = 1000000纳秒
+        if (total_runtime > 0) {
+            unsigned long long idle_time_ns = idle_ticks * 1000000ULL; // 转换为纳秒
+            double usage = 100.0 * (1.0 - ((double)idle_time_ns / total_runtime));
+            
+            // 确保使用率在0-100之间
+            if (usage < 0) usage = 0;
+            if (usage > 100) usage = 100;
+            
+            printf("CPU Usage: %.2f%%\n", usage);
+        } else {
+            printf("CPU Usage: 0.00%%\n");
+        }
+
+        printf("\nDetailed Statistics:\n");
+        printf("- CPU Migrations: %llu\n", migration_count);
+        printf("- NMIs Delivered: %llu\n", nmi_count);
+        printf("- ExtINTs Delivered: %llu\n", extint_count);
+        
+        // 如果有异常情况，显示警告
+		/*
+        if (migration_count > 100) {
+            warn("Warning: High CPU migration count may affect performance\n");
+        }
+        if (nmi_count > 0 || extint_count > 0) {
+            warn("Warning: Interrupt events detected, please check system status\n");
+        }*/
+    }
+
+    // 内存使用情况
+    title("\nMemory Usage:\n");
+    //printf("----------------------------------------\n");
+    
+    // 获取总内存大小
+    char total_mem[32];
+    strcpy(total_mem, p->vm.ram);
+    printf("Total Memory: %s\n", total_mem);
+    
+    // 获取活动内存
+    sprintf(cmd, "bhyvectl --vm=%s --get-stats | grep 'Resident memory' | awk '{print $3}'", vm_name);
+    fp = popen(cmd, "r");
+    if (fp) {
+        unsigned long long resident_mem = 0;
+        if (fgets(line, sizeof(line), fp)) {
+            resident_mem = strtoull(line, NULL, 10);
+            char mem_str[64];
+            format_bytes(resident_mem, mem_str, sizeof(mem_str));
+            printf("Active Memory: %s\n", mem_str);
+            
+            // 计算内存使用率
+            double usage = (double)resident_mem / (parse_size(total_mem) * 1024) * 100;
+            printf("Memory Usage: %.2f%%\n", usage);
+        }
+        pclose(fp);
+    }
+
+    // 网络流量统计
+    title("\nNetwork Traffic Statistics:\n");
+    //printf("----------------------------------------\n");
+    
+    for (int i = 0; i < atoi(p->vm.nics); i++) {
+        //printf("Network Interface %d (%s):\n", i, p->vm.nic[i].tap);
+		printf("Nic-%d (%s):\n", i, p->vm.nic[i].tap);
+        
+        // 使用 netstat 获取网络接口统计信息
+        sprintf(cmd, "netstat -I %s -b -d | tail -n 1", p->vm.nic[i].tap);
+        fp = popen(cmd, "r");
+        if (fp) {
+            unsigned long long packets_in = 0, bytes_in = 0, errors_in = 0, drops_in = 0;
+            unsigned long long packets_out = 0, bytes_out = 0, errors_out = 0, drops_out = 0;
+            
+            if (fgets(line, sizeof(line), fp)) {
+                sscanf(line, "%*s %*d %*s %*s %llu %llu %llu %llu %llu %llu %llu %llu",
+                       &packets_in, &errors_in, &drops_in, &bytes_in,
+                       &packets_out, &errors_out, &bytes_out, &drops_out);
+            }
+            pclose(fp);
+
+            // 格式化输出
+            char in_bytes[64], out_bytes[64];
+            format_bytes(bytes_in, in_bytes, sizeof(in_bytes));
+            format_bytes(bytes_out, out_bytes, sizeof(out_bytes));
+            
+            printf("Received: %s (%'llu packets)\n", in_bytes, packets_in);
+            if (errors_in > 0 || drops_in > 0) {
+                printf("        Errors: %llu, Drops: %llu\n", errors_in, drops_in);
+            }
+            
+            printf("Transmitted: %s (%'llu packets)\n", out_bytes, packets_out);
+            if (errors_out > 0 || drops_out > 0) {
+                printf("        Errors: %llu, Drops: %llu\n", errors_out, drops_out);
+            }
+            
+            // 计算丢包率
+            double drop_rate = 0.0;
+            unsigned long long total_packets = packets_in + packets_out;
+            unsigned long long total_errors = errors_in + errors_out + drops_in + drops_out;
+            if (total_packets > 0) {
+                drop_rate = (double)total_errors / total_packets * 100;
+            }
+            printf("Packet Loss Rate: %.2f%%\n\n", drop_rate);
+        }
+    }
+}
+
+// 辅助函数：解析内存大小字符串（如 "4G"）转换为字节数
+unsigned long long parse_size(const char *size_str) {
+    unsigned long long size;
+    char unit;
+    sscanf(size_str, "%llu%c", &size, &unit);
+    
+    switch (toupper(unit)) {
+        case 'G': return size * 1024 * 1024 * 1024;
+        case 'M': return size * 1024 * 1024;
+        case 'K': return size * 1024;
+        default: return size;
+    }
+}

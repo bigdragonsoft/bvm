@@ -44,6 +44,8 @@
 #include <dirent.h>
 #include <signal.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
 #include <spawn.h>
 
 #include <openssl/evp.h>
@@ -247,6 +249,7 @@ int  write_log(char *fmt, ...);
 void set_vmdir();
 void set_bvm_os();
 void check_bre();
+void auto_fix_conf(char *conf_file, char *key, char *value);
 void vm_init();
 void vm_end();
 
@@ -344,6 +347,7 @@ void crypt_read(char *file, unsigned char *s, int index);
 void crypt_write(char *file, unsigned char *s, int index);
 void bvm_xor(unsigned char *s, char *passwd);
 int  bvm_crypt_aes(unsigned char *data, char *passwd, int flag);
+void bvm_crypt(unsigned char *data, char *passwd);
 void clean_tap(char *tap_name);
 void clean_bridge(char *bridge_name);
 int  check_spell(char *vm_name);
@@ -365,5 +369,10 @@ int  red(char *fmt, ...);
 int  green(char *fmt, ...);
 int  title(char *fmt, ...);
 
+unsigned long long get_cpu_frequency();
+void format_cpu_time(unsigned long long ticks, char *buf, size_t bufsize, unsigned long long cpu_freq);	
+void format_bytes(unsigned long long bytes, char *buf, size_t bufsize);
+void vm_show_stats(const char *vm_name);
+unsigned long long parse_size(const char *size_str);
 void test();
 #endif	//BVM_VM_H

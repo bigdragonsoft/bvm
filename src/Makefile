@@ -5,7 +5,10 @@ booter_name = bvmb
 booter_objs = booter.o $(objs)
 dhcp_name = bvmdhcp
 dhcp_objs = dhcp.o $(objs)
-opt = -O
+opt = -O 
+#-Wno-deprecated-declarations 
+#-Wno-deprecated-non-prototype
+#-Wno-gnu-folding-constant
 
 # Add OpenSSL link libraries
 LDFLAGS = -lcrypt -lssl -lcrypto
