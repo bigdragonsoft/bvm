@@ -1028,8 +1028,8 @@ void print_dhcp_pool(int output, int server_idx, int bind_idx)
 
      	FILE *fp = NULL;
 
-	const int LINE = 2;
-	char msg[LINE][64] = {0};
+	#define MSG_LINES 2
+	char msg[MSG_LINES][64] = {0};
 	/*
 	sprintf(msg[0], "DHCP server index: %d\n", server_idx);
 	sprintf(msg[1], "DHCP server: %s", ip_to_str(dhcp_pool[server_idx].ip));
@@ -1058,7 +1058,7 @@ void print_dhcp_pool(int output, int server_idx, int bind_idx)
 		}
 
 		if (print_dhcp_pool_head) {
-			for (int i=0; i<LINE; i++)
+			for (int i=0; i<MSG_LINES; i++)
 				fprintf(fp, "%s", msg[i]);
 			print_dhcp_pool_head = 0;
 		}
@@ -1066,7 +1066,7 @@ void print_dhcp_pool(int output, int server_idx, int bind_idx)
 
 	//输出到控制台
 	if (output == OUTPUT_TO_CONSOLE && print_dhcp_pool_head) {
-		for (int i=0; i<LINE; i++)
+		for (int i=0; i<MSG_LINES; i++)
 			warn("%s", msg[i]);
 	}
 	

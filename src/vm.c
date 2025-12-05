@@ -249,6 +249,22 @@ void vm_crypt(char *vm_name, int flag)
 		return;
 	}
 
+    // 警告
+    if (flag > 0) { 
+        printf("\n");
+        warn("IMPORTANT SECURITY WARNING:\n");
+        printf("Incompatible with old images (version <= 1.3.5).\n");
+        printf("DO NOT decrypt old images with this version, or data will be corrupted.\n");
+        printf("Please decrypt with the old version first, then re-encrypt with this one.\n\n");
+    } else {
+        // For decryption, it's even more critical to warn.
+        printf("\n");
+        warn("IMPORTANT SECURITY WARNING:\n");
+        printf("Incompatible with old images (version <= 1.3.5).\n");
+        printf("Ensure this image was encrypted with version > 1.3.5.\n");
+        printf("Decrypting an old image with this version will CORRUPT your data.\n\n");
+    }
+
 	//输入一个key
 	char key[256] = {0};
 	char *msg = "Enter key: ";
@@ -269,6 +285,24 @@ void vm_crypt(char *vm_name, int flag)
 	char passwd[256];
 	strcpy(passwd, crypt(key, salt));
 
+    // 生成密钥和基础IV
+    unsigned char aes_key[32];
+    unsigned char base_iv[16];
+
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    if (mdctx) {
+        unsigned int key_len = 0;
+        if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) == 1 &&
+            EVP_DigestUpdate(mdctx, passwd, strlen(passwd)) == 1 &&
+            EVP_DigestFinal_ex(mdctx, aes_key, &key_len) == 1) {
+            // Success
+        }
+        EVP_MD_CTX_free(mdctx);
+    }
+    
+    // 根据密钥生成基础 IV（如前所述）
+    memcpy(base_iv, aes_key, 16);
+
 	unsigned char data[CRYPT_BUFFER];
 	char file[FN_MAX_LEN];
 	sprintf(file, "%s%s/disk.img", vmdir, p->vm.name);
@@ -281,23 +315,41 @@ void vm_crypt(char *vm_name, int flag)
 	}
 
 	//计算总块数
-	int total_blocks = st.st_size / CRYPT_BUFFER;
+    long long total_size = st.st_size;
+	int total_blocks = (total_size + CRYPT_BUFFER - 1) / CRYPT_BUFFER;
 	
 	// 在开始处打印初始进度
 	printf("Processing: 0%%");
 	fflush(stdout);
 	
 	for (int i=0; i<total_blocks; i++) {
-		//读取数据
-		crypt_read(file, data, i);
+        int len = CRYPT_BUFFER;
+        if (i == total_blocks - 1) {
+            len = total_size % CRYPT_BUFFER;
+            if (len == 0) len = CRYPT_BUFFER;
+        }
+        
+        // Ensure 16-byte alignment for CBC
+        int aligned_len = len;
+        if (len % 16 != 0) {
+            aligned_len = len - (len % 16);
+        }
+        
+        if (aligned_len > 0) {
+            //读取数据
+            crypt_read(file, data, i, aligned_len);
 
-		//异或运算
-		//bvm_xor(data, passwd);
-		//AES-256加密/解密
-		bvm_crypt_aes(data, passwd, flag);
-	
-		//写回文件
-		crypt_write(file, data, i);
+            // 计算当前块IV
+            unsigned char iv[16];
+            memcpy(iv, base_iv, 16);
+            *(uint32_t*)iv ^= (uint32_t)i; // Mix block index
+
+            //AES-256加密/解密
+            bvm_crypt_chunk(data, aligned_len, aes_key, iv, flag);
+        
+            //写回文件
+            crypt_write(file, data, i, aligned_len);
+        }
 		
 		// 更新百分比
 		printf("\r"); // 回到行首
@@ -315,14 +367,14 @@ void vm_crypt(char *vm_name, int flag)
 }
 
 // 将加密后的数据写入虚拟机磁盘
-void crypt_write(char *file, unsigned char *s, int index)
+void crypt_write(char *file, unsigned char *s, int index, int size)
 {
 	FILE *fp = fopen(file, "rb+");
 
 	if (fp) {
 	
-		fseek(fp, index * CRYPT_BUFFER, SEEK_SET);
-		fwrite(s, 1, CRYPT_BUFFER, fp);
+		fseek(fp, (long)index * CRYPT_BUFFER, SEEK_SET);
+		fwrite(s, 1, size, fp);
 
 		fclose(fp);
 	}
@@ -333,14 +385,15 @@ void crypt_write(char *file, unsigned char *s, int index)
 }
 
 // 读取虚拟机磁盘部分数据
-void crypt_read(char *file, unsigned char *s, int index)
+int crypt_read(char *file, unsigned char *s, int index, int size)
 {
 	FILE *fp = fopen(file, "rb");
+    int ret = 0;
 
 	if (fp) {
 
-		fseek(fp, index * CRYPT_BUFFER, SEEK_SET);
-		fread(s, 1, CRYPT_BUFFER, fp);
+		fseek(fp, (long)index * CRYPT_BUFFER, SEEK_SET);
+		ret = fread(s, 1, size, fp);
 
 		fclose(fp);
 	}
@@ -348,6 +401,7 @@ void crypt_read(char *file, unsigned char *s, int index)
 		error("read disk-image error\n");
 		err_exit();
 	}
+    return ret;
 }
 
 // 对数据进行异或运算
@@ -367,52 +421,50 @@ void bvm_xor(unsigned char *s, char *passwd)
 // passwd: 密码
 // encrypt: 1表示加密,0表示解密
 // 返回: 成功返回1,失败返回0
-int bvm_crypt_aes(unsigned char *data, char *passwd, int encrypt)
+// 使用AES-256加密/解密数据块
+int bvm_crypt_chunk(unsigned char *data, int len, unsigned char *key, unsigned char *iv, int encrypt)
 {
-    AES_KEY aes_key;
-    
-    // 从密码生成32字节(256位)密钥
-    unsigned char key[32];
-    unsigned char iv[16];
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) return 0;
 
-    // 使用SHA256生成固定长度的密钥
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, passwd, strlen(passwd));
-    SHA256_Final(key, &sha256);
-
-    // 生成固定的IV(在实际应用中应该使用随机IV)
-    memset(iv, 0x00, sizeof(iv));
-    for(int i = 0; i < 16 && i < strlen(passwd); i++) {
-        iv[i] = passwd[i];
+    unsigned char *outbuf = malloc(len);
+    if (!outbuf) {
+        EVP_CIPHER_CTX_free(ctx);
+        return 0;
     }
 
-    // 设置加密/解密密钥
-    if (encrypt) {
-        if (AES_set_encrypt_key(key, 256, &aes_key) < 0) {
-            return 0;
-        }
-    } else {
-        if (AES_set_decrypt_key(key, 256, &aes_key) < 0) {
-            return 0;
-        }
+    int outlen = 0;
+    int ret = 1;
+
+    if (EVP_CipherInit_ex(ctx, EVP_aes_256_cbc(), NULL, key, iv, encrypt) != 1) {
+        ret = 0;
+        goto end;
     }
 
-    // 临时IV(因为AES_cbc_encrypt会修改IV)
-    unsigned char tmpiv[16];
-    memcpy(tmpiv, iv, 16);
+    // 禁用padding以匹配AES_cbc_encrypt的行为
+    EVP_CIPHER_CTX_set_padding(ctx, 0);
 
-    // 输出缓冲区
-    unsigned char outbuf[CRYPT_BUFFER];
-    
     // 执行加密/解密
-    AES_cbc_encrypt(data, outbuf, CRYPT_BUFFER, &aes_key, tmpiv, 
-                    encrypt ? AES_ENCRYPT : AES_DECRYPT);
+    if (EVP_CipherUpdate(ctx, outbuf, &outlen, data, len) != 1) {
+        ret = 0;
+        goto end;
+    }
+
+    // Finalize
+    int final_len = 0;
+    if (EVP_CipherFinal_ex(ctx, outbuf + outlen, &final_len) != 1) {
+        ret = 0;
+        goto end;
+    }
 
     // 复制结果回原缓冲区
-    memcpy(data, outbuf, CRYPT_BUFFER);
+    memcpy(data, outbuf, len);
 
-    return 1;
+end:
+    free(outbuf);
+    EVP_CIPHER_CTX_free(ctx);
+
+    return ret;
 }
 
 // 使用AES-256加密/解密数据
@@ -421,10 +473,18 @@ void bvm_crypt(unsigned char *data, char *passwd)
     // 使用SHA-256生成256位密钥
     unsigned char key[32];
     unsigned char iv[16];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, passwd, strlen(passwd));
-    SHA256_Final(key, &sha256);
+    
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    if (!mdctx) return;
+
+    unsigned int key_len = 0;
+    if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1 ||
+        EVP_DigestUpdate(mdctx, passwd, strlen(passwd)) != 1 ||
+        EVP_DigestFinal_ex(mdctx, key, &key_len) != 1) {
+        EVP_MD_CTX_free(mdctx);
+        return;
+    }
+    EVP_MD_CTX_free(mdctx);
 
     // 生成IV (对第一个块使用密码hash的前16字节作为IV)
     memcpy(iv, key, 16);
@@ -502,6 +562,8 @@ void test()
 	printf("test AES-256 encryption and decryption\n");
 	int len = 160;
     unsigned char data[len];
+    unsigned char key[32] = "12345678901234567890123456789012";
+    unsigned char iv[16] = "1234567890123456";
 
 
     // 初始化测试数据
@@ -517,7 +579,7 @@ void test()
 
 
     // 加密
-    if (!bvm_crypt_aes(data, "1234567890", 1)) {
+    if (!bvm_crypt_chunk(data, len, key, iv, 1)) {
         printf("encryption failed\n");
         return;
     }
@@ -530,7 +592,7 @@ void test()
 
 
     // 解密
-    if (!bvm_crypt_aes(data, "1234567890", 0)) {
+    if (!bvm_crypt_chunk(data, len, key, iv, 0)) {
         printf("decryption failed\n");
         return;
     }
@@ -2561,7 +2623,7 @@ void destroy_vm_list()
 }
 
 // 在列表中查找指定的vm
-vm_node* find_vm_list(char *vm_name)
+vm_node* find_vm_list(const char *vm_name)
 {
 	if (vm_name == NULL) return NULL;
 
@@ -3295,7 +3357,7 @@ int get_vm_count()
 
 // 获取vm的状态
 // 开机：VM_ON / 关机：VM_OFF
-int get_vm_status(char *vm_name)
+int get_vm_status(const char *vm_name)
 {
 	char fn[FN_MAX_LEN];
 	sprintf(fn, "/dev/vmm/%s", vm_name);

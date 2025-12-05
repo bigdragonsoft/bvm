@@ -48,9 +48,8 @@
 #include <sys/sysctl.h>
 #include <spawn.h>
 
+
 #include <openssl/evp.h>
-#include <openssl/aes.h>
-#include <openssl/sha.h>
 #include <openssl/rand.h>
 #include <openssl/err.h>
 #include <pthread.h>
@@ -316,11 +315,11 @@ void show_vm_name(int status);
 void select_vm(char *vm_name, int status);
 void print_vm_list(int list_type, int online_only);
 void print_vm_net_stat();
-vm_node* find_vm_list(char *vm_name);
+vm_node* find_vm_list(const char *vm_name);
 int  del_from_vm_list(char *vm_name);
 void get_vm_name(char *dir);
 void update_vm_status(char *vm_name, int status);
-int  get_vm_status(char *vm_name);
+int  get_vm_status(const char *vm_name);
 int  get_vm_count();
 int  vm_online_count();
 int  check_vm_files(char *vm_name);
@@ -343,10 +342,10 @@ int  get_bvmb_pid(vm_stru *vm);
 int  exist_hw_vmm_vmx_initialized(vm_stru *vm);
 int  get_vmx(vm_stru *vm);
 void file_lock(char *file, int flag);
-void crypt_read(char *file, unsigned char *s, int index);
-void crypt_write(char *file, unsigned char *s, int index);
+void crypt_write(char *file, unsigned char *s, int index, int size);
+int  crypt_read(char *file, unsigned char *s, int index, int size);
 void bvm_xor(unsigned char *s, char *passwd);
-int  bvm_crypt_aes(unsigned char *data, char *passwd, int flag);
+int  bvm_crypt_chunk(unsigned char *data, int len, unsigned char *key, unsigned char *iv, int encrypt);
 void bvm_crypt(unsigned char *data, char *passwd);
 void clean_tap(char *tap_name);
 void clean_bridge(char *bridge_name);

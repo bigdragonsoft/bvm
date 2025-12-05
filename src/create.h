@@ -49,7 +49,7 @@
 struct _create_stru {
 	char desc[128];
 	char *value;
-	void (*func)();
+	void (*func)(int);
 	int  arg;
 	int  edit;
 	int  submenu;
