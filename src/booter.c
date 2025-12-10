@@ -185,6 +185,26 @@ void uefi_booter(vm_node *p)
 		exit(1);
 	}
 
+	// 自动迁移逻辑：如果 VM 使用 UEFI 但没有 vars 文件
+	if (strcmp(p->vm.uefi, "none") != 0 && strlen(p->vm.uefi_vars) == 0) {
+		// 尝试创建 vars 文件
+		char template_vars[] = "/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd";
+		char vm_vars[256];
+		sprintf(vm_vars, "%s%s/efivars.fd", vmdir, p->vm.name);
+		
+		// 如果模板存在且 vars 文件不存在，则创建
+		if (access(template_vars, R_OK) == 0 && access(vm_vars, F_OK) != 0) {
+			// 复制模板
+			char copy_cmd[512];
+			sprintf(copy_cmd, "cp %s %s", template_vars, vm_vars);
+			if (system(copy_cmd) == 0) {
+				strcpy(p->vm.uefi_vars, vm_vars);
+				save_vm_info(p->vm.name, &p->vm);
+				write_log("Auto-migrated %s to UEFI vars persistence mode", p->vm.name);
+			}
+		}
+	}
+
 	char cmd[BUFFERSIZE];
 	while (1) {
 		
@@ -224,7 +244,20 @@ void uefi_booter(vm_node *p)
 					strcat(cmd, "-s 29,fbuf,tcp=0.0.0.0:${vm_vncport},w=${vm_vncwidth},h=${vm_vncheight} ");
 		strcat(cmd, "-s 30,xhci,tablet ");
 		strcat(cmd, "-s 31,lpc -l com1,stdio ");
-		strcat(cmd, "-l bootrom,/usr/local/share/uefi-firmware/${vm_bhyve_uefi_fd} ");
+		
+		// 智能选择 UEFI 固件模式
+		if (strlen(p->vm.uefi_vars) > 0 && access(p->vm.uefi_vars, R_OK) == 0) {
+			// 新方式：使用 CODE + VARS（优先）
+			if (access("/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd", R_OK) == 0) {
+				strcat(cmd, "-l bootrom,/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd,${vm_uefi_vars} ");
+			} else {
+				// CODE 文件不存在，回退到旧方式
+				strcat(cmd, "-l bootrom,/usr/local/share/uefi-firmware/${vm_bhyve_uefi_fd} ");
+			}
+		} else {
+			// 兼容旧方式（没有 vars 文件或 vars 文件不可读）
+			strcat(cmd, "-l bootrom,/usr/local/share/uefi-firmware/${vm_bhyve_uefi_fd} ");
+		}
 		strcat(cmd, "${vm_name}");
 
 		ret = run(cmd, p);
@@ -277,6 +310,7 @@ void convert(char *code, vm_node *p)
 	str_replace(str, "${vm_vncheight}", 	p->vm.vncheight);
 	str_replace(str, "${vm_network_interface}", 	p->vm.network_interface);
 	str_replace(str, "${vm_storage_interface}", 	p->vm.storage_interface);
+	str_replace(str, "${vm_uefi_vars}",		p->vm.uefi_vars);
 	if (strcmp(p->vm.uefi, "uefi") == 0)
 		str_replace(str, "${vm_bhyve_uefi_fd}", "BHYVE_UEFI.fd");
 	if (strcmp(p->vm.uefi, "uefi_csm")== 0)

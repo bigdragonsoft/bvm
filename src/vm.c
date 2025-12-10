@@ -626,14 +626,28 @@ void check_bre()
 	 * 3. grub-bhyve
 	 ********************************/
 	
-	//bhyve-firmware
-	//bhyve-firmware移除了 BHYVE_UEFI_CSM.fd
-	/*if (access("/usr/local/share/uefi-firmware/BHYVE_UEFI.fd", 0) == -1 ||
-	    access("/usr/local/share/uefi-firmware/BHYVE_UEFI_CSM.fd", 0) == -1) {*/
-	if (access("/usr/local/share/uefi-firmware/BHYVE_UEFI.fd", 0) == -1) {
+	// 检查新版 UEFI 固件文件（支持 vars 持久化）
+	int has_new_uefi = 0;
+	if (access("/usr/local/share/uefi-firmware/BHYVE_UEFI_CODE.fd", 0) == 0 &&
+	    access("/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd", 0) == 0) {
+		has_new_uefi = 1;
+	}
+	
+	// 检查旧版 UEFI 固件文件（兼容模式）
+	int has_old_uefi = 0;
+	if (access("/usr/local/share/uefi-firmware/BHYVE_UEFI.fd", 0) == 0) {
+		has_old_uefi = 1;
+	}
+	
+	// 如果都没有，警告无法支持 UEFI
+	if (!has_new_uefi && !has_old_uefi) {
 		warn("unable to support UEFI\n");
 		warn("please use 'pkg install bhyve-firmware' to install first\n\n");
-	}	
+	} else if (!has_new_uefi && has_old_uefi) {
+		// 只有旧版，警告建议更新
+		warn("Old UEFI firmware detected (legacy mode)\n");
+		warn("Recommend upgrading bhyve-firmware package for UEFI vars persistence support\n\n");
+	}
 
 	//tmux
 	if (access("/usr/local/bin/tmux", 0) == -1) {
@@ -1337,6 +1351,12 @@ void vm_create(char *vm_name, char *template_vm_name)
 	if (template_vm_name) {
 		load_vm_info(template_vm_name, &new_vm);
 		strcpy(new_vm.name, vm_name);
+		// 清空模板的 UEFI vars 路径，让新 VM 首次启动时自动创建
+		if (strlen(new_vm.uefi_vars) > 0) {
+			strcpy(new_vm.uefi_vars, "");
+		}
+		// 设置 CD-ROM 状态为 on
+		strcpy(new_vm.cdstatus,"on");
 		edit_vm(NULL);
 	}
 	else
@@ -1361,6 +1381,29 @@ void vm_create(char *vm_name, char *template_vm_name)
 
 	//生成disk.img
 	create_vm_disk_all(&new_vm);
+
+	//为 UEFI VM 创建 vars 文件
+	if (strcmp(new_vm.uefi, "none") != 0) {
+		char template_vars[] = "/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd";
+		char vm_vars[256];
+		sprintf(vm_vars, "%s%s/efivars.fd", vmdir, new_vm.name);
+		
+		// 检查模板文件是否存在
+		if (access(template_vars, R_OK) == 0) {
+			// 复制模板文件到 VM 目录
+			char cmd[512];
+			sprintf(cmd, "cp %s %s", template_vars, vm_vars);
+			if (system(cmd) == 0) {
+				strcpy(new_vm.uefi_vars, vm_vars);
+				save_vm_info(new_vm.name, &new_vm);
+				write_log("Created UEFI vars file for %s", new_vm.name);
+			} else {
+				warn("Failed to create UEFI vars file, will use legacy mode\n");
+			}
+		} else {
+			warn("UEFI vars template not found, will use legacy mode\n");
+		}
+	}
 }
 
 // 创建虚拟机中所有磁盘
@@ -2155,6 +2198,13 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 	sprintf(str, "%s%s%s", vmdir, dst_vm_name, "/device.map");
 	strcpy(vm.devicemap, str);
 
+	// 清空 UEFI vars 路径，让首次启动时自动创建全新的 vars 文件
+	// 这样可以避免克隆后的 VM 启动项与源 VM 冲突
+	if (strlen(vm.uefi_vars) > 0) {
+		strcpy(vm.uefi_vars, "");
+		write_log("Cleared UEFI vars path for cloned VM %s, will auto-create on first boot", dst_vm_name);
+	}
+
 	save_vm_info(dst_vm_name, &vm);
 
 	//生成device.map
@@ -2233,6 +2283,12 @@ int  vm_rename(char *old_vm_name, char *new_vm_name)
 
 	sprintf(str, "%s%s", new_dir, "/device.map");
 	strcpy(vm.devicemap, str);
+
+	// 更新 UEFI vars 文件路径（如果存在）
+	if (strlen(vm.uefi_vars) > 0) {
+		sprintf(str, "%s/efivars.fd", new_dir);
+		strcpy(vm.uefi_vars, str);
+	}
 
 	save_vm_info(old_vm_name, &vm);
 
@@ -2779,6 +2835,8 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 		strcpy(vm->hostbridge, value);
 	if ((value = get_value_by_name("vm_uefi")) != NULL)
 		strcpy(vm->uefi, value);
+	if ((value = get_value_by_name("vm_uefi_vars")) != NULL)
+		strcpy(vm->uefi_vars, value);
 	if ((value = get_value_by_name("vm_disk")) != NULL)
 		strcpy(vm->disk, value);
 	if ((value = get_value_by_name("vm_devicemap")) != NULL)
@@ -2958,6 +3016,8 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	sprintf(str, "vm_hostbridge=%s\n", vm->hostbridge);
 	fputs(str, fp);
 	sprintf(str, "vm_uefi=%s\n", vm->uefi);
+	fputs(str, fp);
+	sprintf(str, "vm_uefi_vars=%s\n", vm->uefi_vars);
 	fputs(str, fp);
 	sprintf(str, "vm_disk=%s\n", vm->disk);
 	fputs(str, fp);
