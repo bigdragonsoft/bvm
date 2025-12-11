@@ -18,8 +18,9 @@ BVM is a Bhyve virtual machine management tool based on FreeBSD. It provides a s
    - Port forwarding support in NAT mode
 4. Multiple boot methods:
    - Support for traditional GRUB boot
-   - Support for modern UEFI boot
+   - Support for modern UEFI boot (including UEFI Variables persistence)
 5. Other features:
+   - TPM 2.0 support (Trusted Platform Module)
    - VM encryption protection
    - Autoboot configuration
    - Snapshot and rollback support
@@ -71,7 +72,7 @@ Options:
         --os            Output OS list
         --poweroff      Force power off
         --reload-nat    Reload NAT redirect port
-        --remove        Destroy VM
+        --remove        Destroy VM(s)
         --rename        Rename VM
         --restart       Restart VM
         --reboot        Restart VM (alias for --restart)
@@ -132,6 +133,7 @@ Some configuration parameters explained:
     ios path           Installation image directory (auto-listed for selection)
     boot from          Boot options (cd0:CD boot/hd0:Hard disk boot)
     uefi               Used for GUI systems with VNC, will disable --login
+    TPM (UEFI)         Enable TPM 2.0 support (requires UEFI)
     auto boot          Auto-start configuration (see bvm --autoboot)
     hostbridge         CPU architecture (intel:hostbridge/AMD:amd_hostbridge)
     disk config        Disk configuration (can add/remove disks, recommend using --addisk)

@@ -42,6 +42,9 @@
 .Cm --restart
 .Ar name
 .Nm
+.Cm --reboot
+.Ar name
+.Nm
 .Cm --stop
 .Ar name
 .Nm
@@ -53,7 +56,7 @@
 .Ar name new-name
 .Nm
 .Cm --remove
-.Ar name
+.Ar name ...
 .Nm
 .Cm --rename
 .Ar name new-name
@@ -397,9 +400,9 @@ this option to force the virtual machine to power off.
 Reload the NAT port redirect. In general, you do not need to use this option, 
 .Nm 
 will automatically handle port redirection, this option is manual mode.
-.It Cm --remove Ar name
-Destroy a virtual machine and it cannot be recovered.
-Note that the virtual machine cannot be running when you run this command.
+.It Cm --remove Ar name ...
+Destroy one or more virtual machines and they cannot be recovered.
+Note that the virtual machines cannot be running when you run this command.
 .It Cm --rename Ar name new-name
 Rename the virtual machine.
 .It Cm --restart Ar name

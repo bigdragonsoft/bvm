@@ -18,8 +18,9 @@ BVM 是一个基于 FreeBSD 的 Bhyve 虚拟机管理工具。它提供了简单
    - NAT 模式下支持端口转发
 4. 多种引导方式：
    - 支持传统的 GRUB 引导
-   - 支持现代的 UEFI 引导
+   - 支持现代的 UEFI 引导（包含 UEFI 变量持久化支持）
 5. 其他功能：
+   - 支持 TPM 2.0 (可信平台模块)
    - 虚拟机加密保护
    - 自动启动配置
    - 快照和回滚支持
@@ -71,7 +72,7 @@ Options:
         --os            Output OS list
         --poweroff      Force power off
         --reload-nat    Reload NAT redirect port
-        --remove        Destroy VM
+        --remove        Destroy VM(s)
         --rename        Rename VM
         --restart       Restart VM
         --reboot        Restart VM (alias for --restart)
@@ -132,6 +133,7 @@ Options:
     ios path           ISO镜像目录（自动列出供选择）
     boot from          启动选项 (cd0:CD启动/hd0:硬盘启动)
     uefi               用于带有VNC的GUI系统，将禁用--login
+    TPM (UEFI)         启用TPM 2.0支持（需要UEFI）
     auto boot          自启动配置（见bvm --autoboot）
     hostbridge         CPU架构 (intel:hostbridge/AMD:amd_hostbridge)
     disk config        磁盘配置（可以添加/删除磁盘，推荐使用--addisk）

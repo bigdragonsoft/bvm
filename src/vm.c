@@ -2338,12 +2338,13 @@ int  vm_rename(char *old_vm_name, char *new_vm_name)
 }
 
 // 删除vm
-int vm_remove(char *vm_name)
+int vm_remove(char *vm_name, int skip_confirm, int show_list)
 {
 	vm_node *p;
 	if ((p = find_vm_list(vm_name)) == NULL) {
 		error("%s not exist\n", vm_name);
-		show_vm_name(VM_OFF);
+		if (show_list)
+			show_vm_name(VM_OFF);
 		return RET_FAILURE;
 	}
 	
@@ -2352,17 +2353,19 @@ int vm_remove(char *vm_name)
 		return RET_FAILURE;
 	}
 
-	WARN("Enter 'YES' To remove the vm: ");
-	char str[BUFFERSIZE];
-	fgets(str, BUFFERSIZE, stdin);
-	str[strlen(str)-1] = '\0';
-	if (strcmp(str, "YES") == 0) {
-		printf("\033[1A\033[K");
-	}
-	else {
-		printf("\033[1A\033[K");
-		warn("cancelled\n");
-		return RET_FAILURE;
+	if (!skip_confirm) {
+		WARN("Enter 'YES' To remove the vm [%s]: ", vm_name);
+		char str[BUFFERSIZE];
+		fgets(str, BUFFERSIZE, stdin);
+		str[strlen(str)-1] = '\0';
+		if (strcmp(str, "YES") == 0) {
+			printf("\033[1A\033[K");
+		}
+		else {
+			printf("\033[1A\033[K");
+			warn("cancelled\n");
+			return RET_FAILURE;
+		}
 	}
 
 	char filename[FN_MAX_LEN];
@@ -2410,7 +2413,7 @@ int vm_remove(char *vm_name)
 		return RET_FAILURE;
 	}
 	else {
-		success("Remove success\n");
+		success("%s Remove success\n", vm_name);
 		return RET_SUCCESS;
 	}
 	/*

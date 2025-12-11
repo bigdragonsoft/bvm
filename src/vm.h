@@ -267,7 +267,7 @@ void vm_killsession(char *vm_name);
 void vm_poweroff(char *vm_name, int flag_msg);
 int  vm_clone(char *src_vm_name, char *dst_vm_name);
 int  vm_rename(char *old_vm_name, char *new_vm_name);
-int  vm_remove(char *vm_name);
+int  vm_remove(char *vm_name, int skip_confirm, int show_list);
 void vm_add_disk(char *vm_name);
 void vm_del_disk(char *vm_name);
 void vm_list(int list_type, char *index_key, int online_only);

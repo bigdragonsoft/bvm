@@ -42,7 +42,7 @@ void version()
 	printf("author: %s\n", program.author);
 	printf("email: %s\n", program.email);
 	printf("%s\n", program.website);
-	printf("Copyright (C) 2017~2024 BigDragonSoft.com, ChinaFreeBSD.cn\n");
+	printf("Copyright (C) 2017~2025 BigDragonSoft.com, ChinaFreeBSD.cn\n");
 }
 
 // 程序用法
@@ -274,7 +274,40 @@ int main(int argc, char *argv[])
 			break;
 		
 		case 'd': //remove
-			vm_remove(optarg);
+        {
+            char *vm_list[256];
+            int vm_count = 0;
+            vm_list[vm_count++] = optarg;
+            
+			while (optind < argc && argv[optind] && argv[optind][0] != '-') {
+                if (vm_count < 256) {
+				    vm_list[vm_count++] = argv[optind];
+                }
+				optind++;
+			}
+            
+            fprintf(stderr, "\033[33mEnter 'YES' To remove the vm [");
+            for(int i=0; i<vm_count; i++) {
+                fprintf(stderr, "%s%s", vm_list[i], (i<vm_count-1)?", ":"");
+            }
+            fprintf(stderr, "]: \033[0m");
+
+            char str[BUFFERSIZE];
+            if (fgets(str, BUFFERSIZE, stdin)) {
+                str[strcspn(str, "\n")] = 0;
+                if (strcmp(str, "YES") == 0) {
+                    printf("\033[1A\033[K");
+                    for(int i=0; i<vm_count; i++) {
+                        // 如果只有一个虚拟机，删除失败时显示列表，否则不显示
+                        int show_list = (vm_count == 1) ? 1 : 0;
+                        vm_remove(vm_list[i], 1, show_list);
+                    }
+                } else {
+                    printf("\033[1A\033[K");
+                    warn("cancelled\n");
+                }
+            }
+        }
 			break;
 		
 		case '+': //addisk
