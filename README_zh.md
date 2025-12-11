@@ -74,6 +74,7 @@ Options:
         --remove        Destroy VM
         --rename        Rename VM
         --restart       Restart VM
+        --reboot        Restart VM (alias for --restart)
         --rollback      Roll back to snapshot point
         --setnat        Set NAT IP address
         --setsw         Set Switch IP address
@@ -176,7 +177,7 @@ crypt          : no
 ```
 ### 问题 4: 如何启动虚拟机？
 ```
-答: 使用命令 'bvm --start vmname' 启动，使用 'bvm --restart vmname' 重启。对于使用GRUB启动模式的虚拟机，使用 'bvm --login vmname' 登录，而对于使用UEFI启动模式的虚拟机则需要使用VNC登录。
+答: 使用命令 'bvm --start vmname' 启动，使用 'bvm --restart vmname' 或 'bvm --reboot vmname' 重启。对于使用GRUB启动模式的虚拟机，使用 'bvm --login vmname' 登录，而对于使用UEFI启动模式的虚拟机则需要使用VNC登录。
 ```
 
 ### 问题 5: 什么是虚拟机自动启动，如何使用？

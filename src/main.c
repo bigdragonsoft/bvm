@@ -78,6 +78,7 @@ void usage()
 		"	--remove	Destroy VM",
 		"	--rename	Rename VM",
 		"	--restart	Restart VM",
+		"	--reboot	Restart VM (alias for --restart)",
 		"	--rollback	Roll back to snapshot point",
 		"	--setnat	Set NAT IP address",
 		"	--setsw		Set Switch IP address",
@@ -132,7 +133,7 @@ int main(int argc, char *argv[])
 
 	//未使用的字母
 	//q, x, y, z
-	//F, G, J, M, O, P, Q, U, X, Y, Z
+	//F, G, J, M, P, Q, U, X, Y, Z
 	struct option long_options[] = {
 		{"help", 			0,	NULL, 	'h'},
 		{"version", 		0, 	NULL, 	'v'},
@@ -148,6 +149,7 @@ int main(int argc, char *argv[])
 		{"login", 			1, 	NULL, 	'L'},
 		{"stop", 			1, 	NULL, 	'S'},
 		{"restart", 		1, 	NULL, 	'R'},
+		{"reboot", 			1, 	NULL, 	'O'},
 		{"poweroff", 		1, 	NULL, 	'p'},
 		{"clone", 			1, 	NULL, 	'c'},
 		{"rename", 			1, 	NULL, 	'r'},
@@ -249,10 +251,11 @@ int main(int argc, char *argv[])
 			break;
 		
 		case 'R': //restart
+		case 'O': //reboot
 			vm_restart(optarg);
 		
 			//延迟1秒为防止tap被过早清理掉	
-		       	//执行 bvm --restart 后由于时间差误删除tap
+		    //执行 bvm --restart 后由于时间差误删除tap
 			//当时在测试 dhcp 时发现非 freebsd 虚拟机，比如 openbsd 
 			//在使用 bvm --restart 后 tap 丢失
 			//最后才发现是清理 tap 模块的执行速度太快了

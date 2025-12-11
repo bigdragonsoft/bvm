@@ -74,6 +74,7 @@ Options:
         --remove        Destroy VM
         --rename        Rename VM
         --restart       Restart VM
+        --reboot        Restart VM (alias for --restart)
         --rollback      Roll back to snapshot point
         --setnat        Set NAT IP address
         --setsw         Set Switch IP address
@@ -176,7 +177,7 @@ crypt          : no
 ```
 ### Question 4: How to start a VM?
 ```
-Answer: Use command 'bvm --start vmname' to start, use 'bvm --restart vmname' to restart. For VMs using GRUB boot mode, use 'bvm --login vmname' to log in, while VMs using UEFI boot mode require VNC login.
+Answer: Use command 'bvm --start vmname' to start, use 'bvm --restart vmname' or 'bvm --reboot vmname' to restart. For VMs using GRUB boot mode, use 'bvm --login vmname' to log in, while VMs using UEFI boot mode require VNC login.
 ```
 
 ### Question 5: What is VM auto-start and how to use it?
