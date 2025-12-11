@@ -206,6 +206,59 @@ void uefi_booter(vm_node *p)
 	}
 
 	char cmd[BUFFERSIZE];
+
+	// TPM Start Logic
+	if (strcmp(p->vm.tpmstatus, "on") == 0) {
+		char tpm_sock[256];
+		if (strlen(p->vm.tpmpath) > 0)
+			strcpy(tpm_sock, p->vm.tpmpath);
+		else
+			sprintf(tpm_sock, "/tmp/%s/swtpm.sock", p->vm.name);
+
+		char tpm_dir[256];
+		sprintf(tpm_dir, "%s%s/tpm", vmdir, p->vm.name);
+
+		char sock_dir[256];
+		sprintf(sock_dir, "/tmp/%s", p->vm.name);
+		
+		char tpm_ctrl_sock[256];
+		sprintf(tpm_ctrl_sock, "/tmp/%s/swtpm-ctrl.sock", p->vm.name);
+		
+		char start_swtpm[1024];
+		sprintf(start_swtpm, 
+			"mkdir -p %s; "
+			"mkdir -p %s; "
+			"rm -f %s; " // Delete stale sockets
+			"rm -f %s; "
+			"swtpm socket --tpmstate dir=%s --ctrl type=unixio,path=%s --server type=unixio,path=%s --tpm2 -d --pid file=/var/run/swtpm-%s.pid",
+			sock_dir, tpm_dir, tpm_sock, tpm_ctrl_sock, tpm_dir, tpm_ctrl_sock, tpm_sock, p->vm.name);
+		
+		write_log("Starting swtpm: %s", start_swtpm);
+		system(start_swtpm);
+
+		// Wait for socket to be ready (max 5 seconds)
+		int wait_retries = 50;
+		while (wait_retries-- > 0) {
+			if (access(tpm_sock, F_OK) == 0) break;
+			usleep(100000); // 100ms
+		}
+		
+		if (access(tpm_sock, F_OK) != 0) {
+			write_log("Error: swtpm socket %s not found after waiting. Aborting boot.", tpm_sock);
+			// Clean up any partial process
+			char stop_swtpm[512];
+			sprintf(stop_swtpm, 
+				"if [ -f /var/run/swtpm-%s.pid ]; then "
+				"kill $(cat /var/run/swtpm-%s.pid); "
+				"rm /var/run/swtpm-%s.pid; "
+				"fi",
+				p->vm.name, p->vm.name, p->vm.name);
+			system(stop_swtpm);
+			exit(1); 
+		}
+	}
+
+
 	while (1) {
 		
 		//bhyve
@@ -243,6 +296,7 @@ void uefi_booter(vm_node *p)
 			if (strcmp(p->vm.vncstatus, "on") == 0)
 					strcat(cmd, "-s 29,fbuf,tcp=0.0.0.0:${vm_vncport},w=${vm_vncwidth},h=${vm_vncheight} ");
 		strcat(cmd, "-s 30,xhci,tablet ");
+		strcat(cmd, "${vm_tpm_param}");
 		strcat(cmd, "-s 31,lpc -l com1,stdio ");
 		
 		// 智能选择 UEFI 固件模式
@@ -269,7 +323,8 @@ void uefi_booter(vm_node *p)
      		  3	     triple fault
      		  4	     exited due	to an error
 		*******************************************/
-		if (ret > 0 && ret < 4) break;
+		write_log("bhyve exited with status: %d", ret);
+		if (ret > 0 && ret <= 4) break;
 		strcpy(cmd, "/usr/sbin/bhyvectl --destroy --vm=${vm_name}");
 		run(cmd, p);
 		boot = 1;
@@ -280,6 +335,20 @@ void uefi_booter(vm_node *p)
 	for (int n=0; n<atoi(p->vm.nics); n++) {
 		sprintf(cmd, "/sbin/ifconfig ${vm_tap%d} destroy", n);
 		run(cmd, p);
+	}
+
+	// TPM Stop Logic
+	if (strcmp(p->vm.tpmstatus, "on") == 0) {
+		char stop_swtpm[512];
+		sprintf(stop_swtpm, 
+			"if [ -f /var/run/swtpm-%s.pid ]; then "
+			"kill -9 $(cat /var/run/swtpm-%s.pid) 2>/dev/null; "
+			"rm -f /var/run/swtpm-%s.pid; "
+			"fi",
+			p->vm.name, p->vm.name, p->vm.name);
+		
+		write_log("Stopping swtpm: %s", stop_swtpm);
+		system(stop_swtpm);
 	}
 
 }
@@ -315,6 +384,19 @@ void convert(char *code, vm_node *p)
 		str_replace(str, "${vm_bhyve_uefi_fd}", "BHYVE_UEFI.fd");
 	if (strcmp(p->vm.uefi, "uefi_csm")== 0)
 		str_replace(str, "${vm_bhyve_uefi_fd}", "BHYVE_UEFI_CSM.fd"); 
+
+	// TPM
+	char tpm_param[512] = "";
+	if (strcmp(p->vm.tpmstatus, "on") == 0) {
+		char tpm_sock[256];
+		if (strlen(p->vm.tpmpath) > 0)
+			strcpy(tpm_sock, p->vm.tpmpath);
+		else
+			sprintf(tpm_sock, "/tmp/%s/swtpm.sock", p->vm.name);
+		
+		sprintf(tpm_param, "-l tpm,swtpm,%s ", tpm_sock);
+	}
+	str_replace(str, "${vm_tpm_param}", tpm_param); 
 
         for (int n=0; n<atoi(p->vm.nics); n++) {
                 char buf[32];

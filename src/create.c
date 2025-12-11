@@ -96,6 +96,8 @@ void create_init()
 	add_item(tbl, "iso path",     (char*)&new_vm.iso,      		enter_vm_iso, 		0,	1,	0);
 	add_item(tbl, "boot from",    (char*)&new_vm.bootfrom, 		enter_vm_bootfrom, 	0,	1,	0);
 	add_item(tbl, "uefi type",    (char*)&new_vm.uefi,     		enter_vm_uefi, 		0,	0,	0);
+	add_item(tbl, "TPM (UEFI)",   (char*)&new_vm.tpmstatus, 	enter_vm_tpmstatus,	0,	1,	0);
+
 	add_item(tbl, "VNC", 	      (char*)&new_vm.vncstatus,  	enter_vm_vncstatus,	0,	1,	0);
 	add_item(tbl, "VNC port",     (char*)&new_vm.vncport,  		enter_vm_vncport,	0,	1,	0);
 	add_item(tbl, "VNC width",    (char*)&new_vm.vncwidth, 		enter_vm_vncwidth, 	0,	1,	0);
@@ -333,6 +335,8 @@ int is_non_show_item(int item)
 	((tbl[n].func == enter_vm_version && strcmp(new_vm.ostype, "OpenBSD") != 0) ||
 	 (tbl[n].func == enter_vm_iso && strcmp(new_vm.cdstatus, "off") == 0) ||
 	 (tbl[n].func == enter_vm_uefi && !support_uefi(new_vm.ostype)) ||
+	 (tbl[n].func == enter_vm_tpmstatus && 
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0)) ||
 	 (tbl[n].func == enter_vm_vncstatus && 
 		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0)) ||
 	 (tbl[n].func == enter_vm_vncport && 
@@ -700,6 +704,31 @@ void enter_vm_bootdelay(int not_use)
 			break;
 		else
 			warn("input invalid\n");
+	}
+}
+
+// vm_tpmstatus
+// TPM状态输入处理
+void enter_vm_tpmstatus(int not_use)
+{
+	// TPM需要UEFI模式
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0) {
+		strcpy(new_vm.tpmstatus, "off");
+		return;
+	}
+	
+	char *msg = "Enter TPM status: ";
+	char *opts[] = {
+		"on",
+		"off",
+		NULL,
+	};
+	
+	enter_options(msg, opts, NULL, (char*)&new_vm.tpmstatus);
+	
+	// 如果启用TPM，自动设置版本为2.0
+	if (strcmp(new_vm.tpmstatus, "on") == 0) {
+		strcpy(new_vm.tpmversion, "2.0");
 	}
 }
 

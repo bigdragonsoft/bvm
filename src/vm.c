@@ -624,6 +624,7 @@ void check_bre()
 	 * 1. bhyve-firmware
 	 * 2. tmux
 	 * 3. grub-bhyve
+	 * 4. swtpm
 	 ********************************/
 	
 	// 检查新版 UEFI 固件文件（支持 vars 持久化）
@@ -658,6 +659,12 @@ void check_bre()
 	//grub-bhyve
 	if (access("/usr/local/sbin/grub-bhyve", 0) == -1) {
 		error("grub2-bhyve is not installed, use 'pkg install grub2-bhyve' to install it\n");
+		exit(0);
+	}
+
+	//swtpm
+	if (access("/usr/local/bin/swtpm", 0) == -1) {
+		error("swtpm is not installed, use 'pkg install swtpm' to install it\n");
 		exit(0);
 	}
 
@@ -1957,6 +1964,9 @@ void vm_info_all(char *vm_name)
 	printf("%-13s = %s\n",	"vm_bootfrom", 	p->vm.bootfrom);
 	printf("%-13s = %s\n",	"vm_hostbridge",p->vm.hostbridge);
 	printf("%-13s = %s\n",	"vm_uefi",	p->vm.uefi);
+	printf("%-13s = %s\n",	"vm_tpmstatus",p->vm.tpmstatus);
+	printf("%-13s = %s\n",	"vm_tpmversion",p->vm.tpmversion);
+	printf("%-13s = %s\n",	"vm_tpmpath",p->vm.tpmpath);
 	printf("%-13s = %s\n",	"vm_disk",	p->vm.disk);
 	printf("%-13s = %s\n",	"vm_devicemap",	p->vm.devicemap);
 	printf("%-13s = %s\n",	"vm_grubcmd",	p->vm.grubcmd);
@@ -2056,6 +2066,10 @@ void vm_info(char *vm_name)
 		printf("|-%-12s : %s\n", "vnc port", 	p->vm.vncport);
 		printf("|-%-12s : %s\n", "width", 	p->vm.vncwidth);
 		printf("|-%-12s : %s\n", "height", 	p->vm.vncheight);
+		printf("|-%-12s : %s\n", "tpm status", 	p->vm.tpmstatus);
+		if (strcmp(p->vm.tpmstatus, "on") == 0) {
+			printf("|-%-12s : %s\n", "tpm version", 	p->vm.tpmversion);
+		}
 	}
 
 	printf("%-14s : %s\n", "auto boot",		p->vm.autoboot);
@@ -2939,6 +2953,20 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 	else
 		strcpy(vm->storage_interface, "ahci-hd");
 
+	if ((value = get_value_by_name("vm_tpmstatus")) != NULL)
+		strcpy(vm->tpmstatus, value);
+	else
+		strcpy(vm->tpmstatus, "off");
+
+	if ((value = get_value_by_name("vm_tpmversion")) != NULL)
+		strcpy(vm->tpmversion, value);
+	else
+		strcpy(vm->tpmversion, "");
+
+	if ((value = get_value_by_name("vm_tpmpath")) != NULL)
+		strcpy(vm->tpmpath, value);
+	else
+		strcpy(vm->tpmpath, "");
 
 	free_config();
 }
@@ -3090,6 +3118,14 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	sprintf(str, "vm_crypt=%s\n", vm->crypt);
 	fputs(str, fp);
 	sprintf(str, "vm_booter=%s\n", vm->booter);
+	fputs(str, fp);
+	fputs("\n", fp);
+
+	sprintf(str, "vm_tpmstatus=%s\n", vm->tpmstatus);
+	fputs(str, fp);
+	sprintf(str, "vm_tpmversion=%s\n", vm->tpmversion);
+	fputs(str, fp);
+	sprintf(str, "vm_tpmpath=%s\n", vm->tpmpath);
 	fputs(str, fp);
 	fputs("\n", fp);
 
@@ -3516,6 +3552,47 @@ int write_boot_code(char **code, vm_node *p)
 		str_replace(str, "${vm_tap6}", 		p->vm.nic[6].tap);
 		str_replace(str, "${vm_tap7}", 		p->vm.nic[7].tap);
 
+		// TPM
+		char tpm_param[512] = "";
+		char start_swtpm[1024] = "";
+		char stop_swtpm[512] = "";
+
+		if (strcmp(p->vm.tpmstatus, "on") == 0) {
+			char tpm_sock[256];
+			if (strlen(p->vm.tpmpath) > 0)
+				strcpy(tpm_sock, p->vm.tpmpath);
+			else
+				sprintf(tpm_sock, "/tmp/%s/swtpm.sock", p->vm.name);
+
+			char tpm_dir[256];
+			sprintf(tpm_dir, "%s%s/tpm", vmdir, p->vm.name);
+
+			char sock_dir[256];
+			sprintf(sock_dir, "/tmp/%s", p->vm.name);
+			
+			char tpm_ctrl_sock[256];
+			sprintf(tpm_ctrl_sock, "/tmp/%s/swtpm-ctrl.sock", p->vm.name);
+			
+			sprintf(start_swtpm, 
+				"mkdir -p %s\n"
+				"\t\tmkdir -p %s\n"
+				"\t\tswtpm socket --tpmstate dir=%s --ctrl type=unixio,path=%s --server type=unixio,path=%s --tpm2 -d --pid file=/var/run/swtpm-%s.pid",
+				sock_dir, tpm_dir, tpm_dir, tpm_ctrl_sock, tpm_sock, p->vm.name);
+
+			sprintf(stop_swtpm, 
+				"if [ -f /var/run/swtpm-%s.pid ]; then\n"
+				"			kill $(cat /var/run/swtpm-%s.pid)\n"
+				"			rm /var/run/swtpm-%s.pid\n"
+				"		fi",
+				p->vm.name, p->vm.name, p->vm.name);
+
+			sprintf(tpm_param, "		-l tpm,swtpm,%s \\", tpm_sock);
+		}
+		
+		str_replace(str, "${vm_tpm_param}", tpm_param);
+		str_replace(str, "${vm_start_swtpm}", start_swtpm);
+		str_replace(str, "${vm_stop_swtpm}", stop_swtpm);
+
 	
 		sprintf(vm_disk, "%s%s/disk1.img", vmdir, p->vm.name);
 		str_replace(str, "${vm_disk1}",          vm_disk);
@@ -3605,6 +3682,7 @@ int  gen_vm_start_code(char *vm_name)
 	char *uefi_boot[] = {
 		"#!/bin/sh",
 		"boot=\"${vm_bootfrom}\"",
+		"${vm_start_swtpm}",
 		"while [ 1 ]; do",
 		"	if [ \"$boot\" == \"hd0\" ]; then",
 		"	bhyve 	-c ${vm_cpus} -m ${vm_ram} -HAPuw \\",
@@ -3626,6 +3704,7 @@ int  gen_vm_start_code(char *vm_name)
 		"		-s 5:6,e1000,${vm_tap6} \\",
 		"		-s 5:7,e1000,${vm_tap7} \\",
 		//"		-s 29,fbuf,tcp=0.0.0.0:${vm_vncport},w=${vm_vncwidth},h=${vm_vncheight} \\",
+		"		${vm_tpm_param}",
 		"		-s 30,xhci,tablet \\",
 		"		-s 31,lpc -l com1,stdio \\",
 		"		-l bootrom,/usr/local/share/uefi-firmware/${vm_bhyve_uefi_fd} \\",
@@ -3652,6 +3731,7 @@ int  gen_vm_start_code(char *vm_name)
 		"		-s 5:6,e1000,${vm_tap6} \\",
 		"		-s 5:7,e1000,${vm_tap7} \\",
 		"		-s 29,fbuf,tcp=0.0.0.0:${vm_vncport},w=${vm_vncwidth},h=${vm_vncheight},wait \\",
+		"		${vm_tpm_param}",
 		"		-s 30,xhci,tablet \\",
 		"		-s 31,lpc -l com1,stdio \\",
 		"		-l bootrom,/usr/local/share/uefi-firmware/${vm_bhyve_uefi_fd} \\",
@@ -3666,6 +3746,7 @@ int  gen_vm_start_code(char *vm_name)
 		"	boot=\"hd0\"",
 		"	bvm --hd-booting ${vm_name}",
 		"done",
+		"${vm_stop_swtpm}",
 		NULL
 	};
 

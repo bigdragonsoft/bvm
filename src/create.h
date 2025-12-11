@@ -87,6 +87,7 @@ void enter_vm_hostbridge(int);
 void enter_vm_autoboot(int);
 void enter_vm_bootindex(int);
 void enter_vm_bootdelay(int);
+void enter_vm_tpmstatus(int);
 void enter_vm_nics(int);
 void enter_vm_netmode(char *msg, char *value);
 void enter_vm_rpstatus(char *netmode, char *value);

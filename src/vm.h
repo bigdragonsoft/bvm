@@ -216,6 +216,10 @@ struct _vm_stru {
 	char crypt[4];			//是否加密 (0/1)
 	char booter[16];		//启动器 (bvmb)
 
+	char tpmstatus[8];		//TPM状态 (on/off)
+	char tpmversion[8];		//TPM版本 (2.0)
+	char tpmpath[256];		//TPM socket路径
+
 	char network_interface[16];	//网络接口驱动
 	char storage_interface[16];	//存储接口驱动
 };
