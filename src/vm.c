@@ -2219,6 +2219,33 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 		write_log("Cleared UEFI vars path for cloned VM %s, will auto-create on first boot", dst_vm_name);
 	}
 
+	// TPM 状态复制逻辑
+	if (strcmp(vm.tpmstatus, "on") == 0) {
+		char src_tpm[FN_MAX_LEN];
+		char dst_tpm[FN_MAX_LEN];
+		sprintf(src_tpm, "%s%s/tpm", vmdir, src_vm_name);
+		sprintf(dst_tpm, "%s%s/tpm", vmdir, dst_vm_name);
+
+		// 检查源 TPM 目录是否存在
+		if (access(src_tpm, F_OK) == 0) {
+			write_log("Cloning TPM state from %s to %s", src_vm_name, dst_vm_name);
+			
+			// 使用 cp -r 递归复制
+			char cp_cmd[1024];
+			// 确保目标父目录存在(已在上面创建)，这里直接复制目录内容
+			// 注意：为了避免权限问题或 socket 文件干扰，我们应该尽量只复制标准文件
+			// 但 swtpm 的状态主要在 .permall 文件。简单起见，复制整个目录然后清理。
+			sprintf(cp_cmd, "cp -R %s %s", src_tpm, dst_tpm);
+			system(cp_cmd);
+
+			// 清理目标目录中的运行时文件 (.lock, .sock 等)
+			// 这些文件在新 VM 启动时会由 swtpm 重新创建，保留旧的可能导致冲突
+			char clean_cmd[1024];
+			sprintf(clean_cmd, "rm -f %s/*.lock %s/*.sock %s/*.pid", dst_tpm, dst_tpm, dst_tpm);
+			system(clean_cmd);
+		}
+	}
+
 	save_vm_info(dst_vm_name, &vm);
 
 	//生成device.map

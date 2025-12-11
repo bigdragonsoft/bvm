@@ -151,10 +151,10 @@ void grub_booter(vm_node *p)
 
 		/*********** bhyve EXIT STATUS ***********
 		  0	     rebooted
-     		  1	     powered off
-     		  2	     halted
-     		  3	     triple fault
-     		  4	     exited due	to an error
+     	  1	     powered off
+     	  2	     halted
+     	  3	     triple fault
+     	  4	     exited due	to an error
 		*******************************************/
 		if (ret > 0 && ret < 4) break;
 		strcpy(cmd, "/usr/sbin/bhyvectl --destroy --vm=${vm_name}");
@@ -207,7 +207,7 @@ void uefi_booter(vm_node *p)
 
 	char cmd[BUFFERSIZE];
 
-	// TPM Start Logic
+	// TPM 启动逻辑
 	if (strcmp(p->vm.tpmstatus, "on") == 0) {
 		char tpm_sock[256];
 		if (strlen(p->vm.tpmpath) > 0)
@@ -218,6 +218,48 @@ void uefi_booter(vm_node *p)
 		char tpm_dir[256];
 		sprintf(tpm_dir, "%s%s/tpm", vmdir, p->vm.name);
 
+		// 检查 swtpm 是否需要初始化
+		char tpm_permall[512];
+		sprintf(tpm_permall, "%s/tpm2-00.permall", tpm_dir);
+		
+		if (access(tpm_permall, F_OK) != 0) {
+			// 创建 swtpm 包装器以修复 FreeBSD 上的 --print-capabilities 问题
+			// 使用 VM 目录而不是 /tmp 以避免 noexec 问题
+			char wrapper_path[512];
+			sprintf(wrapper_path, "%s%s/swtpm_wrapper.sh", vmdir, p->vm.name);
+			
+			FILE *fp = fopen(wrapper_path, "w");
+			if (fp) {
+				fprintf(fp, "#!/bin/sh\n");
+				fprintf(fp, "# Check if first argument is one of the commands requiring socket mode\n");
+				fprintf(fp, "case \"$1\" in\n");
+				fprintf(fp, "    socket|cuse|-v|--version|--help|-h)\n");
+				fprintf(fp, "        exec /usr/local/bin/swtpm \"$@\"\n");
+				fprintf(fp, "        ;;\n");
+				fprintf(fp, "    *)\n");
+				fprintf(fp, "        # Default to socket mode for everything else\n");
+				fprintf(fp, "        exec /usr/local/bin/swtpm socket \"$@\"\n");
+				fprintf(fp, "        ;;\n");
+				fprintf(fp, "esac\n");
+				fclose(fp);
+				chmod(wrapper_path, 0755);
+			}
+
+			write_log("Initializing TPM state for %s...", p->vm.name);
+			char init_cmd[1024];
+			// 使用 --tpmstate dir:///path 格式更安全
+			sprintf(init_cmd, "mkdir -p %s; /usr/local/bin/swtpm_setup --tpm %s --tpmstate dir://%s --create-ek-cert --create-platform-cert --tpm2", tpm_dir, wrapper_path, tpm_dir);
+			int ret = system(init_cmd);
+			
+			// 清理包装器
+			unlink(wrapper_path);
+			
+			if (ret != 0) {
+				write_log("Error: swtpm_setup failed with exit code %d", ret);
+				// 继续进行，可能在没有证书的情况下工作，但 Windows 可能会抱怨
+			}
+		}
+
 		char sock_dir[256];
 		sprintf(sock_dir, "/tmp/%s", p->vm.name);
 		
@@ -225,27 +267,54 @@ void uefi_booter(vm_node *p)
 		sprintf(tpm_ctrl_sock, "/tmp/%s/swtpm-ctrl.sock", p->vm.name);
 		
 		char start_swtpm[1024];
+		char swtpm_log[256];
+		sprintf(swtpm_log, "/tmp/swtpm-%s.log", p->vm.name);
+
 		sprintf(start_swtpm, 
 			"mkdir -p %s; "
 			"mkdir -p %s; "
-			"rm -f %s; " // Delete stale sockets
+			"rm -f %s; " // 删除过期的 socket
 			"rm -f %s; "
-			"swtpm socket --tpmstate dir=%s --ctrl type=unixio,path=%s --server type=unixio,path=%s --tpm2 -d --pid file=/var/run/swtpm-%s.pid",
-			sock_dir, tpm_dir, tpm_sock, tpm_ctrl_sock, tpm_dir, tpm_ctrl_sock, tpm_sock, p->vm.name);
+			"/usr/local/bin/swtpm socket --tpmstate dir=%s --ctrl type=unixio,path=%s --server type=unixio,path=%s --tpm2 --flags not-need-init,startup-clear -d --pid file=/var/run/swtpm-%s.pid > %s 2>&1",
+			sock_dir, tpm_dir, tpm_sock, tpm_ctrl_sock, tpm_dir, tpm_ctrl_sock, tpm_sock, p->vm.name, swtpm_log);
 		
 		write_log("Starting swtpm: %s", start_swtpm);
-		system(start_swtpm);
+		int ret = system(start_swtpm);
 
-		// Wait for socket to be ready (max 5 seconds)
-		int wait_retries = 50;
+		if (ret != 0) {
+			write_log("Error: swtpm command failed with exit code %d. Check %s for details.", ret, swtpm_log);
+			
+			// 将日志内容打印到 bvm 日志
+			char log_content[1024] = {0};
+			FILE *fp = fopen(swtpm_log, "r");
+			if (fp) {
+				size_t n = fread(log_content, 1, sizeof(log_content)-1, fp);
+				if (n > 0) write_log("swtpm log output: %s", log_content);
+				fclose(fp);
+			}
+			exit(1);
+		}
+
+		// 等待 socket 准备就绪（最多 10 秒）
+		int wait_retries = 100;
 		while (wait_retries-- > 0) {
 			if (access(tpm_sock, F_OK) == 0) break;
 			usleep(100000); // 100ms
 		}
 		
 		if (access(tpm_sock, F_OK) != 0) {
-			write_log("Error: swtpm socket %s not found after waiting. Aborting boot.", tpm_sock);
-			// Clean up any partial process
+			write_log("Error: swtpm socket %s not found after waiting 10s. Aborting boot. Check %s for details.", tpm_sock, swtpm_log);
+			
+			// 将日志内容打印到 bvm 日志
+			char log_content[1024] = {0};
+			FILE *fp = fopen(swtpm_log, "r");
+			if (fp) {
+				size_t n = fread(log_content, 1, sizeof(log_content)-1, fp);
+				if (n > 0) write_log("swtpm log output: %s", log_content);
+				fclose(fp);
+			}
+
+			// 清理任何部分进程
 			char stop_swtpm[512];
 			sprintf(stop_swtpm, 
 				"if [ -f /var/run/swtpm-%s.pid ]; then "
@@ -318,10 +387,10 @@ void uefi_booter(vm_node *p)
 
 		/*********** bhyve EXIT STATUS ***********
 		  0	     rebooted
-     		  1	     powered off
-     		  2	     halted
-     		  3	     triple fault
-     		  4	     exited due	to an error
+		  1	     powered off
+		  2	     halted
+		  3	     triple fault
+		  4	     exited due	to an error
 		*******************************************/
 		write_log("bhyve exited with status: %d", ret);
 		if (ret > 0 && ret <= 4) break;
@@ -337,7 +406,7 @@ void uefi_booter(vm_node *p)
 		run(cmd, p);
 	}
 
-	// TPM Stop Logic
+	// TPM 停止逻辑
 	if (strcmp(p->vm.tpmstatus, "on") == 0) {
 		char stop_swtpm[512];
 		sprintf(stop_swtpm, 
