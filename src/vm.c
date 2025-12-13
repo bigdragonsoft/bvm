@@ -211,6 +211,66 @@ void file_lock(char *file, int flag)
 }
 
 
+// 获取网桥中tap接口对应的mac地址
+int get_mac_from_bridge(char *bridge, char *tap, char *mac)
+{
+	char cmd[BUFFERSIZE];
+	sprintf(cmd, "ifconfig %s addr | grep %s | awk '{print $1}'", bridge, tap);
+
+	FILE *fp = popen(cmd, "r");
+	if (fp == NULL) return RET_FAILURE;
+
+	char buf[64];
+	if (fgets(buf, 64, fp)) {
+		buf[strlen(buf)-1] = '\0';
+		strcpy(mac, buf);
+		pclose(fp);
+		return RET_SUCCESS;
+	}
+	pclose(fp);
+	return RET_FAILURE;
+}
+
+// 生成MAC地址
+void generate_mac(char *mac)
+{
+	// 58:9c:fc is bhyve default OUI
+    // Use arc4random for BSD systems
+	sprintf(mac, "58:9c:fc:%02x:%02x:%02x", 
+		arc4random() % 256,
+		arc4random() % 256,
+		arc4random() % 256);
+}
+
+// 从dhcp地址池中获取指定mac对应的ip
+// 返回 RET_SUCCESS 找到
+// 返回 RET_FAILURE 未找到
+int get_ip_from_dhcp_pool(char *mac, char *ip)
+{
+	char fn[FN_MAX_LEN];
+	sprintf(fn, "%s/%s", vmdir, dhcp_pool_file);
+
+	FILE *fp = fopen(fn, "r");
+	if (fp == NULL) return RET_FAILURE;
+
+	char line[BUFFERSIZE];
+	while(fgets(line, BUFFERSIZE, fp)) {
+		if (strstr(line, mac)) {
+			//found
+            // format: IP <tab> MAC <tab> ...
+            // e.g. 192.168.1.100	58:9c:fc:00:00:01 ...
+			char *p = strtok(line, "\t");
+			if (p) {
+				strcpy(ip, p);
+				fclose(fp);
+				return RET_SUCCESS;
+			}
+		}
+	}
+	fclose(fp);
+	return RET_FAILURE;
+}
+
 // 对虚拟机进行加密处理
 void vm_crypt(char *vm_name, int flag)
 {
@@ -2792,9 +2852,33 @@ void add_to_vm_list(char *vm_name)
 }
 
 // 将vm列表按名称排序
+// 辅助函数：获取用于显示的IP（支持动态获取）
+void get_display_ip(vm_stru *vm, char *ip_buf) 
+{
+    strcpy(ip_buf, vm->nic[0].ip);
+    
+    // 如果是 NAT 模式且 VM 运行中，尝试获取动态 IP
+    // 仅显示第一块网卡的 IP (nic[0])
+    if (strncmp(vm->nic[0].netmode, "NAT", 3) == 0 && get_vm_status(vm->name) == VM_ON) {
+         char dhcp_ip[32] = {0};
+         // 尝试使用持久化MAC获取IP
+         if (get_ip_from_dhcp_pool(vm->nic[0].mac, dhcp_ip) == RET_SUCCESS) {
+             strcpy(ip_buf, dhcp_ip);
+         }
+         // 如果失败（可能是旧VM），尝试使用Bridge表获取MAC
+         else if (get_mac_from_bridge(vm->nic[0].bridge, vm->nic[0].tap, vm->nic[0].mac) == RET_SUCCESS) {
+             if (get_ip_from_dhcp_pool(vm->nic[0].mac, dhcp_ip) == RET_SUCCESS) {
+                 strcpy(ip_buf, dhcp_ip);
+             }
+         }
+    }
+}
+
 void sort_vm_list(int type)
 {
 	char *s1, *s2;
+    char ip1[32], ip2[32]; 
+
 	for (vm_node *p1=vms; p1!=NULL; p1=p1->next)
 		for (vm_node *p2=p1->next; p2!=NULL; p2=p2->next) {
 			if (type == LS_BY_NAME) {
@@ -2802,8 +2886,10 @@ void sort_vm_list(int type)
 				s2 = p2->vm.name;
 			} 
 			else if (type == LS_BY_IP) {
-				s1 = p1->vm.nic[0].ip;
-				s2 = p2->vm.nic[0].ip;
+                get_display_ip(&p1->vm, ip1);
+                get_display_ip(&p2->vm, ip2);
+				s1 = ip1;
+				s2 = ip2;
 			}
 			else if (type == LS_BY_OS) {
 				s1 = p1->vm.ostype;
@@ -2930,6 +3016,9 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 		sprintf(str, "vm_nic%d_ip", n);
 		if ((value = get_value_by_name(str)) != NULL)
 			strcpy(vm->nic[n].ip, value);
+		sprintf(str, "vm_nic%d_mac", n);
+		if ((value = get_value_by_name(str)) != NULL)
+			strcpy(vm->nic[n].mac, value);
 		sprintf(str, "vm_nic%d_bind", n);
 		if ((value = get_value_by_name(str)) != NULL)
 			strcpy(vm->nic[n].bind, value);
@@ -3118,6 +3207,8 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 		fputs(str, fp);
 		sprintf(str, "vm_nic%d_ip=%s\n", n, vm->nic[n].ip);
 		fputs(str, fp);
+		sprintf(str, "vm_nic%d_mac=%s\n", n, vm->nic[n].mac);
+		fputs(str, fp);
 		sprintf(str, "vm_nic%d_bind=%s\n", n, vm->nic[n].bind);
 		fputs(str, fp);
 	}
@@ -3241,7 +3332,25 @@ void print_vm_net_stat()
             max_width.mode = MAX(max_width.mode, 6); // "BRIDGE"/"SWITCH"的宽度
 
             // 更新ip列宽
-            max_width.ip = MAX(max_width.ip, strlen(p->vm.nic[i].ip));
+            //max_width.ip = MAX(max_width.ip, strlen(p->vm.nic[i].ip));
+            char ip[32];
+            strcpy(ip, p->vm.nic[i].ip);
+            
+            // 如果是 NAT 模式且 VM 运行中，尝试获取动态 IP
+            if (strncmp(p->vm.nic[i].netmode, "NAT", 3) == 0 && get_vm_status(p->vm.name) == VM_ON) {
+                 char dhcp_ip[32] = {0};
+                 // 尝试使用持久化MAC获取IP
+                 if (get_ip_from_dhcp_pool(p->vm.nic[i].mac, dhcp_ip) == RET_SUCCESS) {
+                     strcpy(ip, dhcp_ip);
+                 }
+                 // 如果失败（可能是旧VM），尝试使用Bridge表获取MAC
+                 else if (get_mac_from_bridge(p->vm.nic[i].bridge, p->vm.nic[i].tap, p->vm.nic[i].mac) == RET_SUCCESS) {
+                     if (get_ip_from_dhcp_pool(p->vm.nic[i].mac, dhcp_ip) == RET_SUCCESS) {
+                         strcpy(ip, dhcp_ip);
+                     }
+                 }
+            }
+            max_width.ip = MAX(max_width.ip, strlen(ip));
 
             // 更新gateway列宽
             char gateway[64];
@@ -3323,7 +3432,25 @@ void print_vm_net_stat()
                 printf("%-*s  ", max_width.mode, mode);  // 2个空格
 
                 // IP
-                printf("%-*s  ", max_width.ip, p->vm.nic[i].ip);  // 2个空格
+                //printf("%-*s  ", max_width.ip, p->vm.nic[i].ip);  // 2个空格
+                char ip[32];
+                strcpy(ip, p->vm.nic[i].ip);
+
+                // 如果是 NAT 模式且 VM 运行中，尝试获取动态 IP
+                if (strncmp(p->vm.nic[i].netmode, "NAT", 3) == 0 && get_vm_status(p->vm.name) == VM_ON) {
+                     char dhcp_ip[32] = {0};
+                     // 尝试使用持久化MAC获取IP
+                     if (get_ip_from_dhcp_pool(p->vm.nic[i].mac, dhcp_ip) == RET_SUCCESS) {
+                         strcpy(ip, dhcp_ip);
+                     }
+                     // 如果失败（可能是旧VM），尝试使用Bridge表获取MAC
+                     else if (get_mac_from_bridge(p->vm.nic[i].bridge, p->vm.nic[i].tap, p->vm.nic[i].mac) == RET_SUCCESS) {
+                         if (get_ip_from_dhcp_pool(p->vm.nic[i].mac, dhcp_ip) == RET_SUCCESS) {
+                             strcpy(ip, dhcp_ip);
+                         }
+                     }
+                }
+                printf("%-*s  ", max_width.ip, ip);
 
                 // GATEWAY
                 char gateway[64] = "-";
@@ -3364,105 +3491,232 @@ void print_vm_list(int list_type, int online_only)
 	if (vms == NULL) return;
 	if (online_only && vm_online_count() == 0) return;
 
-	if (list_type == VM_LONG_LIST)
-		title("NAME\t\tIP\t\t\tGUEST\t\tLOADER\tAUTOSTART\tCPU\tMEMORY\tDISK\t\tSTATE\n");
-	else
-		title("NAME\t\tGUEST\t\tCPU\tMEMORY\tDISK\t\tSTATE\n");
-	vm_node *p = vms;
-	while (p) {
-		if (online_only && strcmp(p->vm.status, "off") == 0) {
-			p = p->next;
-			continue;
-		}
+    // 定义列宽结构
+    struct {
+        int name;
+        int ip;
+        int vnc;
+        int guest;
+        int loader;
+        int autostart;
+        int cpu;
+        int memory;
+        int disk;
+        int state;
+    } max_width = {4, 2, 3, 5, 6, 9, 3, 6, 4, 5}; // 默认最小宽度（标题长度）
 
-		/* NAME */
-		printf("%s", p->vm.name);
-		for (int n=0; n<(2-strlen(p->vm.name) / TABSTOP); n++) printf("\t");
+    // pass 1: calculate max width
+    vm_node *p = vms;
+    while (p) {
+        if (online_only && strcmp(p->vm.status, "off") == 0) {
+            p = p->next;
+            continue;
+        }
 
-		/* IP */
-		if (list_type == VM_LONG_LIST) {
-			printf("%s", p->vm.nic[0].ip);
-			for (int n=0; n<(3-strlen(p->vm.nic[0].ip) / TABSTOP); n++) printf("\t");
-		}
+        // NAME
+        max_width.name = MAX(max_width.name, strlen(p->vm.name));
 
-		/* GUEST */
-		printf("%s", p->vm.ostype);
-		for (int n=0; n<(2-strlen(p->vm.ostype) / TABSTOP); n++) printf("\t");
-		
-		/* LOADER */
-		if (list_type == VM_LONG_LIST) {
-			if (strcmp(p->vm.uefi, "uefi") == 0)
-				printf("uefi\t");
-			else
-				printf("grub\t");
-		}
+        // IP
+        if (list_type == VM_LONG_LIST) {
+            char ip[32];
+            strcpy(ip, p->vm.nic[0].ip);
+            
+            // 如果是 NAT 模式且 VM 运行中，尝试获取动态 IP
+            if (strncmp(p->vm.nic[0].netmode, "NAT", 3) == 0 && get_vm_status(p->vm.name) == VM_ON) {
+                 char dhcp_ip[32] = {0};
+                 // 尝试使用持久化MAC获取IP
+                 if (get_ip_from_dhcp_pool(p->vm.nic[0].mac, dhcp_ip) == RET_SUCCESS) {
+                     strcpy(ip, dhcp_ip);
+                 }
+                 // 如果失败（可能是旧VM），尝试使用Bridge表获取MAC
+                 else if (get_mac_from_bridge(p->vm.nic[0].bridge, p->vm.nic[0].tap, p->vm.nic[0].mac) == RET_SUCCESS) {
+                     if (get_ip_from_dhcp_pool(p->vm.nic[0].mac, dhcp_ip) == RET_SUCCESS) {
+                         strcpy(ip, dhcp_ip);
+                     }
+                 }
+            }
+            max_width.ip = MAX(max_width.ip, strlen(ip));
 
-		/* AUTO-START */
-		if (list_type == VM_LONG_LIST) {
-			if (strcmp(p->vm.autoboot, "yes") == 0) {
-				char str[16];
-				sprintf(str, "Yes [%d]", atoi(p->vm.bootindex));
-				printf("%s", str);
-				for (int n=0; n<(2-strlen(str) / TABSTOP); n++) printf("\t");
-			}
-			else
-				printf("No\t\t");
-		}
+            // VNC
+            char vnc[32] = "-";
+            if (strcmp(p->vm.uefi, "uefi") == 0 || strcmp(p->vm.uefi, "uefi_csm") == 0) {
+                 if (strlen(p->vm.vncport) > 0) {
+                      sprintf(vnc, "0.0.0.0:%s", p->vm.vncport);
+                 }
+            }
+            max_width.vnc = MAX(max_width.vnc, strlen(vnc));
+        }
 
+        // GUEST
+        max_width.guest = MAX(max_width.guest, strlen(p->vm.ostype));
 
-		/* CPU */
-		printf("%s\t"  , p->vm.cpus);
+        // LOADER
+        if (list_type == VM_LONG_LIST) {
+             const char* loader = (strcmp(p->vm.uefi, "uefi") == 0) ? "uefi" : "grub";
+             max_width.loader = MAX(max_width.loader, strlen(loader));
+        }
 
-		/* MEMORY */
-		printf("%s\t"  , strtoupper(p->vm.ram));
+        // AUTOSTART
+        if (list_type == VM_LONG_LIST) {
+            if (strcmp(p->vm.autoboot, "yes") == 0) {
+                char str[16];
+                sprintf(str, "Yes [%d]", atoi(p->vm.bootindex));
+                max_width.autostart = MAX(max_width.autostart, strlen(str));
+            } else {
+                max_width.autostart = MAX(max_width.autostart, 2); // "No"
+            }
+        }
 
-		/* 容量 
-		char str[16];
-		unit_convert(total_disk_size(&p->vm), 1, str);
-		printf("%s\t\t", str);
-		*/
+        // CPU
+        max_width.cpu = MAX(max_width.cpu, strlen(p->vm.cpus));
 
-		/* 容量[磁盘数量]
-		char str[16];
-		unit_convert(total_disk_size(&p->vm), 1, str); 
-		int n = atoi(p->vm.disks);
-		//if (n > 1)
-			sprintf(str, "%s[%d]", str, n);
-		printf("%s", str);
-		for (int n=0; n<(2-strlen(str)/TABSTOP); n++) printf("\t");
-		*/
+        // MEMORY
+        max_width.memory = MAX(max_width.memory, strlen(p->vm.ram));
 
-		/* [磁盘数量]容量 */
-		char str1[16], str2[16];
-		int n = atoi(p->vm.disks);
-		sprintf(str1, "[%d]", n);
-		unit_convert(total_disk_size(&p->vm), 1, str2);
-		strcat(str1, str2);
-		printf("%s", strtoupper(str1));
-		for (int n=0; n<(2-strlen(str1)/TABSTOP); n++) printf("\t");
-		
+        // DISK
+        char str1[16], str2[16];
+        int n = atoi(p->vm.disks);
+        sprintf(str1, "[%d]", n);
+        unit_convert(total_disk_size(&p->vm), 1, str2);
+        strcat(str1, str2);
+        max_width.disk = MAX(max_width.disk, strlen(str1));
+
+        // STATE
+        max_width.state = MAX(max_width.state, strlen(p->vm.status));
+
+        p = p->next;
+    }
+
+    // print header
+    if (list_type == VM_LONG_LIST) {
+        printf("\033[1;4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%s\033[0m\n",
+            max_width.name, "NAME",
+            max_width.ip, "IP",
+            max_width.vnc, "VNC",
+            max_width.guest, "GUEST",
+            max_width.loader, "LOADER",
+            max_width.autostart, "AUTOSTART",
+            max_width.cpu, "CPU",
+            max_width.memory, "MEMORY",
+            max_width.disk, "DISK",
+            "STATE");
+    } else {
+        printf("\033[1;4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%s\033[0m\n",
+            max_width.name, "NAME",
+            max_width.guest, "GUEST",
+            max_width.cpu, "CPU",
+            max_width.memory, "MEMORY",
+            max_width.disk, "DISK",
+            "STATE");
+    }
+
+    // pass 2: print data
+    p = vms;
+    while (p) {
+        if (online_only && strcmp(p->vm.status, "off") == 0) {
+            p = p->next;
+            continue;
+        }
+
+        // NAME
+        printf("%-*s  ", max_width.name, p->vm.name);
+
+        // IP
+        if (list_type == VM_LONG_LIST) {
+            char ip[32];
+            strcpy(ip, p->vm.nic[0].ip);
+            int is_dynamic = 0;
+            
+            // 如果是 NAT 模式且 VM 运行中，尝试获取动态 IP
+            if (strncmp(p->vm.nic[0].netmode, "NAT", 3) == 0 && get_vm_status(p->vm.name) == VM_ON) {
+                 char dhcp_ip[32] = {0};
+                 // 尝试使用持久化MAC获取IP
+                 if (get_ip_from_dhcp_pool(p->vm.nic[0].mac, dhcp_ip) == RET_SUCCESS) {
+                     strcpy(ip, dhcp_ip);
+                     is_dynamic = 1;
+                 }
+                 // 如果失败（可能是旧VM），尝试使用Bridge表获取MAC
+                 else if (get_mac_from_bridge(p->vm.nic[0].bridge, p->vm.nic[0].tap, p->vm.nic[0].mac) == RET_SUCCESS) {
+                     if (get_ip_from_dhcp_pool(p->vm.nic[0].mac, dhcp_ip) == RET_SUCCESS) {
+                         strcpy(ip, dhcp_ip);
+                         is_dynamic = 1;
+                     }
+                 }
+            }
+            
+            if (is_dynamic) {
+                printf("\033[96m%s\033[0m", ip); // Cyan
+                int pad = max_width.ip - strlen(ip);
+                for (int k = 0; k < pad; k++) printf(" ");
+                printf("  ");
+            } else {
+                printf("%-*s  ", max_width.ip, ip);
+            }
+
+            // VNC
+            char vnc[32] = "-";
+            if (strcmp(p->vm.uefi, "uefi") == 0 || strcmp(p->vm.uefi, "uefi_csm") == 0) {
+                 if (strlen(p->vm.vncport) > 0) {
+                      sprintf(vnc, "0.0.0.0:%s", p->vm.vncport);
+                 }
+            }
+            printf("%-*s  ", max_width.vnc, vnc);
+        }
+
+        // GUEST
+        printf("%-*s  ", max_width.guest, p->vm.ostype);
+
+        // LOADER
+        if (list_type == VM_LONG_LIST) {
+            const char* loader = (strcmp(p->vm.uefi, "uefi") == 0) ? "uefi" : "grub";
+            printf("%-*s  ", max_width.loader, loader);
+        }
+
+        // AUTOSTART
+        if (list_type == VM_LONG_LIST) {
+            char str[32] = "No";
+            if (strcmp(p->vm.autoboot, "yes") == 0) {
+                sprintf(str, "Yes [%d]", atoi(p->vm.bootindex));
+            }
+            printf("%-*s  ", max_width.autostart, str);
+        }
+
+        // CPU
+        printf("%-*s  ", max_width.cpu, p->vm.cpus);
+
+        // MEMORY
+        printf("%-*s  ", max_width.memory, strtoupper(p->vm.ram));
+
+        // DISK
+        char str1[16], str2[16];
+        int n = atoi(p->vm.disks);
+        sprintf(str1, "[%d]", n);
+        unit_convert(total_disk_size(&p->vm), 1, str2);
+        strcat(str1, str2);
+        printf("%-*s  ", max_width.disk, strtoupper(str1));
+
 		/* STATE */
 		//if (strcmp(p->vm.status, "off") == 0)
 		//	printf("\033[33m");
-		if (strcmp(p->vm.status, "on") == 0)
-			printf("\033[32;1m");
-		printf("%s\033[0m", p->vm.status);
+        if (strcmp(p->vm.status, "on") == 0)
+            printf("\033[32;1m");
+        printf("%s\033[0m", p->vm.status);
 
 		/* PID */
 		//if (strcmp(p->vm.status, "on") == 0) 
 		//	printf(" (%d)", get_vm_pid(&p->vm));
 
 		/* LOCK */
-		if (strcmp(p->vm.lock, "1") == 0)
-			warn(" *");
+        if (strcmp(p->vm.lock, "1") == 0)
+            warn(" *");
 
 		/* CRYPT */
-		if (strcmp(p->vm.crypt, "1") == 0)
-			error(" *");
+        if (strcmp(p->vm.crypt, "1") == 0)
+            error(" *");
 
-		printf("\n");
-		p = p->next;
-	}
+        printf("\n");
+        p = p->next;
+    }
 }
 
 // 获得vm的数量
@@ -3582,6 +3836,15 @@ int write_boot_code(char **code, vm_node *p)
 		str_replace(str, "${vm_tap6}", 		p->vm.nic[6].tap);
 		str_replace(str, "${vm_tap7}", 		p->vm.nic[7].tap);
 
+		str_replace(str, "${vm_mac}", 		p->vm.nic[0].mac);
+		str_replace(str, "${vm_mac1}", 		p->vm.nic[1].mac);
+		str_replace(str, "${vm_mac2}", 		p->vm.nic[2].mac);
+		str_replace(str, "${vm_mac3}", 		p->vm.nic[3].mac);
+		str_replace(str, "${vm_mac4}", 		p->vm.nic[4].mac);
+		str_replace(str, "${vm_mac5}", 		p->vm.nic[5].mac);
+		str_replace(str, "${vm_mac6}", 		p->vm.nic[6].mac);
+		str_replace(str, "${vm_mac7}", 		p->vm.nic[7].mac);
+
 		// TPM
 		char tpm_param[512] = "";
 		char start_swtpm[1024] = "";
@@ -3678,14 +3941,14 @@ int  gen_vm_start_code(char *vm_name)
 		"		-s 3:6,ahci-hd,${vm_disk6} \\",
 		"		-s 3:7,ahci-hd,${vm_disk7} \\",
 		"		-s 2:0,ahci-cd,${vm_iso} \\",
-		"		-s 4:0,e1000,${vm_tap} \\",
-		"		-s 4:1,e1000,${vm_tap1} \\",
-		"		-s 4:2,e1000,${vm_tap2} \\",
-		"		-s 4:3,e1000,${vm_tap3} \\",
-		"		-s 4:4,e1000,${vm_tap4} \\",
-		"		-s 4:5,e1000,${vm_tap5} \\",
-		"		-s 4:6,e1000,${vm_tap6} \\",
-		"		-s 4:7,e1000,${vm_tap7} \\",
+		"		-s 4:0,e1000,${vm_tap},mac=${vm_mac} \\",
+		"		-s 4:1,e1000,${vm_tap1},mac=${vm_mac1} \\",
+		"		-s 4:2,e1000,${vm_tap2},mac=${vm_mac2} \\",
+		"		-s 4:3,e1000,${vm_tap3},mac=${vm_mac3} \\",
+		"		-s 4:4,e1000,${vm_tap4},mac=${vm_mac4} \\",
+		"		-s 4:5,e1000,${vm_tap5},mac=${vm_mac5} \\",
+		"		-s 4:6,e1000,${vm_tap6},mac=${vm_mac6} \\",
+		"		-s 4:7,e1000,${vm_tap7},mac=${vm_mac7} \\",
 		"		-s 31,lpc -l com1,stdio \\",
 		"		${vm_name}",
 		"		",
@@ -3783,6 +4046,16 @@ int  gen_vm_start_code(char *vm_name)
 
 	vm_node *p;
 	if ((p = find_vm_list(vm_name)) == NULL) return RET_FAILURE;
+    
+    // 检查并生成MAC地址
+    int need_save = 0;
+    for (int i=0; i<atoi(p->vm.nics); i++) {
+        if (strlen(p->vm.nic[i].mac) == 0) {
+            generate_mac(p->vm.nic[i].mac);
+            need_save = 1;
+        }
+    }
+    if (need_save) save_vm_info(vm_name, &p->vm);
 	
 	//生成启动代码
 	char **code;

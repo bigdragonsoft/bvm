@@ -80,6 +80,7 @@ void usage()
 		"	--restart	Restart VM",
 		"	--reboot	Restart VM (alias for --restart)",
 		"	--rollback	Roll back to snapshot point",
+		"	--set-hd-boot	Set VM to boot from hard disk",
 		"	--setnat	Set NAT IP address",
 		"	--setsw		Set Switch IP address",
 		"	--setpr		Set port redirection list",
@@ -183,7 +184,7 @@ int main(int argc, char *argv[])
 		{"showsnapall",		0, 	NULL, 	'V'},
 		{"snapshot",		1, 	NULL, 	'W'},
 		{"rollback",		1, 	NULL, 	'K'},
-		{"hd-booting",		1, 	NULL, 	'H'},
+		{"set-hd-boot",		1, 	NULL, 	'H'},
 		{"test", 			0, 	NULL, 	't'},
 		{"destroy-bridge", 	0, 	NULL, 	0},
 		{"destroy-tap", 	0, 	NULL, 	0},
@@ -430,7 +431,7 @@ int main(int argc, char *argv[])
 			vm_rollback(optarg);
 			break;
 		
-		case 'H': //hd-booting
+		case 'H': //set-hd-boot
 			vm_boot_from_hd(optarg);
 			break;
 		

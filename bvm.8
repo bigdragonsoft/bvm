@@ -1,4 +1,4 @@
-.Dd December 26, 2024
+.Dd December 13, 2025
 .Dt BVM 8
 .Os
 .Sh NAME
@@ -49,6 +49,9 @@
 .Ar name
 .Nm
 .Cm --poweroff
+.Ar name
+.Nm
+.Cm --set-hd-boot
 .Ar name
 .Pp
 .Nm
@@ -411,6 +414,8 @@ Restart a virtual machine.
 Restart a virtual machine (alias for --restart).
 .It Cm --rollback Ar name
 Roll back to the snapshot point.
+.It Cm --set-hd-boot Ar name
+Set the virtual machine to boot from the hard disk.
 .It Cm --setnat Ar nat ip/mask
 Set the IP address and mask of the NAT.
 .Bd -literal -offset indent

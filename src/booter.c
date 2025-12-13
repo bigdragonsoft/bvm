@@ -135,11 +135,11 @@ void grub_booter(vm_node *p)
 		for (int n=0; n<atoi(p->vm.nics); n++) {
 			if (host_version() >= EM0_VER)
 				if (strlen(p->vm.network_interface) == 0)
-					sprintf(t, "-s 10:%d,e1000,${vm_tap%d} ", n, n);
+					sprintf(t, "-s 10:%d,e1000,${vm_tap%d},mac=${vm_mac%d} ", n, n, n);
 				else
-					sprintf(t, "-s 10:%d,${vm_network_interface},${vm_tap%d} ", n, n);
+					sprintf(t, "-s 10:%d,${vm_network_interface},${vm_tap%d},mac=${vm_mac%d} ", n, n, n);
 			else
-				sprintf(t, "-s 10:%d,virtio-net,${vm_tap%d} ", n, n);
+				sprintf(t, "-s 10:%d,virtio-net,${vm_tap%d},mac=${vm_mac%d} ", n, n, n);
 			strcat(cmd, t);
 		}
 		
@@ -356,7 +356,7 @@ void uefi_booter(vm_node *p)
 			//if (host_version() >= EM0_VER)
 			//	sprintf(t, "-s 10:%d,e1000,${vm_tap%d} ", n, n);
 			//else
-				sprintf(t, "-s 10:%d,virtio-net,${vm_tap%d} ", n, n);
+				sprintf(t, "-s 10:%d,virtio-net,${vm_tap%d},mac=${vm_mac%d} ", n, n, n);
 			strcat(cmd, t);
 		}
 		if (boot == 0) //cd
@@ -471,6 +471,9 @@ void convert(char *code, vm_node *p)
                 char buf[32];
                 sprintf(buf, "${vm_tap%d}", n);
                 str_replace(str, buf, p->vm.nic[n].tap);
+
+                sprintf(buf, "${vm_mac%d}", n);
+                str_replace(str, buf, p->vm.nic[n].mac);
         }
 
         for (int n=0; n<atoi(p->vm.disks); n++) {

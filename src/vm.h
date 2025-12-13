@@ -164,6 +164,7 @@ struct _nic_stru {
 	char bridge[32];		//网桥
 	char tap[32];			//tap
 	char ip[32];			//ip
+	char mac[32];			//mac
 	char bind[32];			//绑定宿主的网卡名称
 };
 typedef struct _nic_stru nic_stru;
@@ -338,6 +339,10 @@ void str_replace(char *str, char *ostr, const char *nstr);
 void get_bvm_os(os_stru *os);
 int  support_uefi(char *os);
 int  support_grub(char *os);
+int  get_mac_from_bridge(char *bridge, char *tap, char *mac);
+void generate_mac(char *mac);
+int  get_ip_from_dhcp_pool(char *mac, char *ip);
+void get_display_ip(vm_stru *vm, char *ip_buf);
 int  disk_offset(vm_stru *vm);
 int  check_vm_disks(vm_stru *vm);
 int  select_disk(vm_stru *vm);
