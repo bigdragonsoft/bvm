@@ -1422,6 +1422,11 @@ void vm_create(char *vm_name, char *template_vm_name)
 		if (strlen(new_vm.uefi_vars) > 0) {
 			strcpy(new_vm.uefi_vars, "");
 		}
+		// 清空所有网卡的 MAC 地址，让首次启动时自动生成
+		// 避免从模板创建的 VM 与模板有相同的 MAC 地址
+		for (int i = 0; i < atoi(new_vm.nics); i++) {
+			strcpy(new_vm.nic[i].mac, "");
+		}
 		// 设置 CD-ROM 状态为 on
 		strcpy(new_vm.cdstatus,"on");
 		edit_vm(NULL);
@@ -1711,6 +1716,37 @@ void vm_config(char *vm_name)
 	save_vm_info(new_vm.name, &new_vm);
 }
 
+// 检查VNC端口冲突
+// 返回值: 0 无冲突, -1 有冲突
+int check_vnc_port_conflict(char *vm_name, vm_stru *vm)
+{
+	// 如果VNC未开启，无需检查
+	if (strcmp(vm->vncstatus, "on") != 0) 
+		return 0;
+	
+	vm_node *p = vms;
+	while (p) {
+		// 跳过自己
+		if (strcmp(p->vm.name, vm_name) == 0) {
+			p = p->next;
+			continue;
+		}
+		
+		// 检查是否正在运行且VNC已开启
+		if (get_vm_status(p->vm.name) == VM_ON && 
+			strcmp(p->vm.vncstatus, "on") == 0) {
+			// 比较端口号
+			if (strcmp(p->vm.vncport, vm->vncport) == 0) {
+				error("VNC port %s conflicts with running VM '%s'\n", 
+					vm->vncport, p->vm.name);
+				return -1;
+			}
+		}
+		p = p->next;
+	}
+	return 0;
+}
+
 // 启动vm
 void vm_start(char *vm_name)
 {
@@ -1740,6 +1776,11 @@ void vm_start(char *vm_name)
 
 	if (atoi(p->vm.crypt)) {
 		error("%s has been encrypted, cannot run\n", vm_name);
+		return;
+	}
+
+	// 检查VNC端口冲突
+	if (check_vnc_port_conflict(vm_name, &p->vm) != 0) {
 		return;
 	}
 
@@ -2278,6 +2319,13 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 		strcpy(vm.uefi_vars, "");
 		write_log("Cleared UEFI vars path for cloned VM %s, will auto-create on first boot", dst_vm_name);
 	}
+
+	// 清空所有网卡的 MAC 地址，让首次启动时自动生成
+	// 避免克隆后的 VM 与源 VM 有相同的 MAC 地址
+	for (int i = 0; i < atoi(vm.nics); i++) {
+		strcpy(vm.nic[i].mac, "");
+	}
+	write_log("Cleared MAC addresses for cloned VM %s, will auto-generate on first boot", dst_vm_name);
 
 	// TPM 状态复制逻辑
 	if (strcmp(vm.tpmstatus, "on") == 0) {
@@ -3814,6 +3862,12 @@ int write_boot_code(char **code, vm_node *p)
 		str_replace(str, "${vm_vncport}", 	p->vm.vncport);
 		str_replace(str, "${vm_vncwidth}", 	p->vm.vncwidth);
 		str_replace(str, "${vm_vncheight}", 	p->vm.vncheight);
+		
+		if (strlen(p->vm.storage_interface) > 0)
+			str_replace(str, "${vm_storage_interface}", p->vm.storage_interface);
+		else
+			str_replace(str, "${vm_storage_interface}", "ahci-hd");
+
 		if (strcmp(p->vm.uefi, "uefi") == 0)
 			str_replace(str, "${vm_bhyve_uefi_fd}", "BHYVE_UEFI.fd");
 		if (strcmp(p->vm.uefi, "uefi_csm")== 0)
@@ -3932,14 +3986,14 @@ int  gen_vm_start_code(char *vm_name)
 		"	fi",
 		"	bhyve   -c ${vm_cpus} -m ${vm_ram} -HAPuw \\",
 		"		-s 0:0,${vm_hostbridge} \\",
-		"		-s 3:0,ahci-hd,${vm_disk}  \\",
-		"		-s 3:1,ahci-hd,${vm_disk1} \\",
-		"		-s 3:2,ahci-hd,${vm_disk2} \\",
-		"		-s 3:3,ahci-hd,${vm_disk3} \\",
-		"		-s 3:4,ahci-hd,${vm_disk4} \\",
-		"		-s 3:5,ahci-hd,${vm_disk5} \\",
-		"		-s 3:6,ahci-hd,${vm_disk6} \\",
-		"		-s 3:7,ahci-hd,${vm_disk7} \\",
+		"		-s 3:0,${vm_storage_interface},${vm_disk}  \\",
+		"		-s 3:1,${vm_storage_interface},${vm_disk1} \\",
+		"		-s 3:2,${vm_storage_interface},${vm_disk2} \\",
+		"		-s 3:3,${vm_storage_interface},${vm_disk3} \\",
+		"		-s 3:4,${vm_storage_interface},${vm_disk4} \\",
+		"		-s 3:5,${vm_storage_interface},${vm_disk5} \\",
+		"		-s 3:6,${vm_storage_interface},${vm_disk6} \\",
+		"		-s 3:7,${vm_storage_interface},${vm_disk7} \\",
 		"		-s 2:0,ahci-cd,${vm_iso} \\",
 		"		-s 4:0,e1000,${vm_tap},mac=${vm_mac} \\",
 		"		-s 4:1,e1000,${vm_tap1},mac=${vm_mac1} \\",
@@ -3980,14 +4034,14 @@ int  gen_vm_start_code(char *vm_name)
 		"	if [ \"$boot\" == \"hd0\" ]; then",
 		"	bhyve 	-c ${vm_cpus} -m ${vm_ram} -HAPuw \\",
 		"		-s 0:0,${vm_hostbridge} \\",
-		"		-s 4:0,ahci-hd,${vm_disk} \\",
-		"		-s 4:1,ahci-hd,${vm_disk1} \\",
-		"		-s 4:2,ahci-hd,${vm_disk2} \\",
-		"		-s 4:3,ahci-hd,${vm_disk3} \\",
-		"		-s 4:4,ahci-hd,${vm_disk4} \\",
-		"		-s 4:5,ahci-hd,${vm_disk5} \\",
-		"		-s 4:6,ahci-hd,${vm_disk6} \\",
-		"		-s 4:7,ahci-hd,${vm_disk7} \\",
+		"		-s 4:0,${vm_storage_interface},${vm_disk} \\",
+		"		-s 4:1,${vm_storage_interface},${vm_disk1} \\",
+		"		-s 4:2,${vm_storage_interface},${vm_disk2} \\",
+		"		-s 4:3,${vm_storage_interface},${vm_disk3} \\",
+		"		-s 4:4,${vm_storage_interface},${vm_disk4} \\",
+		"		-s 4:5,${vm_storage_interface},${vm_disk5} \\",
+		"		-s 4:6,${vm_storage_interface},${vm_disk6} \\",
+		"		-s 4:7,${vm_storage_interface},${vm_disk7} \\",
 		"		-s 5:0,e1000,${vm_tap} \\",
 		"		-s 5:1,e1000,${vm_tap1} \\",
 		"		-s 5:2,e1000,${vm_tap2} \\",
@@ -4007,14 +4061,14 @@ int  gen_vm_start_code(char *vm_name)
 		"	bhyve 	-c ${vm_cpus} -m ${vm_ram} -HAPuw \\",
 		"		-s 0:0,${vm_hostbridge} \\",
 		"		-s 3:0,ahci-cd,${vm_iso} \\",
-		"		-s 4:0,ahci-hd,${vm_disk} \\",
-		"		-s 4:1,ahci-hd,${vm_disk1} \\",
-		"		-s 4:2,ahci-hd,${vm_disk2} \\",
-		"		-s 4:3,ahci-hd,${vm_disk3} \\",
-		"		-s 4:4,ahci-hd,${vm_disk4} \\",
-		"		-s 4:5,ahci-hd,${vm_disk5} \\",
-		"		-s 4:6,ahci-hd,${vm_disk6} \\",
-		"		-s 4:7,ahci-hd,${vm_disk7} \\",
+		"		-s 4:0,${vm_storage_interface},${vm_disk} \\",
+		"		-s 4:1,${vm_storage_interface},${vm_disk1} \\",
+		"		-s 4:2,${vm_storage_interface},${vm_disk2} \\",
+		"		-s 4:3,${vm_storage_interface},${vm_disk3} \\",
+		"		-s 4:4,${vm_storage_interface},${vm_disk4} \\",
+		"		-s 4:5,${vm_storage_interface},${vm_disk5} \\",
+		"		-s 4:6,${vm_storage_interface},${vm_disk6} \\",
+		"		-s 4:7,${vm_storage_interface},${vm_disk7} \\",
 		"		-s 5:0,e1000,${vm_tap} \\",
 		"		-s 5:1,e1000,${vm_tap1} \\",
 		"		-s 5:2,e1000,${vm_tap2} \\",

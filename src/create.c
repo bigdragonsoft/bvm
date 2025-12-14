@@ -1452,7 +1452,27 @@ void enter_vm_network_interface(int not_use)
 		NULL,
 	};
 
-	enter_options(msg, opt, desc, (char*)&new_vm.network_interface);
+	char *opt_uefi[] = {
+		"virtio-net",
+		NULL,
+	};
+
+	char *desc_uefi[] = {
+		"Virtio network interface [virtio-net]",
+		NULL,
+	};
+
+	char **opts, **descs;
+	if (strcmp(new_vm.uefi, "uefi") == 0) {
+		opts = opt_uefi;
+		descs = desc_uefi;
+	} 
+	else {
+		opts = opt;
+		descs = desc;
+	}
+
+	enter_options(msg, opts, descs, (char*)&new_vm.network_interface);
 
 }
 
@@ -1464,6 +1484,7 @@ void enter_vm_storage_interface(int not_use)
 	char *opt[] = {
 		"ahci-hd",
 		"virtio-blk",
+		"nvme",
 		//"virtio-scsi",
 		NULL,
 	};
@@ -1471,6 +1492,7 @@ void enter_vm_storage_interface(int not_use)
 	char *desc[] = {
 		"SATA hard-drive [ahci-hd]",
 		"Virtio block storage interface [virtio-blk]",
+		"NVM Express (NVMe) controller [nvme]",
 		//"Virtio SCSI interface [virtio-scsi]",
 		NULL,
 	};
