@@ -2066,6 +2066,9 @@ void vm_info_all(char *vm_name)
 	printf("%-13s = %s\n",	"vm_zpool", 	p->vm.zpool);
 	printf("%-13s = %s\n",	"vm_ram", 	p->vm.ram);
 	printf("%-13s = %s\n",	"vm_cpus", 	p->vm.cpus);
+	printf("%-13s = %s\n",	"vm_sockets", 	p->vm.sockets);
+	printf("%-13s = %s\n",	"vm_cores", 	p->vm.cores);
+	printf("%-13s = %s\n",	"vm_threads", 	p->vm.threads);
 	printf("\n");
 	printf("%-13s = %s\n",	"vm_ostype", 	p->vm.ostype);
 	printf("%-13s = %s\n",	"vm_version", 	p->vm.version);
@@ -2151,6 +2154,9 @@ void vm_info(char *vm_name)
 		printf("%-14s : %s\n", "version", 	p->vm.version);	
 	printf("%-14s : %s\n", "ram", 			p->vm.ram);
 	printf("%-14s : %s\n", "cpus", 			p->vm.cpus);
+	printf("|-%-12s : %s\n", "sockets", 	p->vm.sockets);
+	printf("|-%-12s : %s\n", "cores", 		p->vm.cores);
+	printf("|-%-12s : %s\n", "threads", 	p->vm.threads);
 	printf("%-14s : %s\n", "disk interface",	p->vm.storage_interface);
 	printf("%-14s : %s\n", "disk numbers",		p->vm.disks);
 
@@ -3007,6 +3013,29 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 	else
 		strcpy(vm->disks, "1");
 
+	if ((value = get_value_by_name("vm_ram")) != NULL)
+		strcpy(vm->ram, value);
+	if ((value = get_value_by_name("vm_cpus")) != NULL)
+		strcpy(vm->cpus, value);
+	else
+		strcpy(vm->cpus, "1");
+
+	// CPU 拓扑：如果没有配置，自动按最佳实践设置（sockets=1, cores=cpus, threads=1）
+	if ((value = get_value_by_name("vm_sockets")) != NULL)
+		strcpy(vm->sockets, value);
+	else
+		strcpy(vm->sockets, "1");
+
+	if ((value = get_value_by_name("vm_cores")) != NULL)
+		strcpy(vm->cores, value);
+	else
+		strcpy(vm->cores, vm->cpus);  // 默认等于总 CPU 数
+
+	if ((value = get_value_by_name("vm_threads")) != NULL)
+		strcpy(vm->threads, value);
+	else
+		strcpy(vm->threads, "1");
+
 	for (int n=0; n<atoi(vm->disks); n++) {
 		sprintf(str, "vm_disk%d_name", n);
 		if ((value = get_value_by_name(str)) != NULL)
@@ -3245,6 +3274,12 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	sprintf(str, "vm_ram=%s\n", vm->ram);
 	fputs(str, fp);
 	sprintf(str, "vm_cpus=%s\n", vm->cpus);
+	fputs(str, fp);
+	sprintf(str, "vm_sockets=%s\n", vm->sockets);
+	fputs(str, fp);
+	sprintf(str, "vm_cores=%s\n", vm->cores);
+	fputs(str, fp);
+	sprintf(str, "vm_threads=%s\n", vm->threads);
 	fputs(str, fp);
 	fputs("\n", fp);
 

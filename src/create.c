@@ -538,7 +538,99 @@ void enter_vm_ram(int not_use)
 void enter_vm_cpus(int not_use)
 {
 	char *msg = "Enter vm CPUs: ";
+	char old_cpus[8];
+	strcpy(old_cpus, new_vm.cpus); // 保存旧的 CPU 数量
+
 	enter_numbers(msg, NULL, (char*)&new_vm.cpus);
+
+	// 检查 CPU 数量是否发生变化
+	if (strcmp(old_cpus, new_vm.cpus) != 0) {
+		// 如果数量变了，重置为默认推荐拓扑
+		strcpy(new_vm.sockets, "1");
+		strcpy(new_vm.cores, new_vm.cpus);
+		strcpy(new_vm.threads, "1");
+	} 
+	// 如果没变，保留原有的 sockets/cores/threads 配置（从 load_vm_info 读取的）
+	// 但为了防止旧配置为空（例如旧版本升级上来），还是要做个兜底检查
+	else if (strlen(new_vm.sockets) == 0 || strlen(new_vm.cores) == 0 || strlen(new_vm.threads) == 0) {
+		strcpy(new_vm.sockets, "1");
+		strcpy(new_vm.cores, new_vm.cpus);
+		strcpy(new_vm.threads, "1");
+	}
+
+	// 询问是否需要高级配置
+	char advanced[16];
+	printf("Advanced CPU topology? (Enter to skip or 'y' to enable): ");
+	fgets(advanced, sizeof(advanced), stdin);
+	advanced[strlen(advanced)-1] = '\0';
+	
+	// 转换为小写
+	for (int i = 0; i < strlen(advanced); i++)
+		advanced[i] = tolower(advanced[i]);
+	
+	
+	if (strcmp(advanced, "y") == 0 || strcmp(advanced, "yes") == 0) {
+		// 高级模式：让用户自定义 sockets, cores, threads
+		int total_cpus = atoi(new_vm.cpus);
+		
+		printf("\n--- CPU Topology Configuration ---\n");
+		printf("Recommended (Best Practice):\n");
+		printf("  Sockets: 1, Cores: %d, Threads: 1\n", total_cpus);
+		printf("  (Reason: Maximum OS compatibility, especially for Windows)\n\n");
+		
+		// 显示当前配置（如果与推荐值不同）
+		int current_calc = atoi(new_vm.sockets) * atoi(new_vm.cores) * atoi(new_vm.threads);
+		if (strcmp(new_vm.sockets, "1") != 0 || 
+		    strcmp(new_vm.cores, new_vm.cpus) != 0 || 
+		    strcmp(new_vm.threads, "1") != 0) {
+			printf("Current Saved Configuration:\n");
+			printf("  Sockets: %s, Cores: %s, Threads: %s\n", 
+				new_vm.sockets, new_vm.cores, new_vm.threads);
+			printf("  Total CPUs: %s × %s × %s = %d\n\n", 
+				new_vm.sockets, new_vm.cores, new_vm.threads, current_calc);
+		} else {
+			printf("Current Configuration: Using recommended defaults\n\n");
+		}
+		
+		char input[16];
+		char prompt[64];
+		
+		while (1) {
+			// Sockets
+			sprintf(prompt, "Enter sockets (default: %s): ", new_vm.sockets);
+			printf("%s", prompt);
+			fgets(input, sizeof(input), stdin);
+			input[strlen(input)-1] = '\0';
+			if (strlen(input) > 0) strcpy(new_vm.sockets, input);
+			
+			// Cores
+			sprintf(prompt, "Enter cores per socket (default: %s): ", new_vm.cores);
+			printf("%s", prompt);
+			fgets(input, sizeof(input), stdin);
+			input[strlen(input)-1] = '\0';
+			if (strlen(input) > 0) strcpy(new_vm.cores, input);
+			
+			// Threads
+			sprintf(prompt, "Enter threads per core (default: %s): ", new_vm.threads);
+			printf("%s", prompt);
+			fgets(input, sizeof(input), stdin);
+			input[strlen(input)-1] = '\0';
+			if (strlen(input) > 0) strcpy(new_vm.threads, input);
+			
+			// 验证：sockets * cores * threads == cpus
+			int calc_cpus = atoi(new_vm.sockets) * atoi(new_vm.cores) * atoi(new_vm.threads);
+			if (calc_cpus == total_cpus) {
+				break;
+			} else {
+				warn("Invalid topology: %s × %s × %s = %d, but CPUs = %d\n",
+					new_vm.sockets, new_vm.cores, new_vm.threads, calc_cpus, total_cpus);
+				// 重置为默认值
+				strcpy(new_vm.sockets, "1");
+				strcpy(new_vm.cores, new_vm.cpus);
+				strcpy(new_vm.threads, "1");
+			}
+		}
+	}
 }
 
 // vm_bootfrom

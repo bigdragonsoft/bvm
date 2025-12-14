@@ -112,7 +112,7 @@ void grub_booter(vm_node *p)
 
 		//bhyve
 		char t[BUFFERSIZE];
-		strcpy(cmd, "bhyve -c ${vm_cpus} -m ${vm_ram} -HAPuw ");
+		strcpy(cmd, "bhyve -c cpus=${vm_cpus},sockets=${vm_sockets},cores=${vm_cores},threads=${vm_threads} -m ${vm_ram} -HAPuw ");
 		strcat(cmd, "-s 0:0,${vm_hostbridge} ");
 		
 		
@@ -332,7 +332,7 @@ void uefi_booter(vm_node *p)
 		
 		//bhyve
 		char t[BUFFERSIZE];
-		strcpy(cmd, "bhyve -c ${vm_cpus} -m ${vm_ram} -HAPuw ");
+		strcpy(cmd, "bhyve -c cpus=${vm_cpus},sockets=${vm_sockets},cores=${vm_cores},threads=${vm_threads} -m ${vm_ram} -HAPuw ");
 
 		strcat(cmd, "-s 0:0,${vm_hostbridge} ");
 		
@@ -458,6 +458,9 @@ void convert(char *code, vm_node *p)
 	str_replace(str, "${vm_devicemap}", 	p->vm.devicemap);
 	str_replace(str, "${vm_ram}", 		p->vm.ram);
 	str_replace(str, "${vm_cpus}", 		p->vm.cpus);
+	str_replace(str, "${vm_sockets}", 	p->vm.sockets);
+	str_replace(str, "${vm_cores}", 	p->vm.cores);
+	str_replace(str, "${vm_threads}", 	p->vm.threads);
 	str_replace(str, "${vm_hostbridge}", 	p->vm.hostbridge);
 	str_replace(str, "${vm_disk}",		p->vm.disk);
 	str_replace(str, "${vm_disk0}",		p->vm.disk);

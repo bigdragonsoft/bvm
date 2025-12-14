@@ -185,6 +185,9 @@ struct _vm_stru {
 	disk_stru vdisk[DISK_NUM];	//磁盘信息
 	char ram[32];			//内存
 	char cpus[8];			//cpu数量
+	char sockets[8];      	// CPU 插槽数，默认 1
+	char cores[8];        	// 每插槽核心数，默认等于 cpus
+	char threads[8];      	// 每核心线程数，默认 1
 
 	char ostype[32];		//操作系统类型
 	char version[32];		//操作系统版本
