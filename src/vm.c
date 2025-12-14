@@ -1737,9 +1737,18 @@ int check_vnc_port_conflict(char *vm_name, vm_stru *vm)
 			strcmp(p->vm.vncstatus, "on") == 0) {
 			// 比较端口号
 			if (strcmp(p->vm.vncport, vm->vncport) == 0) {
-				error("VNC port %s conflicts with running VM '%s'\n", 
-					vm->vncport, p->vm.name);
-				return -1;
+				// 端口相同，进一步检查绑定地址
+				char *bind1 = strlen(vm->vncbind) > 0 ? vm->vncbind : "0.0.0.0";
+				char *bind2 = strlen(p->vm.vncbind) > 0 ? p->vm.vncbind : "0.0.0.0";
+				
+				// 如果绑定地址相同，或者其中一个绑定到 0.0.0.0（所有接口），则冲突
+				if (strcmp(bind1, bind2) == 0 || 
+					strcmp(bind1, "0.0.0.0") == 0 || 
+					strcmp(bind2, "0.0.0.0") == 0) {
+					error("VNC port %s on %s conflicts with running VM '%s' on %s\n", 
+						vm->vncport, bind1, p->vm.name, bind2);
+					return -1;
+				}
 			}
 		}
 		p = p->next;
@@ -2090,7 +2099,15 @@ void vm_info_all(char *vm_name)
 		sprintf(str, "vm_nic%d_tap", n);
 		printf("%-13s = %s\n",	str,	p->vm.nic[n].tap);
 		sprintf(str, "vm_nic%d_ip", n);
-		printf("%-13s = %s\n",	str,	p->vm.nic[n].ip);
+		printf("%-13s = %s",	str,	p->vm.nic[n].ip);
+		// 显示 DHCP 分配的 IP（如果是 NAT 模式且 VM 正在运行）
+		if (strcmp(p->vm.nic[n].netmode, "NAT") == 0 && get_vm_status(p->vm.name) == VM_ON) {
+			char dhcp_ip[32];
+			if (get_ip_from_dhcp_pool(p->vm.nic[n].mac, dhcp_ip) == RET_SUCCESS) {
+				printf(" (DHCP: \033[96m%s\033[0m)", dhcp_ip);
+			}
+		}
+		printf("\n");
 	}
 	
 
@@ -2165,6 +2182,7 @@ void vm_info(char *vm_name)
 	printf("%-14s : %s\n", "uefi", 			p->vm.uefi);
 	if (support_uefi(p->vm.ostype) && strcmp(p->vm.uefi, "none") != 0) {
 		printf("|-%-12s : %s\n", "vnc status", 	p->vm.vncstatus);
+		printf("|-%-12s : %s\n", "vnc bind", 	p->vm.vncbind);
 		printf("|-%-12s : %s\n", "vnc port", 	p->vm.vncport);
 		printf("|-%-12s : %s\n", "width", 	p->vm.vncwidth);
 		printf("|-%-12s : %s\n", "height", 	p->vm.vncheight);
@@ -2186,11 +2204,8 @@ void vm_info(char *vm_name)
 	for (int n=0; n<atoi(p->vm.nics); n++) {
 		printf("%s\n", p->vm.nic[n].name);
 		printf("|-%-12s : %s\n", "network mode",		p->vm.nic[n].netmode);
-		if (strcmp(p->vm.nic[n].netmode, "NAT") == 0) 
-			printf("|-%-12s : %s\n", "wan",		p->vm.nic[n].bind);
-		else
-			printf("|-%-12s : %s\n", "bind",		p->vm.nic[n].bind);
 		if (strcmp(p->vm.nic[n].netmode, "NAT") == 0) {
+			printf("|-%-12s : %s\n", "wan",		p->vm.nic[n].bind);
 			printf("|-%-12s : %s", "gateway", 		p->vm.nic[n].nat);
 			get_nat_info(p->vm.nic[n].nat);
 			printf(" [GW %s]\n", nat.ip);
@@ -2215,11 +2230,19 @@ void vm_info(char *vm_name)
 			//printf("\n");
 		}
 		if (strlen(p->vm.nic[n].bridge) > 0)
-		printf("|-%-12s : %s\n", "bridge", 		p->vm.nic[n].bridge);
+			printf("|-%-12s : %s\n", "switch",	p->vm.nic[n].bridge);
 		if (strlen(p->vm.nic[n].tap) > 0)
-		printf("|-%-12s : %s\n", "tap",	 		p->vm.nic[n].tap);
-		if (strlen(p->vm.nic[n].ip) > 0)
-		printf("|-%-12s : %s\n", "ip",	 		p->vm.nic[n].ip);
+			printf("|-%-12s : %s\n", "device",	p->vm.nic[n].tap);
+		printf("|-%-12s : %s", "ip", 		p->vm.nic[n].ip);
+		// 显示 DHCP 分配的 IP（如果是 NAT 模式且 VM 正在运行）
+		if (strcmp(p->vm.nic[n].netmode, "NAT") == 0 && get_vm_status(p->vm.name) == VM_ON) {
+			char dhcp_ip[32];
+			if (get_ip_from_dhcp_pool(p->vm.nic[n].mac, dhcp_ip) == RET_SUCCESS) {
+				printf(" (DHCP: \033[96m%s\033[0m)", dhcp_ip);
+			}
+		}
+		printf("\n");
+		printf("|-%-12s : %s\n", "mac", 		p->vm.nic[n].mac);
 	}
 
 
@@ -3085,6 +3108,21 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 	if ((value = get_value_by_name("vm_vncheight")) != NULL)
 		strcpy(vm->vncheight, value);
 
+	if ((value = get_value_by_name("vm_vncpassword")) != NULL)
+		strcpy(vm->vncpassword, value);
+	else
+		strcpy(vm->vncpassword, "");
+
+	if ((value = get_value_by_name("vm_vncwait")) != NULL)
+		strcpy(vm->vncwait, value);
+	else
+		strcpy(vm->vncwait, "off");
+
+	if ((value = get_value_by_name("vm_vncbind")) != NULL)
+		strcpy(vm->vncbind, value);
+	else
+		strcpy(vm->vncbind, "0.0.0.0");
+
 	if ((value = get_value_by_name("vm_autoboot")) != NULL)
 		strcpy(vm->autoboot, value);
 	else
@@ -3276,6 +3314,12 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	sprintf(str, "vm_vncwidth=%s\n", vm->vncwidth);
 	fputs(str, fp);
 	sprintf(str, "vm_vncheight=%s\n", vm->vncheight);
+	fputs(str, fp);
+	sprintf(str, "vm_vncpassword=%s\n", vm->vncpassword);
+	fputs(str, fp);
+	sprintf(str, "vm_vncwait=%s\n", vm->vncwait);
+	fputs(str, fp);
+	sprintf(str, "vm_vncbind=%s\n", vm->vncbind);
 	fputs(str, fp);
 	sprintf(str, "vm_audiostatus=%s\n", vm->audiostatus);
 	fputs(str, fp);

@@ -362,11 +362,24 @@ void uefi_booter(vm_node *p)
 				sprintf(t, "-s 10:%d,virtio-net,${vm_tap%d},mac=${vm_mac%d} ", n, n, n);
 			strcat(cmd, t);
 		}
-		if (boot == 0) //cd
-			strcat(cmd, "-s 29,fbuf,tcp=0.0.0.0:${vm_vncport},w=${vm_vncwidth},h=${vm_vncheight},wait ");
-		else //hd
-			if (strcmp(p->vm.vncstatus, "on") == 0)
-					strcat(cmd, "-s 29,fbuf,tcp=0.0.0.0:${vm_vncport},w=${vm_vncwidth},h=${vm_vncheight} ");
+		// VNC configuration
+		if (boot == 0 || strcmp(p->vm.vncstatus, "on") == 0) {
+			char vnc_cmd[256];
+			sprintf(vnc_cmd, "-s 29,fbuf,tcp=${vm_vncbind}:${vm_vncport},w=${vm_vncwidth},h=${vm_vncheight}");
+			
+			// Add password if set
+			if (strlen(p->vm.vncpassword) > 0) {
+				strcat(vnc_cmd, ",password=${vm_vncpassword}");
+			}
+			
+			// Add wait option
+			if (boot == 0 || strcmp(p->vm.vncwait, "on") == 0) {
+				strcat(vnc_cmd, ",wait");
+			}
+			
+			strcat(vnc_cmd, " ");
+			strcat(cmd, vnc_cmd);
+		}
 		// Audio support
 		if (strcmp(p->vm.audiostatus, "on") == 0)
 			strcat(cmd, "-s 6,hda,play=/dev/dsp0,rec=/dev/dsp0 ");
@@ -452,6 +465,11 @@ void convert(char *code, vm_node *p)
 	str_replace(str, "${vm_vncport}", 	p->vm.vncport);
 	str_replace(str, "${vm_vncwidth}", 	p->vm.vncwidth);
 	str_replace(str, "${vm_vncheight}", 	p->vm.vncheight);
+	str_replace(str, "${vm_vncpassword}", 	p->vm.vncpassword);
+	if (strlen(p->vm.vncbind) > 0)
+		str_replace(str, "${vm_vncbind}", 	p->vm.vncbind);
+	else
+		str_replace(str, "${vm_vncbind}", "0.0.0.0");
 	str_replace(str, "${vm_network_interface}", p->vm.network_interface);
 	if (strlen(p->vm.storage_interface) > 0)
 		str_replace(str, "${vm_storage_interface}", p->vm.storage_interface);

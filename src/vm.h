@@ -207,6 +207,9 @@ struct _vm_stru {
 	char vncport[8];		//vnc port
 	char vncwidth[8];		//vnc 窗口宽度
 	char vncheight[8];		//vnc 窗口高度
+	char vncpassword[32];		//vnc 密码 (optional)
+	char vncwait[8];		//vnc wait选项 (on/off)
+	char vncbind[32];		//vnc 绑定地址 (default: 0.0.0.0)
 
 	char audiostatus[8];		//是否开启音频 (on/off)
 

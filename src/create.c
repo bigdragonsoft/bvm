@@ -102,6 +102,9 @@ void create_init()
 	add_item(tbl, "VNC port",     (char*)&new_vm.vncport,  		enter_vm_vncport,	0,	1,	0);
 	add_item(tbl, "VNC width",    (char*)&new_vm.vncwidth, 		enter_vm_vncwidth, 	0,	1,	0);
 	add_item(tbl, "VNC height",   (char*)&new_vm.vncheight,		enter_vm_vncheight, 	0,	1,	0);
+	add_item(tbl, "VNC password", (char*)&new_vm.vncpassword,	enter_vm_vncpassword,	0,	1,	0);
+	add_item(tbl, "VNC wait",     (char*)&new_vm.vncwait,		enter_vm_vncwait,	0,	1,	0);
+	add_item(tbl, "VNC bind",     (char*)&new_vm.vncbind,		enter_vm_vncbind,	0,	1,	0);
 	add_item(tbl, "audio", 	      (char*)&new_vm.audiostatus,  	enter_vm_audiostatus,	0,	1,	0);
 	add_item(tbl, "hostbridge",   (char*)&new_vm.hostbridge, 	enter_vm_hostbridge,	0,	1,	0);
 	add_item(tbl, "auto boot",    (char*)&new_vm.autoboot, 		enter_vm_autoboot,	0,	1,	0);
@@ -618,6 +621,51 @@ void enter_vm_audiostatus(int not_use)
 	};
 
 	enter_options(msg, opts, NULL, (char*)&new_vm.audiostatus);
+}
+
+// vm_vncpassword
+// VNC密码输入处理
+void enter_vm_vncpassword(int not_use)
+{
+	char *msg = "Enter VNC password (leave empty for no password): ";
+	printf("%s", msg);
+	bvm_gets(new_vm.vncpassword, sizeof(new_vm.vncpassword), BVM_ECHO);
+}
+
+// vm_vncwait
+// VNC wait选项输入处理
+void enter_vm_vncwait(int not_use)
+{
+	char *msg = "Enter VNC wait: ";
+	char *opts[] = {
+		"on",
+		"off",
+		NULL,
+	};
+
+	enter_options(msg, opts, NULL, (char*)&new_vm.vncwait);
+}
+
+// vm_vncbind
+// VNC绑定地址输入处理
+void enter_vm_vncbind(int not_use)
+{
+	char *msg = "Enter VNC bind address (default 0.0.0.0): ";
+	while (1) {
+		printf("%s", msg);
+		bvm_gets(new_vm.vncbind, sizeof(new_vm.vncbind), BVM_ECHO);
+		if (strlen(new_vm.vncbind) == 0) {
+			strcpy(new_vm.vncbind, "0.0.0.0");
+			break;
+		}
+		// 验证IP地址格式（使用inet_pton）
+		struct in_addr addr;
+		if (inet_pton(AF_INET, new_vm.vncbind, &addr) > 0) {
+			break;
+		}
+		error("Invalid IP address format\n");
+		printf("\033[1A\033[K"); // 清除上一行
+	}
 }
 
 // vm_vncport
