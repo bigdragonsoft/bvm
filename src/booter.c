@@ -143,7 +143,18 @@ void grub_booter(vm_node *p)
 			strcat(cmd, t);
 		}
 		
-		
+		// VirtIO-9P file sharing (grub mode)
+		if (strcmp(p->vm.share_status, "on") == 0 && strlen(p->vm.share_path) > 0) {
+			char share_cmd[512];
+			if (strcmp(p->vm.share_ro, "on") == 0)
+				sprintf(share_cmd, "-s 20,virtio-9p,%s=%s,ro ", 
+					p->vm.share_name, p->vm.share_path);
+			else
+				sprintf(share_cmd, "-s 20,virtio-9p,%s=%s ", 
+					p->vm.share_name, p->vm.share_path);
+			strcat(cmd, share_cmd);
+		}
+
 		strcat(cmd, "-s 31,lpc -l com1,stdio ");
 		strcat(cmd, "${vm_name}");
 
@@ -383,6 +394,19 @@ void uefi_booter(vm_node *p)
 		// Audio support
 		if (strcmp(p->vm.audiostatus, "on") == 0)
 			strcat(cmd, "-s 6,hda,play=/dev/dsp0,rec=/dev/dsp0 ");
+
+		// VirtIO-9P file sharing
+		if (strcmp(p->vm.share_status, "on") == 0 && strlen(p->vm.share_path) > 0) {
+			char share_cmd[512];
+			if (strcmp(p->vm.share_ro, "on") == 0)
+				sprintf(share_cmd, "-s 20,virtio-9p,%s=%s,ro ", 
+					p->vm.share_name, p->vm.share_path);
+			else
+				sprintf(share_cmd, "-s 20,virtio-9p,%s=%s ", 
+					p->vm.share_name, p->vm.share_path);
+			strcat(cmd, share_cmd);
+		}
+
 		strcat(cmd, "-s 30,xhci,tablet ");
 		strcat(cmd, "${vm_tpm_param}");
 		strcat(cmd, "-s 31,lpc -l com1,stdio ");

@@ -2080,6 +2080,12 @@ void vm_info_all(char *vm_name)
 	printf("%-13s = %s\n",	"vm_tpmstatus",p->vm.tpmstatus);
 	printf("%-13s = %s\n",	"vm_tpmversion",p->vm.tpmversion);
 	printf("%-13s = %s\n",	"vm_tpmpath",p->vm.tpmpath);
+
+	printf("%-13s = %s\n",	"vm_share_status",p->vm.share_status);
+	printf("%-13s = %s\n",	"vm_share_name",p->vm.share_name);
+	printf("%-13s = %s\n",	"vm_share_path",p->vm.share_path);
+	printf("%-13s = %s\n",	"vm_share_ro",p->vm.share_ro);
+
 	printf("%-13s = %s\n",	"vm_audiostatus",p->vm.audiostatus);
 	printf("%-13s = %s\n",	"vm_disk",	p->vm.disk);
 	printf("%-13s = %s\n",	"vm_devicemap",	p->vm.devicemap);
@@ -2202,6 +2208,13 @@ void vm_info(char *vm_name)
 		if (strcmp(p->vm.tpmstatus, "on") == 0) {
 			printf("|-%-12s : %s\n", "tpm version", 	p->vm.tpmversion);
 		}
+	}
+
+	printf("%-14s : %s\n", "shared folder", 		p->vm.share_status);
+	if (strcmp(p->vm.share_status, "on") == 0) {
+		printf("|-%-12s : %s\n", "share name", 	p->vm.share_name);
+		printf("|-%-12s : %s\n", "share path", 	p->vm.share_path);
+		printf("|-%-12s : %s\n", "read-only", 	p->vm.share_ro);
 	}
 
 	printf("%-14s : %s\n", "auto boot",		p->vm.autoboot);
@@ -3214,6 +3227,26 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 	else
 		strcpy(vm->audiostatus, "off");
 
+	if ((value = get_value_by_name("vm_share_status")) != NULL)
+		strcpy(vm->share_status, value);
+	else
+		strcpy(vm->share_status, "off");
+
+	if ((value = get_value_by_name("vm_share_name")) != NULL)
+		strcpy(vm->share_name, value);
+	else
+		strcpy(vm->share_name, "");
+
+	if ((value = get_value_by_name("vm_share_path")) != NULL)
+		strcpy(vm->share_path, value);
+	else
+		strcpy(vm->share_path, "");
+
+	if ((value = get_value_by_name("vm_share_ro")) != NULL)
+		strcpy(vm->share_ro, value);
+	else
+		strcpy(vm->share_ro, "off");
+
 	free_config();
 }
 
@@ -3388,6 +3421,16 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	sprintf(str, "vm_tpmversion=%s\n", vm->tpmversion);
 	fputs(str, fp);
 	sprintf(str, "vm_tpmpath=%s\n", vm->tpmpath);
+	fputs(str, fp);
+	fputs("\n", fp);
+
+	sprintf(str, "vm_share_status=%s\n", vm->share_status);
+	fputs(str, fp);
+	sprintf(str, "vm_share_name=%s\n", vm->share_name);
+	fputs(str, fp);
+	sprintf(str, "vm_share_path=%s\n", vm->share_path);
+	fputs(str, fp);
+	sprintf(str, "vm_share_ro=%s\n", vm->share_ro);
 	fputs(str, fp);
 	fputs("\n", fp);
 

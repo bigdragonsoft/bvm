@@ -98,6 +98,11 @@ void create_init()
 	add_item(tbl, "uefi type",    (char*)&new_vm.uefi,     		enter_vm_uefi, 		0,	0,	0);
 	add_item(tbl, "TPM (UEFI)",   (char*)&new_vm.tpmstatus, 	enter_vm_tpmstatus,	0,	1,	0);
 
+	add_item(tbl, "shared folder", (char*)&new_vm.share_status, 	enter_vm_sharestatus,	0,	1,	0);
+	add_item(tbl, "share name",   (char*)&new_vm.share_name, 	enter_vm_sharename,	0,	1,	0);
+	add_item(tbl, "share path",   (char*)&new_vm.share_path, 	enter_vm_sharepath,	0,	1,	0);
+	add_item(tbl, "share ro",     (char*)&new_vm.share_ro, 		enter_vm_sharero,	0,	1,	0);
+
 	add_item(tbl, "VNC", 	      (char*)&new_vm.vncstatus,  	enter_vm_vncstatus,	0,	1,	0);
 	add_item(tbl, "VNC bind",     (char*)&new_vm.vncbind,		enter_vm_vncbind,	0,	1,	0);
 	add_item(tbl, "VNC port",     (char*)&new_vm.vncport,  		enter_vm_vncport,	0,	1,	0);
@@ -267,6 +272,21 @@ int check_enter_valid()
 		       return -1;
 	       }
 
+	if (strcmp(new_vm.share_status, "on") == 0) {
+		if (strlen(new_vm.share_name) == 0) {
+			warn("share name invalid\n");
+			return -1;
+		}
+		if (strlen(new_vm.share_path) == 0) {
+			warn("share path invalid\n");
+			return -1;
+		}
+		if (strlen(new_vm.share_ro) == 0) {
+			warn("share ro invalid\n");
+			return -1;
+		}
+	}
+	
 	if (support_uefi(new_vm.ostype) && strcmp(new_vm.uefi, "none") != 0) {
 		if (strlen(new_vm.vncstatus) == 0) {
 			warn("VNC status invalid\n");
@@ -341,6 +361,9 @@ int is_non_show_item(int item)
 	 (tbl[n].func == enter_vm_uefi && !support_uefi(new_vm.ostype)) ||
 	 (tbl[n].func == enter_vm_tpmstatus && 
 		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0)) ||
+	 (tbl[n].func == enter_vm_sharename && strcmp(new_vm.share_status, "off") == 0) ||
+	 (tbl[n].func == enter_vm_sharepath && strcmp(new_vm.share_status, "off") == 0) ||
+	 (tbl[n].func == enter_vm_sharero && strcmp(new_vm.share_status, "off") == 0) ||
 	 (tbl[n].func == enter_vm_vncstatus && 
 		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0)) ||
 	 (tbl[n].func == enter_vm_vncbind && 
@@ -910,6 +933,119 @@ void enter_vm_tpmstatus(int not_use)
 	if (strcmp(new_vm.tpmstatus, "on") == 0) {
 		strcpy(new_vm.tpmversion, "2.0");
 	}
+}
+
+// vm_sharestatus
+// VirtIO-9P共享状态输入处理
+void enter_vm_sharestatus(int not_use)
+{
+	char *msg = "Enable shared folder: ";
+	char *opts[] = {
+		"on",
+		"off",
+		NULL,
+	};
+	
+	enter_options(msg, opts, NULL, (char*)&new_vm.share_status);
+	
+	// 如果启用共享，设置默认值
+	if (strcmp(new_vm.share_status, "on") == 0) {
+		if (strlen(new_vm.share_name) == 0)
+			strcpy(new_vm.share_name, "hostshare");
+		if (strlen(new_vm.share_ro) == 0)
+			strcpy(new_vm.share_ro, "off");
+	}
+}
+
+// vm_sharename
+// VirtIO-9P共享名称输入处理
+void enter_vm_sharename(int not_use)
+{
+	if (strcmp(new_vm.share_status, "on") != 0) return;
+	
+	char *msg = "Enter share name (used in guest): ";
+	
+	while (1) {
+		printf("%s", msg);
+		bvm_gets(new_vm.share_name, sizeof(new_vm.share_name), BVM_ECHO);
+		
+		if (strlen(new_vm.share_name) == 0) {
+			strcpy(new_vm.share_name, "hostshare");
+			break;
+		}
+		
+		// 验证共享名称只包含字母数字和下划线
+		int valid = 1;
+		for (int i = 0; i < strlen(new_vm.share_name); i++) {
+			char c = new_vm.share_name[i];
+			if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || 
+			      (c >= '0' && c <= '9') || c == '_')) {
+				valid = 0;
+				break;
+			}
+		}
+		
+		if (valid)
+			break;
+		else
+			warn("share name can only contain letters, numbers, and underscores\n");
+	}
+}
+
+// vm_sharepath
+// VirtIO-9P共享目录路径输入处理
+void enter_vm_sharepath(int not_use)
+{
+	if (strcmp(new_vm.share_status, "on") != 0) return;
+	
+	char *msg = "Enter host directory to share: ";
+	
+	while (1) {
+		printf("%s", msg);
+		bvm_gets(new_vm.share_path, sizeof(new_vm.share_path), BVM_ECHO);
+		
+		if (strlen(new_vm.share_path) == 0) {
+			warn("path cannot be empty\n");
+			continue;
+		}
+		
+		// 验证路径必须是绝对路径
+		if (new_vm.share_path[0] != '/') {
+			warn("path must be an absolute path (start with /)\n");
+			continue;
+		}
+		
+		// 验证路径存在
+		struct stat st;
+		if (stat(new_vm.share_path, &st) != 0) {
+			warn("path does not exist\n");
+			continue;
+		}
+		
+		// 验证路径是目录
+		if (!S_ISDIR(st.st_mode)) {
+			warn("path must be a directory\n");
+			continue;
+		}
+		
+		break;
+	}
+}
+
+// vm_sharero
+// VirtIO-9P只读模式输入处理
+void enter_vm_sharero(int not_use)
+{
+	if (strcmp(new_vm.share_status, "on") != 0) return;
+	
+	char *msg = "Enter share read-only mode: ";
+	char *opts[] = {
+		"on",
+		"off",
+		NULL,
+	};
+	
+	enter_options(msg, opts, NULL, (char*)&new_vm.share_ro);
 }
 
 // 磁盘配置

@@ -6,23 +6,32 @@ BVM is a Bhyve virtual machine management tool based on FreeBSD. It provides a s
 ## Features
 1. Support for multiple mainstream operating systems, including:
    - BSD systems like FreeBSD, OpenBSD, NetBSD
-   - Linux distributions like Debian, Ubuntu, OpenSuse
-   - Windows systems like Windows 10
+   - Linux distributions like Debian, Ubuntu, OpenSuse, CentOS, Kali
+   - Windows systems like Windows 10, Windows 11
 2. Flexible storage configuration:
    - Support for adding multiple virtual disks to each VM
    - Support for dynamic disk addition and removal
+   - Multiple storage interfaces: AHCI, VirtIO-BLK, NVMe
    - ZFS storage support with snapshot and data protection features
 3. Powerful networking capabilities:
    - Support for configuring multiple network cards per VM
-   - Bridge and NAT networking modes
+   - Bridge, NAT, and Switch networking modes
    - Port forwarding support in NAT mode
+   - Built-in DHCP server with dynamic IP display in `bvm --ll`
 4. Multiple boot methods:
    - Support for traditional GRUB boot
    - Support for modern UEFI boot (including UEFI Variables persistence)
-5. Other features:
-   - TPM 2.0 support (Trusted Platform Module)
+5. VNC and Display:
+   - Configurable VNC bind address, port, resolution
+   - VNC password protection
+   - VNC wait option for boot synchronization
+   - HDA audio device support
+6. Advanced features:
+   - TPM 2.0 support (Trusted Platform Module) for Windows 11
+   - VirtIO-9P shared folders (share host directories with VMs)
+   - CPU topology control (sockets, cores, threads)
    - VM encryption protection
-   - Autoboot configuration
+   - Autoboot configuration with boot order
    - Snapshot and rollback support
    - Complete command line management interface
 
@@ -128,16 +137,24 @@ Some configuration parameters explained:
 
     Parameter          Description
     ---------          -----------
-    cpus               Number of CPUs used by VM (not cores)
+    cpus               Number of CPUs used by VM (the total vCPU count)
     ram                Memory allocated to VM (e.g. 512M or 1G)
     ios path           Installation image directory (auto-listed for selection)
     boot from          Boot options (cd0:CD boot/hd0:Hard disk boot)
     uefi               Used for GUI systems with VNC, will disable --login
-    TPM (UEFI)         Enable TPM 2.0 support (requires UEFI)
+    TPM (UEFI)         Enable TPM 2.0 support (requires UEFI, needed for Windows 11)
+    shared folder      Share host directories with the VM (VirtIO-9P)
+    VNC                Enable/disable VNC display
+    VNC bind           VNC server bind address (default: 0.0.0.0)
+    VNC port           VNC server port number
+    VNC width/height   VNC display resolution
+    VNC password       Optional password for VNC connection
+    VNC wait           Wait for VNC connection before boot
+    audio              Enable HDA audio device
     auto boot          Auto-start configuration (see bvm --autoboot)
     hostbridge         CPU architecture (intel:hostbridge/AMD:amd_hostbridge)
-    disk config        Disk configuration (can add/remove disks, recommend using --addisk)
-    network config     Network configuration (networking/connectivity)
+    disk config        Disk configuration (can add/remove disks, set storage interface: ahci-hd/virtio-blk/nvme)
+    network config     Network configuration (Bridge/NAT/Switch modes)
 ```
 ### Question 3: How to view VM configuration information?
 ```
@@ -448,4 +465,21 @@ Nic 0 (vmnet0):
 Received: 112.54 KB (1302 packets)
 Transmitted: 316.48 KB (3345 packets)
 Packet Loss Rate: 0.00%
+```
+
+### Question 17: How to use file sharing (Shared Folder)?
+```
+Answer: Shared folders allow you to share host directories with virtual machines. Enable 'shared folder' in the VM configuration, set the share name and host path.
+
+Configuration options:
+    shared folder      Enable/disable file sharing (on/off)
+    share name         Name used in guest to identify the share
+    share path         Host directory path to share
+    share ro           Read-only mode (on/off)
+
+Mount in Linux guest:
+    mkdir -p /mnt/hostshare
+    mount -t 9p -o trans=virtio hostshare /mnt/hostshare
+
+Note: VirtIO-9P is well supported in Linux guests. FreeBSD 14 guests lack the virtio_p9fs module; FreeBSD 15+ has full support.
 ```

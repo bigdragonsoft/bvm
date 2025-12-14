@@ -1,4 +1,4 @@
-.Dd December 13, 2025
+.Dd December 14, 2025
 .Dt BVM 8
 .Os
 .Sh NAME
@@ -230,10 +230,10 @@ Clone a new virtual machine from an existing virtual machine.
 Edit the configuration of the virtual machine.
 This option needs to be used in the case of a virtual machine. Options that 
 allow users to configure independently are: cpus, ram, iso path, boot from, 
-hostbridge, uefi, auto boot, disk config, and network config.
+hostbridge, uefi, TPM, VNC settings, shared folder, audio, auto boot, disk config, and network config.
 .Bl -tag -width 17n
 .It cpus
-The number of CPUs (non-cores) used by the current virtual machine.
+The total number of virtual CPUs used by the current virtual machine.
 .It ram
 The size of the memory requested by the current virtual machine, 
 the unit of which can be M/G, etc.
@@ -257,6 +257,17 @@ this option will invalidate the
 option because 
 .Cm --login 
 is a text console and does not have graphical interface operating conditions.
+.It TPM (UEFI)
+Enable TPM 2.0 (Trusted Platform Module) support. This is required for 
+Windows 11 installation and needs UEFI boot mode. The swtpm package must 
+be installed on the host.
+.It VNC settings
+VNC configuration includes bind address (default 0.0.0.0), port number, 
+display resolution (width/height), optional password protection, and 
+wait option (wait for VNC connection before boot).
+.It audio
+Enable HDA audio device support for the virtual machine. Requires /dev/dsp0 
+on the host.
 .It auto boot
 See 
 .Cm --autoboot 
@@ -267,13 +278,23 @@ using the Intel system CPU; its attribute value should be amd_hostbridge when
 using the AMD series CPU.
 .It disk config
 The option can add or delete the hard disk of the current virtual machine. 
-If you only want to add the hard disk, it is recommended to use 
+Supports multiple storage interfaces: ahci-hd (AHCI), virtio-blk (VirtIO Block), 
+and nvme (NVM Express). If you only want to add the hard disk, it is recommended to use 
 .Nm
 .Cm --addisk 
 shortcut command.
+.It shared folder
+VirtIO-9P file sharing. This option allows sharing host directories 
+with the virtual machine. When enabled, you can set the share name 
+(used in guest to identify the share), share path (host directory to share), 
+and read-only mode. Linux guests can mount the share using:
+.Bd -literal -offset indent
+mount -t 9p -o trans=virtio sharename /mnt/point
+.Ed
+Note: FreeBSD 14 guests lack virtio_p9fs support; FreeBSD 15+ has full support.
 .It network config
-This option allows you to configure the networking or networking of 
-virtual machines.
+This option allows you to configure the networking of virtual machines.
+Supports Bridge, NAT, and Switch network modes with built-in DHCP server.
 .El
 .It Cm --create Ar name Op Cm from Ar template-name
 Create a new virtual machine.

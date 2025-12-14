@@ -231,6 +231,11 @@ struct _vm_stru {
 
 	char network_interface[16];	//网络接口驱动
 	char storage_interface[16];	//存储接口驱动
+
+	char share_status[8];		//VirtIO-9P共享状态 (on/off)
+	char share_name[64];		//共享名称 (guest中使用的标识)
+	char share_path[256];		//主机共享目录路径
+	char share_ro[8];		//只读模式 (on/off)
 };
 typedef struct _vm_stru vm_stru;
 

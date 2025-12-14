@@ -6,23 +6,32 @@ BVM 是一个基于 FreeBSD 的 Bhyve 虚拟机管理工具。它提供了简单
 ## 功能特性
 1. 支持多种主流操作系统，包括：
    - BSD 系统如 FreeBSD、OpenBSD、NetBSD
-   - Linux 发行版如 Debian、Ubuntu、OpenSuse
-   - Windows 系统如 Windows 10
+   - Linux 发行版如 Debian、Ubuntu、OpenSuse、CentOS、Kali
+   - Windows 系统如 Windows 10、Windows 11
 2. 灵活的存储配置：
    - 支持为每个虚拟机添加多个虚拟磁盘
    - 支持动态添加和删除磁盘
+   - 多种存储接口：AHCI、VirtIO-BLK、NVMe
    - 支持 ZFS 存储，具有快照和数据保护功能
 3. 强大的网络功能：
    - 支持为每个虚拟机配置多个网卡
-   - 支持桥接和 NAT 网络模式
+   - 支持桥接、NAT 和 Switch 网络模式
    - NAT 模式下支持端口转发
+   - 内置 DHCP 服务器，`bvm --ll` 可显示动态 IP
 4. 多种引导方式：
    - 支持传统的 GRUB 引导
    - 支持现代的 UEFI 引导（包含 UEFI 变量持久化支持）
-5. 其他功能：
-   - 支持 TPM 2.0 (可信平台模块)
+5. VNC 和显示：
+   - 可配置 VNC 绑定地址、端口、分辨率
+   - VNC 密码保护
+   - VNC wait 选项用于启动同步
+   - HDA 音频设备支持
+6. 高级功能：
+   - 支持 TPM 2.0 (可信平台模块)，用于 Windows 11
+   - VirtIO-9P 共享文件夹（与虚拟机共享宿主机目录）
+   - CPU 拓扑控制（sockets、cores、threads）
    - 虚拟机加密保护
-   - 自动启动配置
+   - 自动启动配置（支持启动顺序）
    - 快照和回滚支持
    - 完整的命令行管理界面
 
@@ -128,16 +137,24 @@ Options:
 
     参数                描述
     ---------          -----------
-    cpus               VM使用的CPU数量（不是核心数）
+    cpus               VM使用的CPU数量（总虚拟核心数）
     ram                VM分配的内存（例如512M或1G）
     ios path           ISO镜像目录（自动列出供选择）
     boot from          启动选项 (cd0:CD启动/hd0:硬盘启动)
     uefi               用于带有VNC的GUI系统，将禁用--login
-    TPM (UEFI)         启用TPM 2.0支持（需要UEFI）
+    TPM (UEFI)         启用TPM 2.0支持（需要UEFI，Windows 11必需）
+    shared folder      共享文件夹（与虚拟机共享宿主机目录）
+    VNC                启用/禁用VNC显示
+    VNC bind           VNC服务器绑定地址（默认0.0.0.0）
+    VNC port           VNC服务器端口号
+    VNC width/height   VNC显示分辨率
+    VNC password       VNC连接密码（可选）
+    VNC wait           启动前等待VNC连接
+    audio              启用HDA音频设备
     auto boot          自启动配置（见bvm --autoboot）
     hostbridge         CPU架构 (intel:hostbridge/AMD:amd_hostbridge)
-    disk config        磁盘配置（可以添加/删除磁盘，推荐使用--addisk）
-    network config     网络配置（网络/连接）
+    disk config        磁盘配置（可添加/删除磁盘，设置存储接口：ahci-hd/virtio-blk/nvme）
+    network config     网络配置（Bridge/NAT/Switch模式）
 ```
 ### 问题 3: 如何查看虚拟机配置信息？
 ```
@@ -448,4 +465,21 @@ Nic 0 (vmnet0):
 Received: 112.54 KB (1302 packets)
 Transmitted: 316.48 KB (3345 packets)
 Packet Loss Rate: 0.00%
+```
+
+### 问题 17: 如何使用共享文件夹？
+```
+答: 共享文件夹允许您与虚拟机共享宿主机目录。在虚拟机配置中启用 'shared folder'，设置共享名称和宿主机路径。
+
+配置选项：
+    shared folder      启用/禁用共享文件夹 (on/off)
+    share name         虚拟机中用于识别共享的名称
+    share path         要共享的宿主机目录路径
+    share ro           只读模式 (on/off)
+
+在 Linux 虚拟机中挂载：
+    mkdir -p /mnt/hostshare
+    mount -t 9p -o trans=virtio hostshare /mnt/hostshare
+
+注意：VirtIO-9P 在 Linux 虚拟机中支持良好。FreeBSD 14 虚拟机缺少 virtio_p9fs 模块；FreeBSD 15+ 完整支持。
 ```
