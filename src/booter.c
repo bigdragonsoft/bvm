@@ -367,6 +367,9 @@ void uefi_booter(vm_node *p)
 		else //hd
 			if (strcmp(p->vm.vncstatus, "on") == 0)
 					strcat(cmd, "-s 29,fbuf,tcp=0.0.0.0:${vm_vncport},w=${vm_vncwidth},h=${vm_vncheight} ");
+		// Audio support
+		if (strcmp(p->vm.audiostatus, "on") == 0)
+			strcat(cmd, "-s 6,hda,play=/dev/dsp0,rec=/dev/dsp0 ");
 		strcat(cmd, "-s 30,xhci,tablet ");
 		strcat(cmd, "${vm_tpm_param}");
 		strcat(cmd, "-s 31,lpc -l com1,stdio ");

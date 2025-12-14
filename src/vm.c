@@ -2068,6 +2068,7 @@ void vm_info_all(char *vm_name)
 	printf("%-13s = %s\n",	"vm_tpmstatus",p->vm.tpmstatus);
 	printf("%-13s = %s\n",	"vm_tpmversion",p->vm.tpmversion);
 	printf("%-13s = %s\n",	"vm_tpmpath",p->vm.tpmpath);
+	printf("%-13s = %s\n",	"vm_audiostatus",p->vm.audiostatus);
 	printf("%-13s = %s\n",	"vm_disk",	p->vm.disk);
 	printf("%-13s = %s\n",	"vm_devicemap",	p->vm.devicemap);
 	printf("%-13s = %s\n",	"vm_grubcmd",	p->vm.grubcmd);
@@ -2167,6 +2168,7 @@ void vm_info(char *vm_name)
 		printf("|-%-12s : %s\n", "vnc port", 	p->vm.vncport);
 		printf("|-%-12s : %s\n", "width", 	p->vm.vncwidth);
 		printf("|-%-12s : %s\n", "height", 	p->vm.vncheight);
+		printf("|-%-12s : %s\n", "audio", 	p->vm.audiostatus);
 		printf("|-%-12s : %s\n", "tpm status", 	p->vm.tpmstatus);
 		if (strcmp(p->vm.tpmstatus, "on") == 0) {
 			printf("|-%-12s : %s\n", "tpm version", 	p->vm.tpmversion);
@@ -3135,6 +3137,11 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 	else
 		strcpy(vm->tpmpath, "");
 
+	if ((value = get_value_by_name("vm_audiostatus")) != NULL)
+		strcpy(vm->audiostatus, value);
+	else
+		strcpy(vm->audiostatus, "off");
+
 	free_config();
 }
 
@@ -3269,6 +3276,8 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	sprintf(str, "vm_vncwidth=%s\n", vm->vncwidth);
 	fputs(str, fp);
 	sprintf(str, "vm_vncheight=%s\n", vm->vncheight);
+	fputs(str, fp);
+	sprintf(str, "vm_audiostatus=%s\n", vm->audiostatus);
 	fputs(str, fp);
 	fputs("\n", fp);
 

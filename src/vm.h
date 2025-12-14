@@ -208,6 +208,8 @@ struct _vm_stru {
 	char vncwidth[8];		//vnc 窗口宽度
 	char vncheight[8];		//vnc 窗口高度
 
+	char audiostatus[8];		//是否开启音频 (on/off)
+
 	char autoboot[8];		//是否随宿主机自动启动 (on/off)
 	char bootindex[8];		//启动序号
 	char bootdelay[8];		//启动延迟

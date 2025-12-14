@@ -102,6 +102,7 @@ void create_init()
 	add_item(tbl, "VNC port",     (char*)&new_vm.vncport,  		enter_vm_vncport,	0,	1,	0);
 	add_item(tbl, "VNC width",    (char*)&new_vm.vncwidth, 		enter_vm_vncwidth, 	0,	1,	0);
 	add_item(tbl, "VNC height",   (char*)&new_vm.vncheight,		enter_vm_vncheight, 	0,	1,	0);
+	add_item(tbl, "audio", 	      (char*)&new_vm.audiostatus,  	enter_vm_audiostatus,	0,	1,	0);
 	add_item(tbl, "hostbridge",   (char*)&new_vm.hostbridge, 	enter_vm_hostbridge,	0,	1,	0);
 	add_item(tbl, "auto boot",    (char*)&new_vm.autoboot, 		enter_vm_autoboot,	0,	1,	0);
 	add_item(tbl, "boot index",   (char*)&new_vm.bootindex, 	enter_vm_bootindex,	0,	1,	0);
@@ -603,6 +604,20 @@ void enter_vm_vncstatus(int not_use)
 	};
 
 	enter_options(msg, opts, NULL, (char*)&new_vm.vncstatus);
+}
+
+// vm_audiostatus
+// 音频状态输入处理
+void enter_vm_audiostatus(int not_use)
+{
+	char *msg = "Enter audio: ";
+	char *opts[] = {
+		"on",
+		"off",
+		NULL,
+	};
+
+	enter_options(msg, opts, NULL, (char*)&new_vm.audiostatus);
 }
 
 // vm_vncport

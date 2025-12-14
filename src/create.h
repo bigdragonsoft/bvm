@@ -83,6 +83,7 @@ void enter_vm_vncstatus(int);
 void enter_vm_vncport(int);
 void enter_vm_vncwidth(int);
 void enter_vm_vncheight(int);
+void enter_vm_audiostatus(int);
 void enter_vm_hostbridge(int);
 void enter_vm_autoboot(int);
 void enter_vm_bootindex(int);
