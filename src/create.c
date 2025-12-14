@@ -99,12 +99,12 @@ void create_init()
 	add_item(tbl, "TPM (UEFI)",   (char*)&new_vm.tpmstatus, 	enter_vm_tpmstatus,	0,	1,	0);
 
 	add_item(tbl, "VNC", 	      (char*)&new_vm.vncstatus,  	enter_vm_vncstatus,	0,	1,	0);
+	add_item(tbl, "VNC bind",     (char*)&new_vm.vncbind,		enter_vm_vncbind,	0,	1,	0);
 	add_item(tbl, "VNC port",     (char*)&new_vm.vncport,  		enter_vm_vncport,	0,	1,	0);
 	add_item(tbl, "VNC width",    (char*)&new_vm.vncwidth, 		enter_vm_vncwidth, 	0,	1,	0);
 	add_item(tbl, "VNC height",   (char*)&new_vm.vncheight,		enter_vm_vncheight, 	0,	1,	0);
 	add_item(tbl, "VNC password", (char*)&new_vm.vncpassword,	enter_vm_vncpassword,	0,	1,	0);
 	add_item(tbl, "VNC wait",     (char*)&new_vm.vncwait,		enter_vm_vncwait,	0,	1,	0);
-	add_item(tbl, "VNC bind",     (char*)&new_vm.vncbind,		enter_vm_vncbind,	0,	1,	0);
 	add_item(tbl, "audio", 	      (char*)&new_vm.audiostatus,  	enter_vm_audiostatus,	0,	1,	0);
 	add_item(tbl, "hostbridge",   (char*)&new_vm.hostbridge, 	enter_vm_hostbridge,	0,	1,	0);
 	add_item(tbl, "auto boot",    (char*)&new_vm.autoboot, 		enter_vm_autoboot,	0,	1,	0);
@@ -343,6 +343,12 @@ int is_non_show_item(int item)
 		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0)) ||
 	 (tbl[n].func == enter_vm_vncstatus && 
 		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0)) ||
+	 (tbl[n].func == enter_vm_vncbind && 
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
+	 (tbl[n].func == enter_vm_vncpassword && 
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
+	 (tbl[n].func == enter_vm_vncwait && 
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
 	 (tbl[n].func == enter_vm_vncport && 
 		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
 	 (tbl[n].func == enter_vm_vncwidth && 
@@ -557,6 +563,16 @@ void enter_vm_bootfrom(int not_use)
 	else
 		opts = cd_hd_opts;
 	enter_options(msg, opts, NULL, (char*)&new_vm.bootfrom);
+
+	// 自动调整 VNC wait 选项
+	// 如果是 UEFI 启动且从光盘启动，通常需要安装，开启 wait 以便连接 VNC
+	// 否则关闭 wait
+	if (strcmp(new_vm.uefi, "none") != 0) {
+		if (strcmp(new_vm.bootfrom, "cd0") == 0)
+			strcpy(new_vm.vncwait, "on");
+		else
+			strcpy(new_vm.vncwait, "off");
+	}
 }
 
 // vm_uefi
@@ -591,7 +607,16 @@ void enter_vm_uefi(int not_use)
 		opts = opts_only_uefi;
 	else
 		opts = opts_grub_and_uefi;
+
 	enter_options(msg, opts, NULL, (char*)&new_vm.uefi);
+
+	// 自动调整 VNC wait 选项
+	if (strcmp(new_vm.uefi, "none") != 0) {
+		if (strcmp(new_vm.bootfrom, "cd0") == 0)
+			strcpy(new_vm.vncwait, "on");
+		else
+			strcpy(new_vm.vncwait, "off");
+	}
 }
 
 // vm_vncstatus

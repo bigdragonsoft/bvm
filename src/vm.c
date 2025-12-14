@@ -2113,9 +2113,12 @@ void vm_info_all(char *vm_name)
 
 	printf("\n");
 	printf("%-13s = %s\n",	"vm_vncstatus",	p->vm.vncstatus);
+	printf("%-13s = %s\n",	"vm_vncbind",	p->vm.vncbind);
 	printf("%-13s = %s\n",	"vm_vncport",	p->vm.vncport);
 	printf("%-13s = %s\n",	"vm_vncwidth",	p->vm.vncwidth);
 	printf("%-13s = %s\n",	"vm_vncheight",	p->vm.vncheight);
+	printf("%-13s = %s\n",	"vm_vncwait",	p->vm.vncwait);
+	printf("%-13s = %s\n",	"vm_vncpassword",	p->vm.vncpassword);
 	printf("\n");
 	printf("%-13s = %s\n",	"vm_autoboot",	p->vm.autoboot);
 	printf("%-13s = %s\n",	"vm_bootindex",	p->vm.bootindex);
@@ -2186,6 +2189,8 @@ void vm_info(char *vm_name)
 		printf("|-%-12s : %s\n", "vnc port", 	p->vm.vncport);
 		printf("|-%-12s : %s\n", "width", 	p->vm.vncwidth);
 		printf("|-%-12s : %s\n", "height", 	p->vm.vncheight);
+		printf("|-%-12s : %s\n", "wait", 	p->vm.vncwait);
+		printf("|-%-12s : %s\n", "password", 	p->vm.vncpassword);
 		printf("|-%-12s : %s\n", "audio", 	p->vm.audiostatus);
 		printf("|-%-12s : %s\n", "tpm status", 	p->vm.tpmstatus);
 		if (strcmp(p->vm.tpmstatus, "on") == 0) {
