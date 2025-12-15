@@ -252,11 +252,11 @@ this option to cd0.
 .It uefi
 This option is mostly used by the operating system that installs the graphical 
 interface. It needs to be used with VNC to get the desktop. In addition, 
-this option will invalidate the 
+this option may have limited functionality with the 
 .Cm --login 
 option because 
 .Cm --login 
-is a text console and does not have graphical interface operating conditions.
+connects to a text console, which depends on guest OS support.
 .It TPM (UEFI)
 Enable TPM 2.0 (Trusted Platform Module) support. This is required for 
 Windows 11 installation and needs UEFI boot mode. The swtpm package must 
@@ -311,9 +311,9 @@ Encrypt the virtual machine.
 .It Cm --help
 Show all options and descriptions.
 .It Cm --login Ar name
-Login to a running virtual machine from console, the boot loader of this 
-virtual machine must be grub, and the uefi mode needs to log in using 
-the VNC client.
+Login to a running virtual machine from the console. For UEFI mode, 
+console support depends on the guest OS configuration; if it fails, please use 
+the VNC client or SSH.
 .It Cm --ls Op Ar byname | byos | bystatus | online
 Show a list and status of all virtual machines.
 By default, the output is sorted in ascending order by name, 

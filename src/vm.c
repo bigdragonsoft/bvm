@@ -1429,6 +1429,8 @@ void vm_create(char *vm_name, char *template_vm_name)
 		}
 		// 设置 CD-ROM 状态为 on
 		strcpy(new_vm.cdstatus,"on");
+		// 自动设置 boot from 为 cd0
+		strcpy(new_vm.bootfrom, "cd0");
 		edit_vm(NULL);
 	}
 	else
@@ -1835,9 +1837,13 @@ void vm_login(char *vm_name)
 		p = find_vm_list(vm_name);
 	}
 
+	// bhyve 现在虽已经支持 uefi 控制台登录，但还是用vnc登录比较稳定，
+	// 有的系统是完全可以控制台登录，但有的系统则不行
+	// 这里做一个警告不保证控制台登录能成功
 	if (strcmp(p->vm.uefi, "none") != 0) {
-		warn("Please use a remote desktop or SSH to login\n");
-		return;
+		warn("UEFI mode may not support console login.\n");
+		warn("If login fails, please use VNC or SSH.\n");
+		sleep(1);
 	}
 
 	if (get_vm_status(vm_name) == VM_ON) { 
@@ -2291,7 +2297,16 @@ void vm_boot_from_hd(char *vm_name)
 		p = find_vm_list(vm_name);
 	}
 
+	// 设置从hd启动
 	strcpy(p->vm.bootfrom, "hd0");
+	// 自动关闭光驱，防止再次从安装盘启动
+	strcpy(p->vm.cdstatus, "off");
+
+	// 如果是 UEFI 模式，安装完成后通常无需等待 VNC 连接
+	if (strcmp(p->vm.uefi, "none") != 0) {
+		strcpy(p->vm.vncwait, "off");
+	}
+
 	save_vm_info(vm_name, &p->vm);
 }
 

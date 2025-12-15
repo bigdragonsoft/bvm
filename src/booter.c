@@ -216,6 +216,42 @@ void uefi_booter(vm_node *p)
 		}
 	}
 
+	// 如果设置为从光盘启动(boot=0)，强制重置 UEFI 变量以确保光盘启动优先
+	// 这是一个必要的变通方案，因为无法直接修改 nvram 二进制文件中的启动顺序
+	if (boot == 0 && strcmp(p->vm.uefi, "none") != 0 && strlen(p->vm.uefi_vars) > 0) {
+		char template_vars[] = "/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd";
+		
+		if (access(template_vars, R_OK) == 0 && access(p->vm.uefi_vars, F_OK) == 0) {
+			// 备份现有 vars
+			char backup_cmd[512];
+			sprintf(backup_cmd, "cp %s %s.orig", p->vm.uefi_vars, p->vm.uefi_vars);
+			system(backup_cmd);
+
+			// 重置 vars
+			char reset_cmd[512];
+			sprintf(reset_cmd, "cp %s %s", template_vars, p->vm.uefi_vars);
+			system(reset_cmd);
+			
+			write_log("Reset UEFI vars for VM %s to ensure CD boot", p->vm.name);
+		}
+	}
+
+	// 如果设置为从硬盘启动(boot=1)，且存在备份的 vars 文件，则恢复它
+	// 这通常意味着之前为了 CD 启动而重置了 vars，现在需要恢复原有的引导记录
+	if (boot == 1 && strcmp(p->vm.uefi, "none") != 0 && strlen(p->vm.uefi_vars) > 0) {
+		char backup_vars[512];
+		sprintf(backup_vars, "%s.orig", p->vm.uefi_vars);
+
+		if (access(backup_vars, F_OK) == 0) {
+			char restore_cmd[512];
+			// 使用 move 恢复，确保只恢复一次
+			sprintf(restore_cmd, "mv -f %s %s", backup_vars, p->vm.uefi_vars);
+			system(restore_cmd);
+			
+			write_log("Restored UEFI vars for VM %s from backup", p->vm.name);
+		}
+	}
+
 	char cmd[BUFFERSIZE];
 
 	// TPM 启动逻辑
