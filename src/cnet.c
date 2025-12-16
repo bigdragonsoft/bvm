@@ -119,7 +119,7 @@ void edit_network_config()
 
 		if (network_sel[n]->func == goback_mainmenu) {
 			if (check_network_enter_valid() == -1) { 
-				printf("\033[1A\033[K"); 
+				//printf("\033[1A\033[K"); 
 				continue; 
 			}
 			break;
@@ -152,22 +152,43 @@ void set_network_edit(int type, int edit)
 int check_network_enter_valid()
 {
 	for (int i=0; i<atoi(new_vm.nics); i++) {
-		if (strlen(new_vm.nic[i].netmode) == 0) return -1;
-		if (strlen(new_vm.nic[i].ip) == 0) return -1;
+		if (strlen(new_vm.nic[i].netmode) == 0) {
+			warn("Netmode is invalid\n");
+			return -1;
+		}
+		if (strlen(new_vm.nic[i].ip) == 0) {
+			warn("IP is invalid\n");
+			return -1;
+		}
 		
-		if (strlen(new_vm.nic[i].bind) == 0) return -1;
+		if (strlen(new_vm.nic[i].bind) == 0) {
+			warn("Bind is invalid\n");
+			return -1;
+		}
 		if (strcmp(new_vm.nic[i].netmode, "NAT") == 0) {
-			if (strlen(new_vm.nic[i].nat) == 0) return -1;
-			if (strlen(new_vm.nic[i].rpstatus) == 0) return -1;
+			if (strlen(new_vm.nic[i].nat) == 0) {
+				warn("NAT is invalid\n");
+				return -1;
+			}
+			if (strlen(new_vm.nic[i].rpstatus) == 0) {
+				warn("Port forwarding status is invalid\n");
+				return -1;
+			}
 			if (strcmp(new_vm.nic[i].rpstatus, "enable") == 0) {
-				if (strlen(new_vm.nic[i].rplist) == 0) return -1;
+				if (strlen(new_vm.nic[i].rplist) == 0) {
+					warn("Port forwarding list is invalid\n");
+					return -1;
+				}
 				//if (strlen(new_vm.nic[i].bind) == 0) return -1;
 			}
 		}
 		//if (strcmp(new_vm.nic[i].netmode, "Bridged") == 0 && strlen(new_vm.nic[i].bind) == 0) return -1;
 	}
 
-	if (strlen(new_vm.network_interface) == 0) return -1;
+	if (strlen(new_vm.network_interface) == 0) {
+		warn("Interface is invalid\n");
+		return -1;
+	}
 
 	return 1;
 }

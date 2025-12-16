@@ -1431,6 +1431,8 @@ void vm_create(char *vm_name, char *template_vm_name)
 		strcpy(new_vm.cdstatus,"on");
 		// 自动设置 boot from 为 cd0
 		strcpy(new_vm.bootfrom, "cd0");
+		// 自动设置 vncwait 为 on
+		strcpy(new_vm.vncwait, "on");
 		edit_vm(NULL);
 	}
 	else

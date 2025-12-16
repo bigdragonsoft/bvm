@@ -112,7 +112,7 @@ void edit_disk_config()
 
 		if (disk_sel[n]->func == goback_mainmenu) {
 			if (check_disk_enter_valid() == -1) { 
-				printf("\033[1A\033[K"); 
+				//printf("\033[1A\033[K"); 
 				continue; 
 			}
 			break;
@@ -145,11 +145,16 @@ int check_disk_enter_valid()
 {
 	for (int i=0; i<atoi(new_vm.disks); i++) {
 		//if (strlen(&new_vm.imgsize+i*(&new_vm.img1size-&new_vm.imgsize)) == 0)
-		if (strlen(new_vm.vdisk[i].size) == 0)
+		if (strlen(new_vm.vdisk[i].size) == 0) {
+			warn("Disk size is invalid\n");
 			return -1;
+		}
 	}
 
-	if (strlen(new_vm.storage_interface) == 0) return -1;
+	if (strlen(new_vm.storage_interface) == 0) {
+		warn("storage interface is invalid\n");
+		return -1;
+	}
 
 	return 1;
 }
