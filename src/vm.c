@@ -4915,195 +4915,219 @@ void vm_show_stats(const char *vm_name) {
         return;
     }
 
-    unsigned long long cpu_freq = get_cpu_frequency();
     char cmd[BUFFERSIZE];
     FILE *fp;
     char line[BUFFERSIZE];
 
-    // 打印表头
-    //title("\nVM Status Information: %s\n", vm_name);
-    //printf("----------------------------------------\n");
+    // --- 1. 基础设施指标 ---
+    title("\n[ Infrastructure Metrics ]\n");
 
-    // VM 配置信息
-    title("\nVM Configuration:\n"); 
-    //printf("----------------------------------------\n");
-	printf("VM Name: %s\n", vm_name);
-    printf("Allocated CPUs: %s\n", p->vm.cpus);
-    printf("Allocated Memory: %s\n", p->vm.ram);
-    printf("Storage Interface: %s\n", p->vm.storage_interface);
-    printf("Network Interface: %s\n", p->vm.network_interface);
+    // CPU使用率和运行时间 CPU Stats
+    unsigned long long total_runtime = 0;
+    unsigned long long idle_ticks = 0;
+    double cpu_usage = 0.0;
+    char runtime_str[64] = "0s";
+    
+    // 虚拟机退出和中断计数器 VM Exits & Interrupts counters
+    unsigned long long total_exits = 0;
+    unsigned long long io_intercept = 0;
+    unsigned long long hlt_intercept = 0;
+    unsigned long long inst_emul = 0;
+    unsigned long long nmi_count = 0;
 
-    // 运行时间
-    sprintf(cmd, "ps -o etime= -p `pgrep -f 'bhyve: %s'`", vm_name);
+    sprintf(cmd, "bhyvectl --vm=%s --get-stats", vm_name);
+    fp = popen(cmd, "r");
+    if (fp) {
+        while (fgets(line, sizeof(line), fp)) {
+            if (strstr(line, "total runtime")) {
+                sscanf(line, "%*[^0-9]%llu", &total_runtime);
+            } else if (strstr(line, "ticks vcpu was idle")) {
+                sscanf(line, "%*[^0-9]%llu", &idle_ticks);
+            } else if (strstr(line, "total number of vm exits")) {
+                sscanf(line, "%*[^0-9]%llu", &total_exits);
+            } else if (strstr(line, "number of times in/out was intercepted")) { // IO
+                sscanf(line, "%*[^0-9]%llu", &io_intercept);
+            } else if (strstr(line, "number of times hlt was intercepted")) { // HLT
+                sscanf(line, "%*[^0-9]%llu", &hlt_intercept);
+            } else if (strstr(line, "vm exits for instruction emulation")) { // Emulation
+                sscanf(line, "%*[^0-9]%llu", &inst_emul);
+            } else if (strstr(line, "NMIs delivered")) {
+                sscanf(line, "%*[^0-9]%llu", &nmi_count);
+            }
+        }
+        pclose(fp);
+    }
+    
+    // 计算CPU使用率和运行时间
+    if (total_runtime > 0) {
+        unsigned long long idle_time_ns = idle_ticks * 1000000ULL;
+        if (idle_time_ns <= total_runtime) {
+            cpu_usage = 100.0 * (1.0 - ((double)idle_time_ns / total_runtime));
+        } else {
+             cpu_usage = 0.0;
+        }
+        if (cpu_usage < 0) cpu_usage = 0;
+        if (cpu_usage > 100) cpu_usage = 100;
+
+        unsigned long long seconds = total_runtime / 1000000000ULL;
+        unsigned long hours = seconds / 3600;
+        unsigned long minutes = (seconds % 3600) / 60;
+        unsigned long secs = seconds % 60;
+        if (hours > 0) snprintf(runtime_str, sizeof(runtime_str), "%luh %lum %lus", hours, minutes, secs);
+        else if (minutes > 0) snprintf(runtime_str, sizeof(runtime_str), "%lum %lus", minutes, secs);
+        else snprintf(runtime_str, sizeof(runtime_str), "%lus", secs);
+    }
+
+    printf("CPU Usage      : %.2f%% (Allocated: %s Cores)\n", cpu_usage, p->vm.cpus);
+
+    // 内存使用率和运行时间
+    unsigned long long resident_mem = 0;
+    unsigned long long total_mem_bytes = parse_size(p->vm.ram);
+    double mem_usage = 0.0;
+    char resident_str[64] = "0B";
+
+    sprintf(cmd, "bhyvectl --vm=%s --get-stats | grep 'Resident memory' | awk '{print $3}'", vm_name);
+    fp = popen(cmd, "r");
+    if (fp) {
+        if (fgets(line, sizeof(line), fp)) {
+            resident_mem = strtoull(line, NULL, 10);
+            format_bytes(resident_mem, resident_str, sizeof(resident_str));
+            if (total_mem_bytes > 0)
+                 mem_usage = (double)resident_mem / total_mem_bytes * 100.0;
+        }
+        pclose(fp);
+    }
+    printf("Memory Usage   : %.2f%% (Allocated: %s, Active: %s)\n", mem_usage, p->vm.ram, resident_str);
+
+    // 磁盘I/O和容量
+    printf("Disk I/O & Cap :\n");
+    int disk_count = atoi(p->vm.disks);
+    for (int i=0; i < disk_count; i++) {
+         struct stat st;
+         unsigned long long used_size = 0;
+         char used_str[64];
+         if (strlen(p->vm.vdisk[i].path) > 0) {
+             if (stat(p->vm.vdisk[i].path, &st) == 0) {
+                 used_size = (unsigned long long)st.st_blocks * 512;
+             }
+         }
+         format_bytes(used_size, used_str, sizeof(used_str));
+         printf("  - %-10s : Cap: %s, Used: %s (%s)\n", 
+                strlen(p->vm.vdisk[i].name) > 0 ? p->vm.vdisk[i].name : "disk", 
+                p->vm.vdisk[i].size, 
+                used_str,
+                p->vm.vdisk[i].path);
+
+        // ZFS 磁盘使用率
+        if (strcmp(p->vm.zfs, "on") == 0) {
+            if (strncmp(p->vm.vdisk[i].path, "/dev/zvol/", 10) == 0) {
+                 char *dataset = p->vm.vdisk[i].path + 10;
+                 char ratio[16] = "-";
+                 // Get compress ratio
+                 sprintf(cmd, "zfs get -H -o value compressratio %s 2>/dev/null", dataset);
+                 fp = popen(cmd, "r");
+                 if(fp) {
+                     if(fgets(line, sizeof(line), fp)) {
+                         line[strcspn(line, "\n")] = 0;
+                         strcpy(ratio, line);
+                     }
+                     pclose(fp);
+                 }
+                 if (strcmp(ratio, "-") != 0 && strlen(ratio) > 0) {
+                     printf("    [ZFS] Ratio: %s, Dataset: %s\n", ratio, dataset);
+                 }
+            }
+        }
+    }
+
+    // 网络流量 Network Traffic
+    printf("Network Traffic:\n");
+    int nic_count = atoi(p->vm.nics);
+    for (int i = 0; i < nic_count; i++) {
+        unsigned long long bytes_in = 0, bytes_out = 0;
+        unsigned long long pkts_in = 0, pkts_out = 0;
+        unsigned long long drops = 0;
+        
+        sprintf(cmd, "netstat -I %s -b -d -n | tail -n 1", p->vm.nic[i].tap);
+        fp = popen(cmd, "r");
+        if (fp) {
+             if (fgets(line, sizeof(line), fp)) {
+                 unsigned long long err_in=0, drop_in=0, err_out=0, drop_out=0;
+                 sscanf(line, "%*s %*d %*s %*s %llu %llu %llu %llu %llu %llu %llu %llu",
+                        &pkts_in, &err_in, &drop_in, &bytes_in,
+                        &pkts_out, &err_out, &bytes_out, &drop_out);
+                 drops = drop_in + drop_out;
+             }
+             pclose(fp);
+        }
+        
+        char in_str[64], out_str[64];
+        format_bytes(bytes_in, in_str, sizeof(in_str));
+        format_bytes(bytes_out, out_str, sizeof(out_str));
+        
+        printf("  - %-10s : RX: %s / TX: %s (Drops: %llu)\n", 
+               p->vm.nic[i].tap, in_str, out_str, drops);
+    }
+    
+    // --- 2. 高级统计信息 ---
+    title("\n[ Advanced VM Stats ]\n");
+    printf("VM Exits       : %'llu (Rate: ~%.0f/sec)\n", total_exits, total_runtime > 0 ? (double)total_exits / (total_runtime/1000000000.0) : 0);
+    printf("  - IO Access  : %'llu\n", io_intercept);
+    printf("  - Emulation  : %'llu\n", inst_emul);
+    printf("  - Interrupts : %'llu (NMI: %llu)\n", hlt_intercept, nmi_count);
+
+    // --- 3. 可用性和服务 ---
+    title("\n[ Availability & Services ]\n");
+    
+    // PID
+    int pid = get_vm_pid(&p->vm);
+    if (pid <= 0) {
+        sprintf(cmd, "pgrep -f 'bhyve: %s'", vm_name);
+        fp = popen(cmd, "r");
+        if(fp) {
+             if(fgets(line, sizeof(line), fp)) pid = atoi(line);
+             pclose(fp);
+        }
+    }
+    printf("PID            : %d\n", pid);
+
+    // 主机负载	Host Load
+    double load[3];
+    if (getloadavg(load, 3) != -1) {
+        printf("Host Load Avg  : %.2f, %.2f, %.2f\n", load[0], load[1], load[2]);
+    }
+    
+    // 运行时间	Uptime
+    char process_runtime[64] = "Unknown";
+    sprintf(cmd, "ps -o etime= -p %d", pid);
     fp = popen(cmd, "r");
     if (fp) {
         if (fgets(line, sizeof(line), fp)) {
             line[strcspn(line, "\n")] = 0;
-            printf("Process Runtime: %s\n", line);
+            char *ptr = line;
+            while(*ptr == ' ') ptr++;
+            strcpy(process_runtime, ptr);
         }
         pclose(fp);
     }
-	
-    // CPU 信息
-    title("\nCPU Statistics:\n");
-    //printf("----------------------------------------\n");
-    
-    sprintf(cmd, "bhyvectl --vm=%s --get-stats | grep -E 'total runtime|ticks vcpu was idle|migration|NMIs|ExtINTs'", vm_name);
-    fp = popen(cmd, "r");
-    if (fp) {
-        unsigned long long nmi_count = 0;
-        unsigned long long extint_count = 0;
-        unsigned long long migration_count = 0;
-        unsigned long long total_runtime = 0;  // 纳秒
-        unsigned long long idle_ticks = 0;     // 毫秒级别的ticks
-        
-        while (fgets(line, sizeof(line), fp)) {
-            if (strstr(line, "NMIs delivered")) {
-                sscanf(line, "%*[^0-9]%llu", &nmi_count);
-            }
-            else if (strstr(line, "ExtINTs delivered")) {
-                sscanf(line, "%*[^0-9]%llu", &extint_count);
-            }
-            else if (strstr(line, "migration across")) {
-                sscanf(line, "%*[^0-9]%llu", &migration_count);
-            }
-            else if (strstr(line, "total runtime")) {
-                sscanf(line, "%*[^0-9]%llu", &total_runtime);
-            }
-            else if (strstr(line, "ticks vcpu was idle")) {
-                sscanf(line, "%*[^0-9]%llu", &idle_ticks);
-            }
-        }
-        pclose(fp);
+    printf("Status         : Online\n");
+    printf("Uptime         : %s (Process)\n", process_runtime);
+    printf("Boot Time      : %s (CPU Runtime)\n", runtime_str);
 
-        // 计算运行时间（转换为可读格式）
-        char runtime_str[64] = {0};
-        if (total_runtime > 0) {
-            unsigned long long seconds = total_runtime / 1000000000ULL;
-            unsigned long hours = seconds / 3600;
-            unsigned long minutes = (seconds % 3600) / 60;
-            unsigned long secs = seconds % 60;
-            
-            if (hours > 0) {
-                snprintf(runtime_str, sizeof(runtime_str), "%luh %lum %lus", 
-                        hours, minutes, secs);
-            } else if (minutes > 0) {
-                snprintf(runtime_str, sizeof(runtime_str), "%lum %lus", 
-                        minutes, secs);
-            } else {
-                snprintf(runtime_str, sizeof(runtime_str), "%lus", secs);
-            }
-        } else {
-            strcpy(runtime_str, "0s");
-        }
-
-        // 输出统计信息
-        printf("CPU Runtime: %s\n", runtime_str);
-        
-        // 计算CPU使用率
-        // 假设1个tick = 1毫秒 = 1000000纳秒
-        if (total_runtime > 0) {
-            unsigned long long idle_time_ns = idle_ticks * 1000000ULL; // 转换为纳秒
-            double usage = 100.0 * (1.0 - ((double)idle_time_ns / total_runtime));
-            
-            // 确保使用率在0-100之间
-            if (usage < 0) usage = 0;
-            if (usage > 100) usage = 100;
-            
-            printf("CPU Usage: %.2f%%\n", usage);
-        } else {
-            printf("CPU Usage: 0.00%%\n");
-        }
-
-        printf("\nDetailed Statistics:\n");
-        printf("- CPU Migrations: %llu\n", migration_count);
-        printf("- NMIs Delivered: %llu\n", nmi_count);
-        printf("- ExtINTs Delivered: %llu\n", extint_count);
-        
-        // 如果有异常情况，显示警告
-		/*
-        if (migration_count > 100) {
-            warn("Warning: High CPU migration count may affect performance\n");
-        }
-        if (nmi_count > 0 || extint_count > 0) {
-            warn("Warning: Interrupt events detected, please check system status\n");
-        }*/
+    // VNC
+    if (strcmp(p->vm.vncstatus, "on") == 0) {
+        printf("VNC Service    : Enabled (Port: %s, Listen: %s)\n", 
+               p->vm.vncport, strlen(p->vm.vncbind)>0 ? p->vm.vncbind : "Default");
+    } else {
+        printf("VNC Service    : Disabled\n");
     }
-
-    // 内存使用情况
-    title("\nMemory Usage:\n");
-    //printf("----------------------------------------\n");
     
-    // 获取总内存大小
-    char total_mem[32];
-    strcpy(total_mem, p->vm.ram);
-    printf("Total Memory: %s\n", total_mem);
-    
-    // 获取活动内存
-    sprintf(cmd, "bhyvectl --vm=%s --get-stats | grep 'Resident memory' | awk '{print $3}'", vm_name);
-    fp = popen(cmd, "r");
-    if (fp) {
-        unsigned long long resident_mem = 0;
-        if (fgets(line, sizeof(line), fp)) {
-            resident_mem = strtoull(line, NULL, 10);
-            char mem_str[64];
-            format_bytes(resident_mem, mem_str, sizeof(mem_str));
-            printf("Active Memory: %s\n", mem_str);
-            
-            // 计算内存使用率
-            double usage = (double)resident_mem / (parse_size(total_mem) * 1024) * 100;
-            printf("Memory Usage: %.2f%%\n", usage);
-        }
-        pclose(fp);
+    // Port Forwarding Check
+    if (strcmp(p->vm.nic[0].rpstatus, "on") == 0 || p->vm.nic[0].rpnum > 0) {
+         printf("Port Forward   : Active (%d rules)\n", p->vm.nic[0].rpnum);
     }
-
-    // 网络流量统计
-    title("\nNetwork Traffic Statistics:\n");
-    //printf("----------------------------------------\n");
     
-    for (int i = 0; i < atoi(p->vm.nics); i++) {
-        //printf("Network Interface %d (%s):\n", i, p->vm.nic[i].tap);
-		printf("Nic-%d (%s):\n", i, p->vm.nic[i].tap);
-        
-        // 使用 netstat 获取网络接口统计信息
-        sprintf(cmd, "netstat -I %s -b -d | tail -n 1", p->vm.nic[i].tap);
-        fp = popen(cmd, "r");
-        if (fp) {
-            unsigned long long packets_in = 0, bytes_in = 0, errors_in = 0, drops_in = 0;
-            unsigned long long packets_out = 0, bytes_out = 0, errors_out = 0, drops_out = 0;
-            
-            if (fgets(line, sizeof(line), fp)) {
-                sscanf(line, "%*s %*d %*s %*s %llu %llu %llu %llu %llu %llu %llu %llu",
-                       &packets_in, &errors_in, &drops_in, &bytes_in,
-                       &packets_out, &errors_out, &bytes_out, &drops_out);
-            }
-            pclose(fp);
-
-            // 格式化输出
-            char in_bytes[64], out_bytes[64];
-            format_bytes(bytes_in, in_bytes, sizeof(in_bytes));
-            format_bytes(bytes_out, out_bytes, sizeof(out_bytes));
-            
-            printf("Received: %s (%'llu packets)\n", in_bytes, packets_in);
-            if (errors_in > 0 || drops_in > 0) {
-                printf("        Errors: %llu, Drops: %llu\n", errors_in, drops_in);
-            }
-            
-            printf("Transmitted: %s (%'llu packets)\n", out_bytes, packets_out);
-            if (errors_out > 0 || drops_out > 0) {
-                printf("        Errors: %llu, Drops: %llu\n", errors_out, drops_out);
-            }
-            
-            // 计算丢包率
-            double drop_rate = 0.0;
-            unsigned long long total_packets = packets_in + packets_out;
-            unsigned long long total_errors = errors_in + errors_out + drops_in + drops_out;
-            if (total_packets > 0) {
-                drop_rate = (double)total_errors / total_packets * 100;
-            }
-            printf("Packet Loss Rate: %.2f%%\n\n", drop_rate);
-        }
-    }
+    printf("\n");
 }
 
 // 辅助函数：解析内存大小字符串（如 "4G"）转换为字节数

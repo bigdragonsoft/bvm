@@ -438,33 +438,27 @@ Other sections can be filled in according to the default configuration.
 Answer: Use 'bvm --showstats vmname' command to view VM CPU, memory, network traffic information.
 
 Example output:
-VM Configuration:
-VM Name: ob
-Allocated CPUs: 1
-Allocated Memory: 128m
-Storage Interface: ahci-hd
-Network Interface: e1000
-Process Runtime: 02:15:32
+[ Infrastructure Metrics ]
+CPU Usage      : 0.00% (Allocated: 1 Cores)
+Memory Usage   : 0.97% (Allocated: 2g, Active: 19.89 MB)
+Disk I/O & Cap :
+  - disk0      : Cap: 5g, Used: 1.82 GB (/var/vm/fb/disk.img)
+Network Traffic:
+  - vmnet0     : RX: 726 B / TX: 4.43 KB (Drops: 0)
 
-CPU Statistics:
-CPU Runtime: 9m 45s
-CPU Usage: 33.46%
+[ Advanced VM Stats ]
+VM Exits       : 1437238 (Rate: ~45784/sec)
+  - IO Access  : 202732
+  - Emulation  : 685290
+  - Interrupts : 45059 (NMI: 0)
 
-Detailed Statistics:
-- CPU Migrations: 1
-- NMIs Delivered: 0
-- ExtINTs Delivered: 0
-
-Memory Usage:
-Total Memory: 128m
-Active Memory: 23.33 MB
-Memory Usage: 0.02%
-
-Network Traffic Statistics:
-Nic 0 (vmnet0):
-Received: 112.54 KB (1302 packets)
-Transmitted: 316.48 KB (3345 packets)
-Packet Loss Rate: 0.00%
+[ Availability & Services ]
+PID            : 6044
+Host Load Avg  : 1.44, 1.43, 1.36
+Status         : Online
+Uptime         : 52:34 (Process)
+Boot Time      : 31s (CPU Runtime)
+VNC Service    : Disabled
 ```
 
 ### Question 17: How to use file sharing (Shared Folder)?
