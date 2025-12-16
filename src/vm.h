@@ -195,7 +195,7 @@ struct _vm_stru {
 	char iso[256];			//iso
 	char bootfrom[32];		//启动介质 (cd0/hd0)
 	char hostbridge[32];		//hostbridge
-	char uefi[32];			//是否uefi启动 (none/uefi/uefi_csm)
+	char boot_type[32];			//是否uefi启动 (grub/uefi/uefi_csm)
 	char uefi_vars[256];		//UEFI变量文件路径 (用于持久化UEFI设置)
 	char disk[256];			//磁盘文件路径
 	char devicemap[256];		//devicemap路径

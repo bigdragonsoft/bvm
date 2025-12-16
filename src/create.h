@@ -78,7 +78,7 @@ void enter_vm_vdisk_size(int disk_ord);
 void enter_vm_cdstatus(int);
 void enter_vm_iso(int);
 void enter_vm_bootfrom(int);
-void enter_vm_uefi(int);
+void enter_vm_boot_type(int);
 void enter_vm_vncstatus(int);
 void enter_vm_vncport(int);
 void enter_vm_vncwidth(int);

@@ -46,7 +46,7 @@ int main(int argc, char **argv)
 	vm_node *p;
 	if ((p = find_vm_list(vm_name)) == NULL) exit(0);
 
-	if (strcmp(p->vm.uefi, "none") == 0) { 
+	if (strcmp(p->vm.boot_type, "grub") == 0) { 
 		set_grub_cmd(p);
 		grub_booter(p);
 	}
@@ -197,7 +197,7 @@ void uefi_booter(vm_node *p)
 	}
 
 	// 自动迁移逻辑：如果 VM 使用 UEFI 但没有 vars 文件
-	if (strcmp(p->vm.uefi, "none") != 0 && strlen(p->vm.uefi_vars) == 0) {
+	if (strcmp(p->vm.boot_type, "grub") != 0 && strlen(p->vm.uefi_vars) == 0) {
 		// 尝试创建 vars 文件
 		char template_vars[] = "/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd";
 		char vm_vars[256];
@@ -218,7 +218,7 @@ void uefi_booter(vm_node *p)
 
 	// 如果设置为从光盘启动(boot=0)，强制重置 UEFI 变量以确保光盘启动优先
 	// 这是一个必要的变通方案，因为无法直接修改 nvram 二进制文件中的启动顺序
-	if (boot == 0 && strcmp(p->vm.uefi, "none") != 0 && strlen(p->vm.uefi_vars) > 0) {
+	if (boot == 0 && strcmp(p->vm.boot_type, "grub") != 0 && strlen(p->vm.uefi_vars) > 0) {
 		char template_vars[] = "/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd";
 		
 		if (access(template_vars, R_OK) == 0 && access(p->vm.uefi_vars, F_OK) == 0) {
@@ -238,7 +238,7 @@ void uefi_booter(vm_node *p)
 
 	// 如果设置为从硬盘启动(boot=1)，且存在备份的 vars 文件，则恢复它
 	// 这通常意味着之前为了 CD 启动而重置了 vars，现在需要恢复原有的引导记录
-	if (boot == 1 && strcmp(p->vm.uefi, "none") != 0 && strlen(p->vm.uefi_vars) > 0) {
+	if (boot == 1 && strcmp(p->vm.boot_type, "grub") != 0 && strlen(p->vm.uefi_vars) > 0) {
 		char backup_vars[512];
 		sprintf(backup_vars, "%s.orig", p->vm.uefi_vars);
 
@@ -514,7 +514,7 @@ void convert(char *code, vm_node *p)
 	str_replace(str, "${vm_name}", 		p->vm.name);
 	str_replace(str, "${vm_version}", 	p->vm.version);
 	str_replace(str, "${vm_bootfrom}", 	p->vm.bootfrom);
-	str_replace(str, "${vm_uefi}", 		p->vm.uefi);
+	str_replace(str, "${vm_boot_type}", 		p->vm.boot_type);
 	str_replace(str, "${vm_devicemap}", 	p->vm.devicemap);
 	str_replace(str, "${vm_ram}", 		p->vm.ram);
 	str_replace(str, "${vm_cpus}", 		p->vm.cpus);
@@ -539,9 +539,9 @@ void convert(char *code, vm_node *p)
 	else
 		str_replace(str, "${vm_storage_interface}", "ahci-hd");
 	str_replace(str, "${vm_uefi_vars}",	p->vm.uefi_vars);
-	if (strcmp(p->vm.uefi, "uefi") == 0)
+	if (strcmp(p->vm.boot_type, "uefi") == 0)
 		str_replace(str, "${vm_bhyve_uefi_fd}", "BHYVE_UEFI.fd");
-	if (strcmp(p->vm.uefi, "uefi_csm")== 0)
+	if (strcmp(p->vm.boot_type, "uefi_csm")== 0)
 		str_replace(str, "${vm_bhyve_uefi_fd}", "BHYVE_UEFI_CSM.fd"); 
 
 	// TPM

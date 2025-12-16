@@ -95,7 +95,7 @@ void create_init()
 	add_item(tbl, "CD",	      (char*)&new_vm.cdstatus,      	enter_vm_cdstatus, 	0,	1,	0);
 	add_item(tbl, "iso path",     (char*)&new_vm.iso,      		enter_vm_iso, 		0,	1,	0);
 	add_item(tbl, "boot from",    (char*)&new_vm.bootfrom, 		enter_vm_bootfrom, 	0,	1,	0);
-	add_item(tbl, "uefi type",    (char*)&new_vm.uefi,     		enter_vm_uefi, 		0,	0,	0);
+	add_item(tbl, "boot type",    (char*)&new_vm.boot_type, 		enter_vm_boot_type, 	0,	0,	0);
 	add_item(tbl, "TPM (UEFI)",   (char*)&new_vm.tpmstatus, 	enter_vm_tpmstatus,	0,	1,	0);
 
 	add_item(tbl, "shared folder", (char*)&new_vm.share_status, 	enter_vm_sharestatus,	0,	1,	0);
@@ -287,7 +287,7 @@ int check_enter_valid()
 		}
 	}
 	
-	if (support_uefi(new_vm.ostype) && strcmp(new_vm.uefi, "none") != 0) {
+	if (support_uefi(new_vm.ostype) && strcmp(new_vm.boot_type, "grub") != 0) {
 		if (strlen(new_vm.vncstatus) == 0) {
 			warn("VNC status invalid\n");
 			return -1;
@@ -357,27 +357,27 @@ int is_non_show_item(int item)
 	int n = item;
 	return
 	((tbl[n].func == enter_vm_version && strcmp(new_vm.ostype, "OpenBSD") != 0) ||
-	 (tbl[n].func == enter_vm_iso && strcmp(new_vm.cdstatus, "off") == 0) ||
-	 (tbl[n].func == enter_vm_uefi && !support_uefi(new_vm.ostype)) ||
+	(tbl[n].func == enter_vm_iso && strcmp(new_vm.cdstatus, "off") == 0) ||
+	 (tbl[n].func == enter_vm_boot_type && !support_uefi(new_vm.ostype)) ||
 	 (tbl[n].func == enter_vm_tpmstatus && 
-		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0)) ||
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0)) ||
 	 (tbl[n].func == enter_vm_sharename && strcmp(new_vm.share_status, "off") == 0) ||
 	 (tbl[n].func == enter_vm_sharepath && strcmp(new_vm.share_status, "off") == 0) ||
 	 (tbl[n].func == enter_vm_sharero && strcmp(new_vm.share_status, "off") == 0) ||
 	 (tbl[n].func == enter_vm_vncstatus && 
-		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0)) ||
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0)) ||
 	 (tbl[n].func == enter_vm_vncbind && 
-		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
 	 (tbl[n].func == enter_vm_vncpassword && 
-		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
 	 (tbl[n].func == enter_vm_vncwait && 
-		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
 	 (tbl[n].func == enter_vm_vncport && 
-		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
 	 (tbl[n].func == enter_vm_vncwidth && 
-		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
 	 (tbl[n].func == enter_vm_vncheight && 
-		(!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
+		(!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
 	 (tbl[n].func == enter_vm_bootindex && strcmp(new_vm.autoboot, "yes") != 0) ||
 	 (tbl[n].func == enter_vm_bootdelay && strcmp(new_vm.autoboot, "yes") != 0));
 
@@ -682,7 +682,7 @@ void enter_vm_bootfrom(int not_use)
 	// 自动调整 VNC wait 选项
 	// 如果是 UEFI 启动且从光盘启动，通常需要安装，开启 wait 以便连接 VNC
 	// 否则关闭 wait
-	if (strcmp(new_vm.uefi, "none") != 0) {
+	if (strcmp(new_vm.boot_type, "grub") != 0) {
 		if (strcmp(new_vm.bootfrom, "cd0") == 0)
 			strcpy(new_vm.vncwait, "on");
 		else
@@ -690,22 +690,22 @@ void enter_vm_bootfrom(int not_use)
 	}
 }
 
-// vm_uefi
-// uefi启动模式输入处理
-void enter_vm_uefi(int not_use)
+// vm_boot_type
+// boot type启动模式输入处理
+void enter_vm_boot_type(int not_use)
 {
 	if (!support_uefi(new_vm.ostype)) {
-		strcpy(new_vm.uefi, "none");
+		strcpy(new_vm.boot_type, "grub");
 		return;
 	}
 
-	char *msg = "Enter uefi type: ";
+	char *msg = "Enter boot type: ";
 	
 	// 检查 UEFI CSM 固件文件是否存在
 	int has_csm = (access("/usr/local/share/uefi-firmware/BHYVE_UEFI_CSM.fd", F_OK) == 0);
 	
 	char *opts_grub_and_uefi[] = {
-		"none",
+		"grub",
 		"uefi",
 		has_csm ? "uefi_csm" : NULL,
 		NULL,
@@ -723,10 +723,10 @@ void enter_vm_uefi(int not_use)
 	else
 		opts = opts_grub_and_uefi;
 
-	enter_options(msg, opts, NULL, (char*)&new_vm.uefi);
+	enter_options(msg, opts, NULL, (char*)&new_vm.boot_type);
 
 	// 自动调整 VNC wait 选项
-	if (strcmp(new_vm.uefi, "none") != 0) {
+	if (strcmp(new_vm.boot_type, "grub") != 0) {
 		if (strcmp(new_vm.bootfrom, "cd0") == 0)
 			strcpy(new_vm.vncwait, "on");
 		else
@@ -738,7 +738,7 @@ void enter_vm_uefi(int not_use)
 // vnc状态输入处理
 void enter_vm_vncstatus(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0) return;
 	char *msg = "Enter vnc: ";
 	char *opts[] = {
 		"on",
@@ -753,6 +753,7 @@ void enter_vm_vncstatus(int not_use)
 // 音频状态输入处理
 void enter_vm_audiostatus(int not_use)
 {
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0) return;
 	char *msg = "Enter audio: ";
 	char *opts[] = {
 		"on",
@@ -767,6 +768,7 @@ void enter_vm_audiostatus(int not_use)
 // VNC密码输入处理
 void enter_vm_vncpassword(int not_use)
 {
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC password (leave empty for no password): ";
 	printf("%s", msg);
 	bvm_gets(new_vm.vncpassword, sizeof(new_vm.vncpassword), BVM_ECHO);
@@ -776,6 +778,7 @@ void enter_vm_vncpassword(int not_use)
 // VNC wait选项输入处理
 void enter_vm_vncwait(int not_use)
 {
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC wait: ";
 	char *opts[] = {
 		"on",
@@ -790,6 +793,7 @@ void enter_vm_vncwait(int not_use)
 // VNC绑定地址输入处理
 void enter_vm_vncbind(int not_use)
 {
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC bind address (default 0.0.0.0): ";
 	while (1) {
 		printf("%s", msg);
@@ -812,7 +816,7 @@ void enter_vm_vncbind(int not_use)
 // vnc端口输入处理
 void enter_vm_vncport(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC port: ";
 	enter_numbers(msg, NULL, (char*)&new_vm.vncport);
 }
@@ -821,7 +825,7 @@ void enter_vm_vncport(int not_use)
 // vnc屏幕宽度输入处理
 void enter_vm_vncwidth(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC display width: ";
 	enter_numbers(msg, NULL, (char*)&new_vm.vncwidth);
 }
@@ -830,7 +834,7 @@ void enter_vm_vncwidth(int not_use)
 // vnc屏幕高度输入处理
 void enter_vm_vncheight(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC display height: ";
 	enter_numbers(msg, NULL, (char*)&new_vm.vncheight);
 }
@@ -915,7 +919,7 @@ void enter_vm_bootdelay(int not_use)
 void enter_vm_tpmstatus(int not_use)
 {
 	// TPM需要UEFI模式
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.uefi, "none") == 0) {
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0) {
 		strcpy(new_vm.tpmstatus, "off");
 		return;
 	}
@@ -1779,7 +1783,7 @@ void enter_vm_network_interface(int not_use)
 	};
 
 	char **opts, **descs;
-	if (strcmp(new_vm.uefi, "uefi") == 0) {
+	if (strcmp(new_vm.boot_type, "uefi") == 0) {
 		opts = opt_uefi;
 		descs = desc_uefi;
 	} 

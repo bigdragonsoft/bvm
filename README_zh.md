@@ -141,7 +141,7 @@ Options:
     ram                VM分配的内存（例如512M或1G）
     ios path           ISO镜像目录（自动列出供选择）
     boot from          启动选项 (cd0:CD启动/hd0:硬盘启动)
-    uefi               用于带有VNC的GUI系统，将禁用--login
+    boot type          启动方式 (grub: 标准引导, uefi: UEFI引导, uefi_csm: UEFI CSM/兼容传统BIOS)
     TPM (UEFI)         启用TPM 2.0支持（需要UEFI，Windows 11必需）
     shared folder      共享文件夹（与虚拟机共享宿主机目录）
     VNC                启用/禁用VNC显示
@@ -176,7 +176,7 @@ cd status      : on
 |-iso path     : /root/iso/debian-9.3.0-amd64-netinst.iso
 boot from      : cd0
 hostbridge     : hostbridge
-uefi           : none
+boot type      : grub
 auto boot      : yes
 |-index        : 2
 |-time         : 15 sec.

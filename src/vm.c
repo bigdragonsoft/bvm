@@ -1459,7 +1459,7 @@ void vm_create(char *vm_name, char *template_vm_name)
 	create_vm_disk_all(&new_vm);
 
 	//为 UEFI VM 创建 vars 文件
-	if (strcmp(new_vm.uefi, "none") != 0) {
+	if (strcmp(new_vm.boot_type, "grub") != 0) {
 		char template_vars[] = "/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd";
 		char vm_vars[256];
 		sprintf(vm_vars, "%s%s/efivars.fd", vmdir, new_vm.name);
@@ -1842,7 +1842,7 @@ void vm_login(char *vm_name)
 	// bhyve 现在虽已经支持 uefi 控制台登录，但还是用vnc登录比较稳定，
 	// 有的系统是完全可以控制台登录，但有的系统则不行
 	// 这里做一个警告不保证控制台登录能成功
-	if (strcmp(p->vm.uefi, "none") != 0) {
+	if (strcmp(p->vm.boot_type, "grub") != 0) {
 		warn("UEFI mode may not support console login.\n");
 		warn("If login fails, please use VNC or SSH.\n");
 		sleep(1);
@@ -1965,7 +1965,7 @@ void vm_killsession(char *vm_name)
 
 	char cmd[CMD_MAX_LEN];
 	//删除tmux窗口
-	if (strcmp(p->vm.uefi, "none") == 0) {
+	if (strcmp(p->vm.boot_type, "grub") == 0) {
 		sprintf(cmd, "tmux kill-session -t %s >> /dev/null 2>&1", vm_name);
 		run_cmd(cmd);
 	}
@@ -2003,7 +2003,7 @@ void vm_poweroff(char *vm_name,int flag_msg)
 			run_cmd(cmd);
 		}
 		//删除tmux窗口
-		if (strcmp(p->vm.uefi, "none") == 0) {
+		if (strcmp(p->vm.boot_type, "grub") == 0) {
 			sprintf(cmd, "tmux kill-session -t %s", vm_name);
 			//run_cmd(cmd);
 		}
@@ -2084,7 +2084,7 @@ void vm_info_all(char *vm_name)
 	printf("%-13s = %s\n",	"vm_iso", 	p->vm.iso);
 	printf("%-13s = %s\n",	"vm_bootfrom", 	p->vm.bootfrom);
 	printf("%-13s = %s\n",	"vm_hostbridge",p->vm.hostbridge);
-	printf("%-13s = %s\n",	"vm_uefi",	p->vm.uefi);
+	printf("%-13s = %s\n",	"vm_boot_type",	p->vm.boot_type);
 	printf("%-13s = %s\n",	"vm_tpmstatus",p->vm.tpmstatus);
 	printf("%-13s = %s\n",	"vm_tpmversion",p->vm.tpmversion);
 	printf("%-13s = %s\n",	"vm_tpmpath",p->vm.tpmpath);
@@ -2202,8 +2202,8 @@ void vm_info(char *vm_name)
 		printf("|-%-12s : %s\n", "iso path",	p->vm.iso);
 	printf("%-14s : %s\n", "boot from", 		p->vm.bootfrom);
 	printf("%-14s : %s\n", "hostbridge", 		p->vm.hostbridge);
-	printf("%-14s : %s\n", "uefi", 			p->vm.uefi);
-	if (support_uefi(p->vm.ostype) && strcmp(p->vm.uefi, "none") != 0) {
+	printf("%-14s : %s\n", "boot type", 			p->vm.boot_type);
+	if (support_uefi(p->vm.ostype) && strcmp(p->vm.boot_type, "grub") != 0) {
 		printf("|-%-12s : %s\n", "vnc status", 	p->vm.vncstatus);
 		printf("|-%-12s : %s\n", "vnc bind", 	p->vm.vncbind);
 		printf("|-%-12s : %s\n", "vnc port", 	p->vm.vncport);
@@ -2305,7 +2305,7 @@ void vm_boot_from_hd(char *vm_name)
 	strcpy(p->vm.cdstatus, "off");
 
 	// 如果是 UEFI 模式，安装完成后通常无需等待 VNC 连接
-	if (strcmp(p->vm.uefi, "none") != 0) {
+	if (strcmp(p->vm.boot_type, "grub") != 0) {
 		strcpy(p->vm.vncwait, "off");
 	}
 
@@ -3100,8 +3100,18 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 		strcpy(vm->bootfrom, value);
 	if ((value = get_value_by_name("vm_hostbridge")) != NULL)
 		strcpy(vm->hostbridge, value);
-	if ((value = get_value_by_name("vm_uefi")) != NULL)
-		strcpy(vm->uefi, value);
+
+	// Config Migration: Check for vm_boot_type first, then fallback to vm_uefi
+	if ((value = get_value_by_name("vm_boot_type")) != NULL) {
+		strcpy(vm->boot_type, value);
+		if (strcmp(vm->boot_type, "none") == 0) strcpy(vm->boot_type, "grub");
+	}
+	else if ((value = get_value_by_name("vm_uefi")) != NULL) {
+		strcpy(vm->boot_type, value);
+		if (strcmp(vm->boot_type, "none") == 0) strcpy(vm->boot_type, "grub");
+	}
+
+
 	if ((value = get_value_by_name("vm_uefi_vars")) != NULL)
 		strcpy(vm->uefi_vars, value);
 	if ((value = get_value_by_name("vm_disk")) != NULL)
@@ -3345,7 +3355,7 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	fputs(str, fp);
 	sprintf(str, "vm_hostbridge=%s\n", vm->hostbridge);
 	fputs(str, fp);
-	sprintf(str, "vm_uefi=%s\n", vm->uefi);
+	sprintf(str, "vm_boot_type=%s\n", vm->boot_type);
 	fputs(str, fp);
 	sprintf(str, "vm_uefi_vars=%s\n", vm->uefi_vars);
 	fputs(str, fp);
@@ -3740,7 +3750,7 @@ void print_vm_list(int list_type, int online_only)
 
             // VNC
             char vnc[32] = "-";
-            if (strcmp(p->vm.uefi, "uefi") == 0 || strcmp(p->vm.uefi, "uefi_csm") == 0) {
+            if (strcmp(p->vm.boot_type, "uefi") == 0 || strcmp(p->vm.boot_type, "uefi_csm") == 0) {
                  if (strlen(p->vm.vncport) > 0) {
                       sprintf(vnc, "0.0.0.0:%s", p->vm.vncport);
                  }
@@ -3753,7 +3763,7 @@ void print_vm_list(int list_type, int online_only)
 
         // LOADER
         if (list_type == VM_LONG_LIST) {
-             const char* loader = (strcmp(p->vm.uefi, "uefi") == 0) ? "uefi" : "grub";
+             const char* loader = (strcmp(p->vm.boot_type, "uefi") == 0) ? "uefi" : "grub";
              max_width.loader = MAX(max_width.loader, strlen(loader));
         }
 
@@ -3856,7 +3866,7 @@ void print_vm_list(int list_type, int online_only)
 
             // VNC
             char vnc[32] = "-";
-            if (strcmp(p->vm.uefi, "uefi") == 0 || strcmp(p->vm.uefi, "uefi_csm") == 0) {
+            if (strcmp(p->vm.boot_type, "uefi") == 0 || strcmp(p->vm.boot_type, "uefi_csm") == 0) {
                  if (strlen(p->vm.vncport) > 0) {
                       sprintf(vnc, "0.0.0.0:%s", p->vm.vncport);
                  }
@@ -3869,7 +3879,7 @@ void print_vm_list(int list_type, int online_only)
 
         // LOADER
         if (list_type == VM_LONG_LIST) {
-            const char* loader = (strcmp(p->vm.uefi, "uefi") == 0) ? "uefi" : "grub";
+            const char* loader = (strcmp(p->vm.boot_type, "uefi") == 0) ? "uefi" : "grub";
             printf("%-*s  ", max_width.loader, loader);
         }
 
@@ -4005,7 +4015,7 @@ int write_boot_code(char **code, vm_node *p)
 		str_replace(str, "${vm_start_sh}", 	fn);
 		str_replace(str, "${vm_version}", 	p->vm.version);
 		str_replace(str, "${vm_bootfrom}", 	p->vm.bootfrom);
-		str_replace(str, "${vm_uefi}", 		p->vm.uefi);
+		str_replace(str, "${vm_boot_type}", 		p->vm.boot_type);
 		str_replace(str, "${vm_devicemap}", 	p->vm.devicemap);
 		str_replace(str, "${vm_ram}", 		p->vm.ram);
 		str_replace(str, "${vm_cpus}", 		p->vm.cpus);
@@ -4021,9 +4031,9 @@ int write_boot_code(char **code, vm_node *p)
 		else
 			str_replace(str, "${vm_storage_interface}", "ahci-hd");
 
-		if (strcmp(p->vm.uefi, "uefi") == 0)
+		if (strcmp(p->vm.boot_type, "uefi") == 0)
 			str_replace(str, "${vm_bhyve_uefi_fd}", "BHYVE_UEFI.fd");
-		if (strcmp(p->vm.uefi, "uefi_csm")== 0)
+		if (strcmp(p->vm.boot_type, "uefi_csm")== 0)
 			str_replace(str, "${vm_bhyve_uefi_fd}", "BHYVE_UEFI_CSM.fd"); 
 
 		if (strstr(str, "${vm_tap1}") && atoi(p->vm.nics) < 2) continue;
@@ -4266,7 +4276,7 @@ int  gen_vm_start_code(char *vm_name)
 	
 	//生成启动代码
 	char **code;
-	if (strcmp(p->vm.uefi, "none") == 0) {
+	if (strcmp(p->vm.boot_type, "grub") == 0) {
 		code = grub_boot;
 		gen_grub_boot_code(code, p);
 	}

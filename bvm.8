@@ -249,14 +249,20 @@ This is an important option. When the system is first installed,
 will automatically adjust this option to hd0 for system startup. 
 When you need to use iso disc for system maintenance, you can change 
 this option to cd0.
+.It boot type
+Select the boot method. Options are:
+.Bl -tag -width 10n
+.It grub
+Standard Bhyve loader (bhyveload/grub-bhyve). Recommended for most BSD and Linux VMs.
 .It uefi
-This option is mostly used by the operating system that installs the graphical 
-interface. It needs to be used with VNC to get the desktop. In addition, 
-this option may have limited functionality with the 
+UEFI boot mode. Required for Windows and some modern Linux distributions. 
+Often used with VNC for GUI.
+.It uefi_csm
+UEFI Compatibility Support Module (Provides Legacy BIOS compatibility).
+.El
+Note: UEFI modes might have limited console support with 
 .Cm --login 
-option because 
-.Cm --login 
-connects to a text console, which depends on guest OS support.
+depending on the guest OS configuration.
 .It TPM (UEFI)
 Enable TPM 2.0 (Trusted Platform Module) support. This is required for 
 Windows 11 installation and needs UEFI boot mode. The swtpm package must 

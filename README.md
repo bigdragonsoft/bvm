@@ -141,7 +141,7 @@ Some configuration parameters explained:
     ram                Memory allocated to VM (e.g. 512M or 1G)
     ios path           Installation image directory (auto-listed for selection)
     boot from          Boot options (cd0:CD boot/hd0:Hard disk boot)
-    uefi               Used for GUI systems with VNC, will disable --login
+    boot type          Boot method (grub: Standard, uefi: UEFI, uefi_csm: UEFI CSM/Legacy BIOS)
     TPM (UEFI)         Enable TPM 2.0 support (requires UEFI, needed for Windows 11)
     shared folder      Share host directories with the VM (VirtIO-9P)
     VNC                Enable/disable VNC display
@@ -176,7 +176,7 @@ cd status      : on
 |-iso path     : /root/iso/debian-9.3.0-amd64-netinst.iso
 boot from      : cd0
 hostbridge     : hostbridge
-uefi           : none
+boot type      : grub
 auto boot      : yes
 |-index        : 2
 |-time         : 15 sec.
