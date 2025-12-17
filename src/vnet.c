@@ -1595,7 +1595,7 @@ void get_lo_name(char *name)
 int get_nic_list(int type)
 {
 	FILE *fp;
-	fp = popen("ifconfig -l | awk '{for(i=1;i<NF;i++) print $i}'", "r");
+	fp = popen("ifconfig -l | awk '{for(i=1;i<=NF;i++) print $i}'", "r");
 	if (fp == NULL) {
 		error("can't get nic name\n");
 		err_exit();

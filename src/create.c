@@ -316,6 +316,20 @@ int check_enter_valid()
 		return -1;
 	}
 
+	// 用于模板创建的检测
+	// 1. NAT模式下，未指定网卡则默认选择第一个网卡
+	if (strcmp(new_vm.nic[0].netmode, "NAT") == 0 && strlen(new_vm.nic[0].bind) == 0) {
+		get_nic_list(CABLE_AND_WIRELESS);
+		strcpy(new_vm.nic[0].bind, nic_list[0]);
+	}
+
+	// 2. 检测 CPU 数量是否大于主机
+	long host_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+	if (atoi(new_vm.cpus) > host_cpus) {
+		warn("The number of CPUs cannot be greater than the host (%ld)\n", host_cpus);
+		return -1;
+	}
+
 	return 0;
 	
 }
@@ -564,7 +578,14 @@ void enter_vm_cpus(int not_use)
 	char old_cpus[8];
 	strcpy(old_cpus, new_vm.cpus); // 保存旧的 CPU 数量
 
-	enter_numbers(msg, NULL, (char*)&new_vm.cpus);
+	long host_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+	while(1) {
+		enter_numbers(msg, NULL, (char*)&new_vm.cpus);
+		if (atoi(new_vm.cpus) > host_cpus)
+			warn("The number of CPUs cannot be greater than the host (%ld)\n", host_cpus);
+		else
+			break;
+	}
 
 	// 检查 CPU 数量是否发生变化
 	if (strcmp(old_cpus, new_vm.cpus) != 0) {
@@ -738,7 +759,7 @@ void enter_vm_boot_type(int not_use)
 // vnc状态输入处理
 void enter_vm_vncstatus(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0) return;
 	char *msg = "Enter vnc: ";
 	char *opts[] = {
 		"on",
@@ -753,7 +774,7 @@ void enter_vm_vncstatus(int not_use)
 // 音频状态输入处理
 void enter_vm_audiostatus(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0) return;
 	char *msg = "Enter audio: ";
 	char *opts[] = {
 		"on",
@@ -768,7 +789,7 @@ void enter_vm_audiostatus(int not_use)
 // VNC密码输入处理
 void enter_vm_vncpassword(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC password (leave empty for no password): ";
 	printf("%s", msg);
 	bvm_gets(new_vm.vncpassword, sizeof(new_vm.vncpassword), BVM_ECHO);
@@ -778,7 +799,7 @@ void enter_vm_vncpassword(int not_use)
 // VNC wait选项输入处理
 void enter_vm_vncwait(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC wait: ";
 	char *opts[] = {
 		"on",
@@ -793,7 +814,7 @@ void enter_vm_vncwait(int not_use)
 // VNC绑定地址输入处理
 void enter_vm_vncbind(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC bind address (default 0.0.0.0): ";
 	while (1) {
 		printf("%s", msg);
@@ -816,7 +837,7 @@ void enter_vm_vncbind(int not_use)
 // vnc端口输入处理
 void enter_vm_vncport(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC port: ";
 	enter_numbers(msg, NULL, (char*)&new_vm.vncport);
 }
@@ -825,7 +846,7 @@ void enter_vm_vncport(int not_use)
 // vnc屏幕宽度输入处理
 void enter_vm_vncwidth(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC display width: ";
 	enter_numbers(msg, NULL, (char*)&new_vm.vncwidth);
 }
@@ -834,7 +855,7 @@ void enter_vm_vncwidth(int not_use)
 // vnc屏幕高度输入处理
 void enter_vm_vncheight(int not_use)
 {
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0) return;
 	char *msg = "Enter VNC display height: ";
 	enter_numbers(msg, NULL, (char*)&new_vm.vncheight);
 }
@@ -919,7 +940,7 @@ void enter_vm_bootdelay(int not_use)
 void enter_vm_tpmstatus(int not_use)
 {
 	// TPM需要UEFI模式
-	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "none") == 0) {
+	if (!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0) {
 		strcpy(new_vm.tpmstatus, "off");
 		return;
 	}
@@ -1995,16 +2016,35 @@ int bvm_gets(char *s, int len, char echo)
 // value： 作用的数据
 void enter_numbers(char *msg, char *unit, char *value)
 {
-	while (1) {
+	char str[BUFFERSIZE] = {0};
+	// 如果已有默认值，在提示信息中显示
+	if (strlen(value) > 0)
+		printf("%s [default: %s] ", msg, value);
+	else
 		printf("%s", msg);
-		fgets(value, sizeof(value), stdin);
-		value[strlen(value)-1] = '\0';
 
-		if (check_numbers(value, unit) == RET_SUCCESS) {
+	while (1) {
+		//printf("%s", msg);
+		if (fgets(str, sizeof(str), stdin) == NULL) continue;
+		str[strlen(str)-1] = '\0';
+
+		// 如果输入为空，且有默认值，则使用默认值
+		if (strlen(str) == 0 && strlen(value) > 0) {
 			break;
 		}
-		else
+
+		if (check_numbers(str, unit) == RET_SUCCESS) {
+			strcpy(value, str);
+			break;
+		}
+		else {
 			warn("input invalid\n");
+			// 再次提示
+			if (strlen(value) > 0)
+				printf("%s [default: %s]", msg, value);
+			else
+				printf("%s", msg);
+		}
 	}
 	strtolower(value);
 }
@@ -2061,6 +2101,18 @@ void enter_options(char *msg, char **opt, char **opt_desc, char *value)
 	min = 0;
 
 	printf("%s\n", msg);
+	
+	// 查找当前value对应的索引作为默认项
+	int default_idx = -1;
+	if (strlen(value) > 0) {
+		for (int i = 0; i <= max; i++) {
+			if (strcmp(opt[i], value) == 0) {
+				default_idx = i;
+				break;
+			}
+		}
+	}
+
 	while (1) {
 		
 		int n = 0;
@@ -2074,11 +2126,26 @@ void enter_options(char *msg, char **opt, char **opt_desc, char *value)
 			++n;
 		}
 
-		printf("%s", msg);
+		//printf("%s", msg);
+		if (default_idx >= 0)
+			printf("%s [default: %c]: ", msg, options[default_idx]);
+		else
+			printf("%s: ", msg);
 
-		char str[8];
+		char str[32];
 		fgets(str, sizeof(str), stdin);
 		str[strlen(str) - 1] = '\0';
+
+		// 处理直接回车的情况
+		if (strlen(str) == 0) {
+			if (default_idx >= 0) {
+				strcpy(value, opt[default_idx]);
+				break;
+			} else {
+				//warn("input invalid\n"); // 只有在没有默认值时才警告，或者也可以选择忽略
+				continue;
+			}
+		}
 
 		int idx;
 		if ((idx = check_options(min, max, str)) >= 0) {

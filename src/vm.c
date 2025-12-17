@@ -1407,16 +1407,27 @@ void vm_create(char *vm_name, char *template_vm_name)
 		return;
 	}
 
-	if (template_vm_name && (find_vm_list(template_vm_name) == NULL)) {
-		error("%s does not exist\n", template_vm_name);
-		return;
+	char template_path[FN_MAX_LEN] = {0};
+
+	if (template_vm_name) {
+		if (find_vm_list(template_vm_name) == NULL) {
+			// Check if it is a template in /usr/local/etc/bvm/templates/
+			sprintf(template_path, "/usr/local/etc/bvm/templates/%s.conf", template_vm_name);
+			if (access(template_path, R_OK) != 0) {
+				error("Template or VM '%s' does not exist\n", template_vm_name);
+				return;
+			}
+		}
 	}
 
 	create_init();
 	welcome();
 
 	if (template_vm_name) {
-		load_vm_info(template_vm_name, &new_vm);
+		if (strlen(template_path) > 0)
+			load_vm_config_from_path(template_path, &new_vm);
+		else
+			load_vm_info(template_vm_name, &new_vm);
 		strcpy(new_vm.name, vm_name);
 		// 清空模板的 UEFI vars 路径，让新 VM 首次启动时自动创建
 		if (strlen(new_vm.uefi_vars) > 0) {
@@ -1841,11 +1852,21 @@ void vm_login(char *vm_name)
 
 	// bhyve 现在虽已经支持 uefi 控制台登录，但还是用vnc登录比较稳定，
 	// 有的系统是完全可以控制台登录，但有的系统则不行
-	// 这里做一个警告不保证控制台登录能成功
+	// 这里做一个警告不保证控制台登录能成功,windows禁止登录
 	if (strcmp(p->vm.boot_type, "grub") != 0) {
-		warn("UEFI mode may not support console login.\n");
-		warn("If login fails, please use VNC or SSH.\n");
-		sleep(1);
+		char ostype_temp[32];
+		strncpy(ostype_temp, p->vm.ostype, sizeof(ostype_temp) - 1);
+		ostype_temp[sizeof(ostype_temp) - 1] = '\0';
+
+		if (strstr(strtolower(ostype_temp), "win") != NULL) {
+			warn("Windows does not support console login.\n");
+			warn("Please use VNC to login.\n");
+		}
+		else {
+			warn("UEFI mode may not support console login.\n");
+			warn("If login fails, please use VNC or SSH to login.\n");
+			sleep(1);
+		}
 	}
 
 	if (get_vm_status(vm_name) == VM_ON) { 
@@ -3024,11 +3045,9 @@ void sort_vm_list(int type)
 }
 
 // 载入vm配置信息
-void load_vm_info(char *vm_name, vm_stru *vm)
+// 从指定路径载入vm配置信息
+void load_vm_config_from_path(char *filename, vm_stru *vm)
 {
-	char filename[FN_MAX_LEN];
-	sprintf(filename, "%s%s/%s.conf", vmdir, vm_name, vm_name);
-
 	init_config(filename);
 	
 	char *value;
@@ -3101,7 +3120,7 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 	if ((value = get_value_by_name("vm_hostbridge")) != NULL)
 		strcpy(vm->hostbridge, value);
 
-	// Config Migration: Check for vm_boot_type first, then fallback to vm_uefi
+	// 配置迁移：首先检查 vm_boot_type，然后回退到 vm_uefi
 	if ((value = get_value_by_name("vm_boot_type")) != NULL) {
 		strcpy(vm->boot_type, value);
 		if (strcmp(vm->boot_type, "none") == 0) strcpy(vm->boot_type, "grub");
@@ -3275,6 +3294,14 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 		strcpy(vm->share_ro, "off");
 
 	free_config();
+}
+
+// 载入vm配置信息
+void load_vm_info(char *vm_name, vm_stru *vm)
+{
+	char filename[FN_MAX_LEN];
+	sprintf(filename, "%s%s/%s.conf", vmdir, vm_name, vm_name);
+	load_vm_config_from_path(filename, vm);
 }
 
 // 写入vm配置信息
