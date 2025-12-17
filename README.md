@@ -122,6 +122,24 @@ Answer: You can create a new virtual machine in three ways:
         - newname: Name of new VM
     This command will copy the template VM's configuration to the new VM for customization.
 
+    Standard templates available:
+        - freebsd (FreeBSD standard configuration)
+        - linux   (Linux standard configuration)
+        - windows (Windows standard configuration)
+
+    You can also use any existing VM name as a template.
+
+    Optional parameters for template creation:
+        -s          Set boot type to grub
+        -U=N        Set CPU count (e.g. -U=4)
+        -m=SIZE     Set memory size (e.g. -m=512m, -m=2g)
+        -d=SIZE     Set first disk size (e.g. -d=10g, -d=1t)
+        -n=MODE     Set network mode (bridge or nat)
+        -i=NIC      Set bind NIC (e.g. -i=em0)
+
+    Example:
+        bvm --create myvm from linux -s -U=4 -m=512m -d=10g -n=bridge -i=em0
+
     3. Clone an existing VM:
 
         bvm --clone oldname newname

@@ -1399,7 +1399,8 @@ void vm_autoboot_list()
 
 // 新建vm
 // template_vm_name为模板虚拟机名称
-void vm_create(char *vm_name, char *template_vm_name)
+// opts为命令行配置选项(仅用于--create from场景)
+void vm_create(char *vm_name, char *template_vm_name, create_opts_stru *opts)
 {
 	vm_node *p;
 	if ((p = find_vm_list(vm_name)) != NULL) {
@@ -1444,6 +1445,43 @@ void vm_create(char *vm_name, char *template_vm_name)
 		strcpy(new_vm.bootfrom, "cd0");
 		// 自动设置 vncwait 为 on
 		strcpy(new_vm.vncwait, "on");
+
+		// 应用命令行参数覆盖模板配置
+		if (opts) {
+			// -s 启动类型为 grub
+			if (opts->use_grub) {
+				strcpy(new_vm.boot_type, "grub");
+			}
+			// -U=N CPU数量
+			if (strlen(opts->cpus) > 0) {
+				strcpy(new_vm.cpus, opts->cpus);
+				// 同时更新 CPU 拓扑为默认值
+				strcpy(new_vm.sockets, "1");
+				strcpy(new_vm.cores, opts->cpus);
+				strcpy(new_vm.threads, "1");
+			}
+			// -m=SIZE 内存大小
+			if (strlen(opts->ram) > 0) {
+				strcpy(new_vm.ram, opts->ram);
+			}
+			// -d=SIZE 第一块磁盘大小
+			if (strlen(opts->disk_size) > 0) {
+				strcpy(new_vm.vdisk[0].size, opts->disk_size);
+			}
+			// -n=MODE 网络模式
+			if (strlen(opts->netmode) > 0) {
+				strcpy(new_vm.nic[0].netmode, opts->netmode);
+				// 如果是 Bridged 模式，清空 NAT 设置
+				if (strcmp(opts->netmode, "Bridged") == 0) {
+					strcpy(new_vm.nic[0].nat, "");
+				}
+			}
+			// -i=NIC 绑定网卡
+			if (strlen(opts->bind_nic) > 0) {
+				strcpy(new_vm.nic[0].bind, opts->bind_nic);
+			}
+		}
+
 		edit_vm(NULL);
 	}
 	else

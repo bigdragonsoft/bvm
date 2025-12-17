@@ -261,6 +261,17 @@ struct _autoboot_stru {
 typedef struct _autoboot_stru autoboot_stru;
 typedef void *(*fun)(void*);
 
+// 命令行配置选项结构体 (用于 --create from 命令)
+struct _create_opts_stru {
+	int  use_grub;		// -s 启动类型为 grub
+	char cpus[8];		// -U=N CPU 数量
+	char ram[32];		// -m=SIZE 内存大小
+	char disk_size[32];	// -d=SIZE 第一块磁盘大小
+	char netmode[32];	// -n=bridge/nat 网络模式
+	char bind_nic[32];	// -i=NIC 绑定网卡
+};
+typedef struct _create_opts_stru create_opts_stru;
+
 char *bvm_strcpy(char *dst, const char *src);
 int  write_log_time();
 int  write_log(char *fmt, ...);
@@ -271,7 +282,7 @@ void auto_fix_conf(char *conf_file, char *key, char *value);
 void vm_init();
 void vm_end();
 
-void vm_create(char *vm_name, char *template_vm_name);
+void vm_create(char *vm_name, char *template_vm_name, create_opts_stru *opts);
 void vm_config(char *vm_name);
 void vm_start(char *vm_name);
 void vm_login(char *vm_name);

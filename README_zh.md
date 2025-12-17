@@ -122,6 +122,24 @@ Options:
         - newname: 新虚拟机名称
     该命令将复制模板虚拟机的配置到新虚拟机中进行定制。
 
+    可用标准模板：
+        - freebsd (FreeBSD 标准配置)
+        - linux   (Linux 标准配置)
+        - windows (Windows 标准配置)
+
+    您也可以使用任何现有的虚拟机名称作为模板。
+
+    模板创建的可选参数：
+        -s          设置启动类型为 grub
+        -U=N        设置 CPU 数量（例如 -U=4）
+        -m=SIZE     设置内存大小（例如 -m=512m、-m=2g）
+        -d=SIZE     设置第一块磁盘大小（例如 -d=10g、-d=1t）
+        -n=MODE     设置网络模式（bridge 或 nat）
+        -i=NIC      设置绑定网卡（例如 -i=em0）
+
+    示例：
+        bvm --create myvm from linux -s -U=4 -m=512m -d=10g -n=bridge -i=em0
+
     3. 克隆现有虚拟机：
 
         bvm --clone oldname newname

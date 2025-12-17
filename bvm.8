@@ -13,7 +13,7 @@
 .Nm
 .Cm --create
 .Ar name
-.Op Cm from Ar template-name
+.Op Cm from Ar template-name Op Fl s | Fl U Ns = Ns Ar N | Fl m Ns = Ns Ar SIZE | Fl d Ns = Ns Ar SIZE | Fl n Ns = Ns Ar MODE | Fl i Ns = Ns Ar NIC
 .Nm
 .Cm --config
 .Ar name
@@ -302,12 +302,43 @@ Note: FreeBSD 14 guests lack virtio_p9fs support; FreeBSD 15+ has full support.
 This option allows you to configure the networking of virtual machines.
 Supports Bridge, NAT, and Switch network modes with built-in DHCP server.
 .El
-.It Cm --create Ar name Op Cm from Ar template-name
+.It Cm --create Ar name Op Cm from Ar template-name Op options
 Create a new virtual machine.
 .Bd -literal -offset indent
 # bvm --create vm1
 # bvm --create vm2 from vm1
+# bvm --create vm3 from Linux -s -U=4 -m=512m -d=10g -n=bridge -i=em0
 .Ed
+.Pp
+Standard templates available:
+.Bl -tag -width 10n
+.It freebsd
+FreeBSD standard configuration.
+.It linux
+Linux standard configuration.
+.It windows
+Windows standard configuration.
+.El
+.Pp
+You can also use any existing VM name as a template.
+.Pp
+When using
+.Cm from
+to create from a template, optional parameters can override template settings:
+.Bl -tag -width 10n
+.It Fl s
+Set boot type to grub.
+.It Fl U Ns = Ns Ar N
+Set CPU count (e.g. -U=4).
+.It Fl m Ns = Ns Ar SIZE
+Set memory size (e.g. -m=512m, -m=2g).
+.It Fl d Ns = Ns Ar SIZE
+Set first disk size (e.g. -d=10g, -d=1t).
+.It Fl n Ns = Ns Ar MODE
+Set network mode (bridge or nat).
+.It Fl i Ns = Ns Ar NIC
+Set bind NIC (e.g. -i=em0).
+.El
 .It Cm --deldisk Ar name
 Delete the disks in the virtual machine.
 .It Cm --decrypt Ar name

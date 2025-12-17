@@ -50,61 +50,77 @@ void usage()
 {
 	char *help[] = {
 		"Usage:	${name} <options> [args...]",
-		"Options:",
-		"	--abinfo	Display information about auto-boot VMs",
-		"	--addisk	Add a new disk to VM",
-		"	--addnat	Add NAT",
-		"	--addswitch	Add Switch",
-		"	--autoboot	Auto-boot VMs",
-		"	--clone		Clone VM",
-		"	--config	Configure VM",
+		"",
+		"VM Management Options:",
 		"	--create	Create new VM",
-		"	--deldisk	Delete a disk",
-		"	--delnat	Delete NAT",
-		"	--delswitch	Delete Switch",
-		"	--swinfo	Output Switch info",
-		"	--decrypt	Decrypt VM",
-		"	--encrypt	Encrypt VM",	
-		"	--login		Log in to VM",
-		"	--ls		List VMs and status",
-		"	--ll		List VMs and status in long format",
-		"	--netstats	Show VM network status",
-		"	--natinfo	Output NAT info",
-		"	--lock		Lock VM",
-		"	--lockall	Lock all VMs",
-		"	--os		Output OS list",
-		"	--poweroff	Force power off",
-		"	--reload-nat	Reload NAT redirect port",
-		"	--remove	Destroy VM",
-		"	--rename	Rename VM",
+		"",
+		"	        	Usage: ${name} --create <name> [from <template|vm> [options]]",
+		"	        	Standard templates: freebsd, linux, windows",
+		"	        	Or use an existing VM name as a template",
+		"	        	Options: -s(grub), -U=cpus, -m=mem, -d=disk, -n=net, -i=bind_nic",
+		"",
+		"	--start		Start VM",
+		"	--stop		Stop VM (ACPI shutdown)",
+		"	--poweroff	Force power off VM",
 		"	--restart	Restart VM",
 		"	--reboot	Restart VM (alias for --restart)",
-		"	--rollback	Roll back to snapshot point",
 		"	--set-hd-boot	Set VM to boot from hard disk",
-		"	--setnat	Set NAT IP address",
-		"	--setsw		Set Switch IP address",
-		"	--setpr		Set port redirection list",
-		"	--showpr	Show port redirection list",
-		"	--showdev	Show device",
-		"	--showdevall	Show all devices in class mode",
-		"	--showdevuse	Show all devices in simple mode",
-		"	--showdhcp	Show all DHCP clients",
-		"	--showsnap	Show snapshot list of VM",
-		"	--showsnapall	Show snapshot list of all VMs",
-		"	--showstats	Show VM stats",
-		"	--snapshot	Generate snapshot for VM",
-		"	--start		Start VM",
-		"	--stop		Stop VM",
+		"	--login		Log in to VM console (for grub boot)",
+		"	--config	Configure VM settings (cpus, ram, disk, network, etc.)",
+		"	--clone		Clone VM to a new one",
+		"	--remove	Destroy VM(s) permanently",
+		"	--rename	Rename VM",
+		"	--vminfo	Display detailed VM configuration info",
+		"	--ls		List VMs (short format)",
+		"	--ll		List VMs (long format)",
+		"	--showstats	Show VM resource usage statistics",
+		"	--os		List supported OS types",
+		"",
+		"VM Operation & Security:",
+		"	--autoboot	Start all auto-boot enabled VMs",
+		"	--abinfo	Show auto-boot configuration",
+		"	--lock		Lock VM (prevent accidental deletion/modification)",
 		"	--unlock	Unlock VM",
+		"	--lockall	Lock all VMs",
 		"	--unlockall	Unlock all VMs",
+		"	--encrypt	Encrypt VM data",
+		"	--decrypt	Decrypt VM data",
+		"",
+		"Storage & Snapshot Options:",
+		"	--addisk	Add a new disk to VM",
+		"	--deldisk	Delete a disk from VM",
+		"	--snapshot	Create a snapshot of VM",
+		"	--rollback	Rollback VM to a snapshot",
+		"	--showsnap	Show snapshots of a VM",
+		"	--showsnapall	Show snapshots of all VMs",
+		"",
+		"Network Management (NAT & Switch):",
+		"	--netstats	Show VM network status",
+		"	--natinfo	Show NAT configuration info",
+		"	--addnat	Add a new NAT interface",
+		"	--delnat	Delete a NAT interface",
+		"	--setnat	Set NAT IP address",
+		"	--reload-nat	Reload NAT port redirection rules",
+		"	--swinfo	Show Switch configuration info",
+		"	--addswitch	Add a new Switch",
+		"	--delswitch	Delete a Switch",
+		"	--setsw		Set Switch IP address",
 		"	--unsetsw	Unset Switch IP address",
-		"	--vminfo	Output VM info",
-		"	",
+		"	--setpr		Set port redirection (dynamic)",
+		"	--showpr	Show active port redirection rules",
+		"	--showdhcp	Show DHCP client leases",
+		"	--showdev	Show network device mapping",
+		"	--showdevall	Show all network devices (class mode)",
+		"	--showdevuse	Show all network devices (simple mode)",
+		"",
 		"Example:",
-		"	${name} --start vmname",
-		"	${name} --clone oldname newname",
+		"	${name} --create vm1 from linux -U=4 -m=4g -d=20g",
+		"	${name} --start vm1",
 		"	${name} --ls",
 		"	${name} --ll online",
+		"	${name} --vminfo vm1",
+		"",
+		"For more details, please read 'man ${name}'",
 		NULL};
 
 	int n = 0;
@@ -214,17 +230,122 @@ int main(int argc, char *argv[])
 			break;
 
 		case 'C': //create
-			if (argv[optind]) {
-				if (strcmp(strtolower(argv[optind]), "from") == 0)
-					if (argv[optind + 1]) {
-						vm_create(optarg, argv[optind + 1]);
-						break;
-					}
-				error("Invalid parameters.\n");
-				err_exit();
+		{
+			create_opts_stru opts = {0};
+			char *template_name = NULL;
+			int has_from = 0;
+
+			// 检查是否有 "from" 关键字
+			if (argv[optind] && strcmp(strtolower(argv[optind]), "from") == 0) {
+				has_from = 1;
+				if (argv[optind + 1]) {
+					template_name = argv[optind + 1];
+					optind += 2; // 跳过 "from" 和模板名称
+				} else {
+					error("Invalid parameters.\n");
+					err_exit();
+				}
 			}
-			else
-				vm_create(optarg, NULL);
+
+			// 如果使用模板创建，解析额外的配置参数
+			if (has_from) {
+				while (argv[optind] && argv[optind][0] == '-') {
+					char *arg = argv[optind];
+					
+					// -s 启动类型为 grub
+					if (strcmp(arg, "-s") == 0) {
+						opts.use_grub = 1;
+					}
+					// -U=N CPU数量
+					else if (strncmp(arg, "-U=", 3) == 0) {
+						char *val = arg + 3;
+						// 验证: 必须是正整数
+						int cpu_num = atoi(val);
+						if (cpu_num <= 0 || val[0] == '\0') {
+							error("Invalid CPU count: %s (must be a positive integer)\n", arg);
+							err_exit();
+						}
+						strcpy(opts.cpus, val);
+					}
+					// -m=SIZE 内存大小
+					else if (strncmp(arg, "-m=", 3) == 0) {
+						char *val = arg + 3;
+						// 验证: 必须是数字+单位(m/g)
+						int len = strlen(val);
+						if (len < 2) {
+							error("Invalid memory size: %s (e.g. 512m, 2g)\n", arg);
+							err_exit();
+						}
+						char unit = tolower(val[len-1]);
+						if (unit != 'm' && unit != 'g') {
+							error("Invalid memory size: %s (unit must be m or g)\n", arg);
+							err_exit();
+						}
+						// 验证数字部分
+						for (int i = 0; i < len - 1; i++) {
+							if (!isdigit(val[i])) {
+								error("Invalid memory size: %s (must be number+unit)\n", arg);
+								err_exit();
+							}
+						}
+						strcpy(opts.ram, val);
+					}
+					// -d=SIZE 磁盘大小
+					else if (strncmp(arg, "-d=", 3) == 0) {
+						char *val = arg + 3;
+						// 验证: 必须是数字+单位(m/g/t)
+						int len = strlen(val);
+						if (len < 2) {
+							error("Invalid disk size: %s (e.g. 10g, 1t)\n", arg);
+							err_exit();
+						}
+						char unit = tolower(val[len-1]);
+						if (unit != 'm' && unit != 'g' && unit != 't') {
+							error("Invalid disk size: %s (unit must be m, g or t)\n", arg);
+							err_exit();
+						}
+						// 验证数字部分
+						for (int i = 0; i < len - 1; i++) {
+							if (!isdigit(val[i])) {
+								error("Invalid disk size: %s (must be number+unit)\n", arg);
+								err_exit();
+							}
+						}
+						strcpy(opts.disk_size, val);
+					}
+					// -n=MODE 网络模式
+					else if (strncmp(arg, "-n=", 3) == 0) {
+						char *val = arg + 3;
+						// 验证: 必须是 bridge 或 nat
+						if (strcasecmp(val, "bridge") == 0) {
+							strcpy(opts.netmode, "Bridged");
+						} else if (strcasecmp(val, "nat") == 0) {
+							strcpy(opts.netmode, "NAT");
+						} else {
+							error("Invalid network mode: %s (must be bridge or nat)\n", arg);
+							err_exit();
+						}
+					}
+					// -i=NIC 绑定网卡
+					else if (strncmp(arg, "-i=", 3) == 0) {
+						char *val = arg + 3;
+						// 验证: 非空
+						if (strlen(val) == 0) {
+							error("Invalid bind NIC: %s (cannot be empty)\n", arg);
+							err_exit();
+						}
+						strcpy(opts.bind_nic, val);
+					}
+					else {
+						error("Unknown option: %s\n", arg);
+						err_exit();
+					}
+					optind++;
+				}
+			}
+
+			vm_create(optarg, template_name, has_from ? &opts : NULL);
+		}
 			break;
 
 		case 'e': //config
