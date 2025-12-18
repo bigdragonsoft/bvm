@@ -204,6 +204,8 @@ void show_network_config()
 
 	int n = 0;
 	int index = 0;
+	int max_options = strlen(options);  // 62 个字符 (0-9, a-z, A-Z)
+	
 	while (networkmenu[n].func) {
 		if ((networkmenu[n].func == enter_vm_netmode_proc && atoi(new_vm.nics) < networkmenu[n].arg + 1) ||
 		    (networkmenu[n].func == enter_vm_rpstatus_proc && strcmp(new_vm.nic[networkmenu[n].arg].netmode, "NAT") != 0) ||
@@ -218,6 +220,13 @@ void show_network_config()
 		   );
 		else {
 			if (networkmenu[n].edit != -1) {
+				// 检查是否超出可用选项字符范围
+				if (index >= max_options) {
+					error("Too many network menu items (%d) exceeds available options (%d)\n", 
+					      index + 1, max_options);
+					exit(1);
+				}
+				
 				network_sel[index] = &networkmenu[n];
 				
 				//根据网络模式的不同，变更对于bind的不同描述

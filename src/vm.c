@@ -1606,7 +1606,11 @@ void adjust_vm_disk(vm_stru *vm, char *size, int disk_ord)
 	if (support_zfs() && strcmp(vm->zfs, "on") == 0) {
 		if (offset > 0) {
 			// ZFS 扩容确认
-			warn("NOTE: After expanding, you need to extend the partition inside the VM to use the new space.\n");
+			warn("NOTE: After expanding the disk, you need to:\n");
+			warn("  1. Fix the partition table (e.g., GPT backup header)\n");
+			warn("  2. Resize the partition to use the new space\n");
+			warn("  3. Extend the filesystem\n");
+			warn("Refer to your guest OS documentation for specific commands.\n");
 			WARN("Enter 'YES' to confirm expanding disk(%d) from %s to %s: ", n, p, newp);
 			
 			char confirm[16];
@@ -1655,7 +1659,11 @@ void adjust_vm_disk(vm_stru *vm, char *size, int disk_ord)
 		if (offset > 0) {
 			// 磁盘扩容 - 确认
 			warn("\n");
-			warn("NOTE: After expanding, you need to extend the partition inside the VM to use the new space.\n");
+			warn("NOTE: After expanding the disk, you need to:\n");
+			warn("  1. Fix the partition table (e.g., GPT backup header)\n");
+			warn("  2. Resize the partition to use the new space\n");
+			warn("  3. Extend the filesystem\n");
+			warn("Refer to your guest OS documentation for specific commands.\n");
 			WARN("Enter 'YES' to confirm expanding disk(%d) from %s to %s: ", n, p, newp);
 			
 			char confirm[16];
@@ -2208,7 +2216,12 @@ void vm_info_all(char *vm_name)
 	printf("%-13s = %s\n",	"vm_ostype", 	p->vm.ostype);
 	printf("%-13s = %s\n",	"vm_version", 	p->vm.version);
 	printf("%-13s = %s\n",	"vm_cdstatus", 	p->vm.cdstatus);
-	printf("%-13s = %s\n",	"vm_iso", 	p->vm.iso);
+	printf("%-13s = %s\n",	"vm_cds", 	p->vm.cds);
+	for (int n=0; n<atoi(p->vm.cds); n++) {
+		char t[32];
+		sprintf(t, "vm_cd%d_iso", n);
+		printf("%-13s = %s\n", t, p->vm.cd_iso[n]);
+	}
 	printf("%-13s = %s\n",	"vm_bootfrom", 	p->vm.bootfrom);
 	printf("%-13s = %s\n",	"vm_hostbridge",p->vm.hostbridge);
 	printf("%-13s = %s\n",	"vm_boot_type",	p->vm.boot_type);
@@ -2325,8 +2338,14 @@ void vm_info(char *vm_name)
 	*/
 
 	printf("%-14s : %s\n", "cd status", 		p->vm.cdstatus);
-	if (strcmp(p->vm.cdstatus, "on") == 0)
-		printf("|-%-12s : %s\n", "iso path",	p->vm.iso);
+	if (strcmp(p->vm.cdstatus, "on") == 0) {
+		printf("|-%-12s : %s\n", "cd numbers",	p->vm.cds);
+		for (int n=0; n<atoi(p->vm.cds); n++) {
+			char t[32];
+			sprintf(t, "cd(%d) iso", n);
+			printf("|-%-12s : %s\n", t, p->vm.cd_iso[n]);
+		}
+	}
 	printf("%-14s : %s\n", "boot from", 		p->vm.bootfrom);
 	printf("%-14s : %s\n", "hostbridge", 		p->vm.hostbridge);
 	printf("%-14s : %s\n", "boot type", 			p->vm.boot_type);
@@ -2428,8 +2447,8 @@ void vm_boot_from_hd(char *vm_name)
 
 	// 设置从hd启动
 	strcpy(p->vm.bootfrom, "hd0");
-	// 自动关闭光驱，防止再次从安装盘启动
-	strcpy(p->vm.cdstatus, "off");
+	// 多 CD 模式：保持光驱有效，仅切换启动介质到硬盘
+	// 用户可以随时挂载资料 ISO 使用
 
 	// 如果是 UEFI 模式，安装完成后通常无需等待 VNC 连接
 	if (strcmp(p->vm.boot_type, "grub") != 0) {
@@ -2506,11 +2525,53 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 	sprintf(str, "%s%s%s", vmdir, dst_vm_name, "/device.map");
 	strcpy(vm.devicemap, str);
 
-	// 清空 UEFI vars 路径，让首次启动时自动创建全新的 vars 文件
-	// 这样可以避免克隆后的 VM 启动项与源 VM 冲突
+	// 克隆源 VM 的 UEFI vars 文件
+	// 由于 booter.c 中设备 slot 固定（HD 在 slot 2，CD 在 HD 之后），
+	// 克隆后的 VM 设备路径与源 VM 相同，因此可以直接复制 efivars.fd
 	if (strlen(vm.uefi_vars) > 0) {
-		strcpy(vm.uefi_vars, "");
-		write_log("Cleared UEFI vars path for cloned VM %s, will auto-create on first boot", dst_vm_name);
+		char src_vars[FN_MAX_LEN];
+		char dst_vars[FN_MAX_LEN];
+		sprintf(src_vars, "%s", p_src->vm.uefi_vars);
+		sprintf(dst_vars, "%s%s/efivars.fd", vmdir, dst_vm_name);
+		
+		// 尝试复制源 VM 的 efivars.fd
+		if (access(src_vars, R_OK) == 0) {
+			char cp_cmd[1024];
+			sprintf(cp_cmd, "cp %s %s", src_vars, dst_vars);
+			if (system(cp_cmd) == 0) {
+				strcpy(vm.uefi_vars, dst_vars);
+				write_log("Cloned UEFI vars from %s to %s", src_vm_name, dst_vm_name);
+			} else {
+				// 复制失败，回退到使用空模板
+				char template_vars[] = "/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd";
+				if (access(template_vars, R_OK) == 0) {
+					sprintf(cp_cmd, "cp %s %s", template_vars, dst_vars);
+					if (system(cp_cmd) == 0) {
+						strcpy(vm.uefi_vars, dst_vars);
+						write_log("Created new UEFI vars for cloned VM %s from template (fallback)", dst_vm_name);
+					} else {
+						strcpy(vm.uefi_vars, "");
+					}
+				} else {
+					strcpy(vm.uefi_vars, "");
+				}
+			}
+		} else {
+			// 源 vars 不存在，使用空模板
+			char template_vars[] = "/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd";
+			if (access(template_vars, R_OK) == 0) {
+				char cp_cmd[1024];
+				sprintf(cp_cmd, "cp %s %s", template_vars, dst_vars);
+				if (system(cp_cmd) == 0) {
+					strcpy(vm.uefi_vars, dst_vars);
+					write_log("Created new UEFI vars for cloned VM %s from template", dst_vm_name);
+				} else {
+					strcpy(vm.uefi_vars, "");
+				}
+			} else {
+				strcpy(vm.uefi_vars, "");
+			}
+		}
 	}
 
 	// 清空所有网卡的 MAC 地址，让首次启动时自动生成
@@ -2782,7 +2843,7 @@ void vm_add_disk(char *vm_name)
 	}
 	char msg[BUFFERSIZE];
 	sprintf(msg, "Enter new vm disk(%d) size (e.g. 5g): ", new_disk_ord);
-	char disk_size[32];
+	char disk_size[32] = {0};  // 初始化为空字符串，避免乱码
 	enter_numbers(msg, "mMgGtT", (char*)&disk_size);
 
 	//char *img = &p->vm.imgsize + new_disk_ord * disk_offset(&p->vm);
@@ -3219,8 +3280,28 @@ void load_vm_config_from_path(char *filename, vm_stru *vm)
 		strcpy(vm->cdstatus, value);
 	else
 		strcpy(vm->cdstatus, "on");
-	if ((value = get_value_by_name("vm_iso")) != NULL)
+	
+	// 多 CD 支持
+	if ((value = get_value_by_name("vm_cds")) != NULL)
+		strcpy(vm->cds, value);
+	else
+		strcpy(vm->cds, "1");  // 默认 1 个 CD
+	
+	for (int n=0; n<atoi(vm->cds); n++) {
+		if (n >= CD_NUM) break;
+		sprintf(str, "vm_cd%d_iso", n);
+		if ((value = get_value_by_name(str)) != NULL)
+			strcpy(vm->cd_iso[n], value);
+	}
+	
+	// 向后兼容：如果 vm_iso 存在但 cd_iso[0] 为空，迁移旧配置
+	if ((value = get_value_by_name("vm_iso")) != NULL) {
 		strcpy(vm->iso, value);
+		if (strlen(vm->cd_iso[0]) == 0 && strlen(vm->iso) > 0) {
+			strcpy(vm->cd_iso[0], vm->iso);
+		}
+	}
+	
 	if ((value = get_value_by_name("vm_bootfrom")) != NULL)
 		strcpy(vm->bootfrom, value);
 	if ((value = get_value_by_name("vm_hostbridge")) != NULL)
@@ -3482,8 +3563,22 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	fputs(str, fp);
 	sprintf(str, "vm_cdstatus=%s\n", vm->cdstatus);
 	fputs(str, fp);
-	sprintf(str, "vm_iso=%s\n", vm->iso);
+	
+	// 多 CD 支持
+	sprintf(str, "vm_cds=%s\n", vm->cds);
 	fputs(str, fp);
+	for (int n=0; n<atoi(vm->cds); n++) {
+		sprintf(str, "vm_cd%d_iso=%s\n", n, vm->cd_iso[n]);
+		fputs(str, fp);
+	}
+	
+	// 向后兼容：同时保存 vm_iso（使用第一个 CD 的路径）
+	if (atoi(vm->cds) > 0 && strlen(vm->cd_iso[0]) > 0)
+		sprintf(str, "vm_iso=%s\n", vm->cd_iso[0]);
+	else
+		sprintf(str, "vm_iso=%s\n", vm->iso);
+	fputs(str, fp);
+	
 	sprintf(str, "vm_bootfrom=%s\n", vm->bootfrom);
 	fputs(str, fp);
 	sprintf(str, "vm_hostbridge=%s\n", vm->hostbridge);

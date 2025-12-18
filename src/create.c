@@ -85,6 +85,11 @@ char *options = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
  */
 void create_init()
 {
+	// 清空菜单数组和 new_vm，避免残留数据影响
+	memset(tbl, 0, sizeof(tbl));
+	memset(sel, 0, sizeof(sel));
+	memset(&new_vm, 0, sizeof(new_vm));
+	
 	/*-----table--desc------------value-----------------------------func--------------------arg-----edit----submenu*/
 	add_item(tbl, "name",	      (char*)&new_vm.name,		enter_vm_name, 		0,	0,	0);
 	add_item(tbl, "os",	      (char*)&new_vm.ostype, 		enter_vm_ostype,    	0,	0,	0);
@@ -93,7 +98,11 @@ void create_init()
 	add_item(tbl, "ram", 	      (char*)&new_vm.ram,      		enter_vm_ram,        	0,	1,	0);
 	
 	add_item(tbl, "CD",	      (char*)&new_vm.cdstatus,      	enter_vm_cdstatus, 	0,	1,	0);
-	add_item(tbl, "iso path",     (char*)&new_vm.iso,      		enter_vm_iso, 		0,	1,	0);
+	add_item(tbl, "cd numbers",   (char*)&new_vm.cds,		enter_vm_cds, 		0,	1,	0);
+	add_item(tbl, "cd(0) iso",    (char*)&new_vm.cd_iso[0],		enter_vm_cd_iso, 	0,	1,	0);
+	add_item(tbl, "cd(1) iso",    (char*)&new_vm.cd_iso[1],		enter_vm_cd_iso, 	1,	1,	0);
+	add_item(tbl, "cd(2) iso",    (char*)&new_vm.cd_iso[2],		enter_vm_cd_iso, 	2,	1,	0);
+	add_item(tbl, "cd(3) iso",    (char*)&new_vm.cd_iso[3],		enter_vm_cd_iso, 	3,	1,	0);
 	add_item(tbl, "boot from",    (char*)&new_vm.bootfrom, 		enter_vm_bootfrom, 	0,	1,	0);
 	add_item(tbl, "boot type",    (char*)&new_vm.boot_type, 		enter_vm_boot_type, 	0,	0,	0);
 	add_item(tbl, "TPM (UEFI)",   (char*)&new_vm.tpmstatus, 	enter_vm_tpmstatus,	0,	1,	0);
@@ -266,11 +275,17 @@ int check_enter_valid()
 			return -1;
 		}		
 	}
-	if (strcmp(new_vm.cdstatus, "on") == 0)
-	       if (strlen(new_vm.iso) == 0) {
-		       warn("iso path invalid\n");
-		       return -1;
-	       }
+	if (strcmp(new_vm.cdstatus, "on") == 0) {
+		if (atoi(new_vm.cds) < 1) {
+			warn("cd numbers invalid\n");
+			return -1;
+		}
+		// 检查至少第一个 CD 有 ISO 路径
+		if (strlen(new_vm.cd_iso[0]) == 0) {
+			warn("cd(0) iso path invalid\n");
+			return -1;
+		}
+	}
 
 	if (strcmp(new_vm.share_status, "on") == 0) {
 		if (strlen(new_vm.share_name) == 0) {
@@ -371,7 +386,9 @@ int is_non_show_item(int item)
 	int n = item;
 	return
 	((tbl[n].func == enter_vm_version && strcmp(new_vm.ostype, "OpenBSD") != 0) ||
-	(tbl[n].func == enter_vm_iso && strcmp(new_vm.cdstatus, "off") == 0) ||
+	(tbl[n].func == enter_vm_cds && strcmp(new_vm.cdstatus, "off") == 0) ||
+	// 根据 CD 数量决定显示哪些 CD ISO 项
+	(tbl[n].func == enter_vm_cd_iso && (strcmp(new_vm.cdstatus, "off") == 0 || tbl[n].arg >= atoi(new_vm.cds))) ||
 	 (tbl[n].func == enter_vm_boot_type && !support_uefi(new_vm.ostype)) ||
 	 (tbl[n].func == enter_vm_tpmstatus && 
 		(!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0)) ||
@@ -408,9 +425,18 @@ void show_all_enter()
 
 	int n = 0;
 	int index = 0;
+	int max_options = strlen(options);  // 62 个字符 (0-9, a-z, A-Z)
+	
 	while (tbl[n].func) {
 		if (is_non_show_item(n));
 		else {
+			// 检查是否超出可用选项字符范围
+			if (index >= max_options) {
+				error("Too many menu items (%d) exceeds available options (%d)\n", 
+				      index + 1, max_options);
+				exit(1);
+			}
+			
 			//sel[index] = tbl[n].func;
 			sel[index] = &tbl[n];
 			printf("[%c]. %-14s", options[index], tbl[n].desc);
@@ -1739,28 +1765,94 @@ void enter_vm_cdstatus(int not_use)
 	};
 
 	enter_options(msg, opts, NULL, (char*)&new_vm.cdstatus);
-	if (strcmp(new_vm.cdstatus, "off") == 0)
+	if (strcmp(new_vm.cdstatus, "off") == 0) {
 		strcpy(new_vm.bootfrom, "hd0");
+	} else {
+		// 初始化 CD 数量为 1（如果还未设置）
+		if (atoi(new_vm.cds) < 1)
+			strcpy(new_vm.cds, "1");
+	}
 }
 
-
-// vm_iso
-// ISO文件输入处理
-void enter_vm_iso(int not_use)
+// vm_cds
+// CD数量输入处理
+void enter_vm_cds(int not_use)
 {
 	if (strcmp(new_vm.cdstatus, "on") != 0) return;
 
-	char *msg = "Enter iso path for CD-ROM: ";
+	while (1) {
+		char *msg = "Enter number of CDs (1-4): ";
+		enter_numbers(msg, NULL, (char*)&new_vm.cds);
+		if (atoi(new_vm.cds) >= 1 && atoi(new_vm.cds) <= CD_NUM) 
+			break;
+		else 
+			warn("input invalid (1-%d)\n", CD_NUM);
+	}
+}
+
+// vm_cd_iso
+// 单个 CD ISO 文件输入处理
+void enter_vm_cd_iso(int cd_idx)
+{
+	if (strcmp(new_vm.cdstatus, "on") != 0) return;
+	if (cd_idx >= atoi(new_vm.cds)) return;
+
+	char msg[256];
+	char default_dir[256] = {0};
+
+	// 提取默认目录
+	if (strlen(new_vm.cd_iso[cd_idx]) > 0) {
+		printf("Current CD(%d) iso: %s\n", cd_idx, new_vm.cd_iso[cd_idx]);
+		strcpy(default_dir, new_vm.cd_iso[cd_idx]);
+		char *last_slash = strrchr(default_dir, '/');
+		if (last_slash) {
+			*last_slash = '\0';
+		} else {
+			strcpy(default_dir, ".");
+		}
+	}
+
+	if (strlen(default_dir) > 0) {
+		if (cd_idx > 0)
+			sprintf(msg, "Enter iso path for CD(%d) [%s] ('-' to clear): ", cd_idx, default_dir);
+		else
+			sprintf(msg, "Enter iso path for CD(%d) [%s]: ", cd_idx, default_dir);
+	} else
+		sprintf(msg, "Enter iso path for CD(%d): ", cd_idx);
+
 	char *dir_opts[BUFFERSIZE] = {0};
 	char *dir_desc[BUFFERSIZE] = {0};
 
 	int n;
+	char iso_dir[256];
 	while (1) {
 		printf("%s", msg);
-		fgets(new_vm.iso, sizeof(new_vm.iso), stdin);
-		new_vm.iso[strlen(new_vm.iso)-1] = '\0';
+		fgets(iso_dir, sizeof(iso_dir), stdin);
+		iso_dir[strlen(iso_dir)-1] = '\0';
+		
+		// 如果输入为 '-' 或 'none'，清空该 CD 的 ISO 路径
+		if (strcmp(iso_dir, "-") == 0 || strcasecmp(iso_dir, "none") == 0) {
+			if (cd_idx == 0) {
+				warn("cd(0) iso cannot be empty\n");
+				continue;
+			}
+			strcpy(new_vm.cd_iso[cd_idx], "");
+			return;
+		}
+		
+		// 如果输入为空且有默认目录，则使用默认目录
+		if (strlen(iso_dir) == 0 && strlen(default_dir) > 0) {
+			strcpy(iso_dir, default_dir);
+		} else if (strlen(iso_dir) == 0) {
+			// 输入为空且无默认目录
+			if (cd_idx == 0 && strlen(new_vm.cd_iso[0]) == 0) {
+				warn("cd(0) iso is required\n");
+				continue;
+			}
+			return;  // 保持当前值不变（为空）
+		}
 
-		n = get_filelist(new_vm.iso, dir_opts, dir_desc);
+		n = get_filelist(iso_dir, dir_opts, dir_desc);
 		if (n < 0)
 			warn("input invalid\n");
 		if (n == 0)
@@ -1770,13 +1862,21 @@ void enter_vm_iso(int not_use)
 		}
 	}
 
-	enter_options("Enter a iso file: ", dir_opts, dir_desc, (char*)&new_vm.iso);
+	if (strlen(iso_dir) > 0 && n > 0) {
+		char select_msg[64];
+		sprintf(select_msg, "Enter a iso file for CD(%d): ", cd_idx);
+		enter_options(select_msg, dir_opts, dir_desc, (char*)&new_vm.cd_iso[cd_idx]);
+	}
 
 	while (n >= 0) {
 		if (dir_opts[n]) free(dir_opts[n]);
 		if (dir_desc[n]) free(dir_desc[n]);
 		--n;
 	}
+	
+	// 同步到 iso 字段用于向后兼容
+	if (cd_idx == 0 && strlen(new_vm.cd_iso[0]) > 0)
+		strcpy(new_vm.iso, new_vm.cd_iso[0]);
 }
 
 // vm_network_interface

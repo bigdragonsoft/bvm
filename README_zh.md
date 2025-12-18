@@ -13,6 +13,7 @@ BVM 是一个基于 FreeBSD 的 Bhyve 虚拟机管理工具。它提供了简单
    - 支持动态添加和删除磁盘
    - 多种存储接口：AHCI、VirtIO-BLK、NVMe
    - 支持 ZFS 存储，具有快照和数据保护功能
+   - 多光驱支持（最多 4 个 CD，用于驱动安装等场景）
 3. 强大的网络功能：
    - 支持为每个虚拟机配置多个网卡
    - 支持桥接、NAT 和 Switch 网络模式
@@ -157,6 +158,9 @@ Options:
     ---------          -----------
     cpus               VM使用的CPU数量（总虚拟核心数）
     ram                VM分配的内存（例如512M或1G）
+    CD                 启用/禁用光驱 (on/off)
+    cd numbers         光驱数量 (1-4)
+    cd(N) iso          第 N 个光驱的 ISO 路径（输入 '-' 可清空 cd1-cd3）
     ios path           ISO镜像目录（自动列出供选择）
     boot from          启动选项 (cd0:CD启动/hd0:硬盘启动)
     boot type          启动方式 (grub: 标准引导, uefi: UEFI引导, uefi_csm: UEFI CSM/兼容传统BIOS)

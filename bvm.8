@@ -249,6 +249,14 @@ This is an important option. When the system is first installed,
 will automatically adjust this option to hd0 for system startup. 
 When you need to use iso disc for system maintenance, you can change 
 this option to cd0.
+.It CD
+Enable or disable CD-ROM support (on/off).
+.It "cd numbers"
+Number of CD-ROM drives (1-4). Multiple CDs are useful for scenarios 
+like Windows driver installation.
+.It "cd(N) iso"
+ISO path for CD N. Enter '-' or 'none' to clear the ISO path for cd1-cd3.
+The cd(0) is required and cannot be cleared when CD is enabled.
 .It boot type
 Select the boot method. Options are:
 .Bl -tag -width 10n

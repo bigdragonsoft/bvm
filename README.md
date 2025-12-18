@@ -13,6 +13,7 @@ BVM is a Bhyve virtual machine management tool based on FreeBSD. It provides a s
    - Support for dynamic disk addition and removal
    - Multiple storage interfaces: AHCI, VirtIO-BLK, NVMe
    - ZFS storage support with snapshot and data protection features
+   - Multiple CD-ROM support (up to 4 CDs for driver installation, etc.)
 3. Powerful networking capabilities:
    - Support for configuring multiple network cards per VM
    - Bridge, NAT, and Switch networking modes
@@ -157,7 +158,9 @@ Some configuration parameters explained:
     ---------          -----------
     cpus               Number of CPUs used by VM (the total vCPU count)
     ram                Memory allocated to VM (e.g. 512M or 1G)
-    ios path           Installation image directory (auto-listed for selection)
+    CD                 Enable/disable CD-ROM (on/off)
+    cd numbers         Number of CD drives (1-4)
+    cd(N) iso          ISO path for CD N (enter '-' to clear for cd1-cd3)
     boot from          Boot options (cd0:CD boot/hd0:Hard disk boot)
     boot type          Boot method (grub: Standard, uefi: UEFI, uefi_csm: UEFI CSM/Legacy BIOS)
     TPM (UEFI)         Enable TPM 2.0 support (requires UEFI, needed for Windows 11)

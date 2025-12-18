@@ -39,7 +39,7 @@
 #include <termios.h>
 #include "vm.h"
 
-#define MM_MAX	32	//Main Menu Max
+#define MM_MAX	48	//Main Menu Max
 #define DM_MAX	40	//Disk Menu Max
 #define NM_MAX	64	//Network Menu Max
 
@@ -76,7 +76,8 @@ void enter_vm_zpool(int);
 void enter_vm_disks(int);
 void enter_vm_vdisk_size(int disk_ord);
 void enter_vm_cdstatus(int);
-void enter_vm_iso(int);
+void enter_vm_cds(int);
+void enter_vm_cd_iso(int);
 void enter_vm_bootfrom(int);
 void enter_vm_boot_type(int);
 void enter_vm_vncstatus(int);

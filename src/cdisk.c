@@ -172,6 +172,8 @@ void show_disk_config()
 
 	int n = 0;
 	int index = 0;
+	int max_options = strlen(options);  // 62 个字符 (0-9, a-z, A-Z)
+	
 	while (diskmenu[n].func) {
 		if ((diskmenu[n].func == enter_vm_vdisk_size && atoi(new_vm.disks) < diskmenu[n].arg + 1) ||
 
@@ -179,6 +181,13 @@ void show_disk_config()
 		   (diskmenu[n].func == enter_vm_zpool && strcmp(new_vm.zfs, "on") != 0));
 		else {
 			if (diskmenu[n].edit != -1) {
+				// 检查是否超出可用选项字符范围
+				if (index >= max_options) {
+					error("Too many disk menu items (%d) exceeds available options (%d)\n", 
+					      index + 1, max_options);
+					exit(1);
+				}
+				
 			disk_sel[index] = &diskmenu[n];
 			//printf("[%2d]. %-13s", index, diskmenu[n].desc);
 			printf("[%c]. %-13s", options[index], diskmenu[n].desc);

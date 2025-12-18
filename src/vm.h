@@ -62,6 +62,7 @@
 #define PROTO_LEN	4		//协议字符最大长度 tcp/udp
 #define OS_NUM		32		//最大操作系统类型数量
 #define DISK_NUM	8		//最大磁盘数量
+#define CD_NUM		4		//最大CD数量
 #define NIC_NUM		8		//最大网卡数量
 #define PORT_NUM	16		//最大端口转发数量
 #define MAX_BOOT_NUM	32		//最大自动启动数量
@@ -192,7 +193,9 @@ struct _vm_stru {
 	char ostype[32];		//操作系统类型
 	char version[32];		//操作系统版本
 	char cdstatus[8];		//是否使用CD (on/off)
-	char iso[256];			//iso
+	char cds[8];			//CD数量
+	char cd_iso[CD_NUM][256];	//多CD ISO路径
+	char iso[256];			//iso (向后兼容，使用第一个CD路径)
 	char bootfrom[32];		//启动介质 (cd0/hd0)
 	char hostbridge[32];		//hostbridge
 	char boot_type[32];			//是否uefi启动 (grub/uefi/uefi_csm)

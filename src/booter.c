@@ -84,6 +84,50 @@ int run(char *cmd, vm_node *p)
 	return WEXITSTATUS(ret);
 }
 
+// Helper to append CD args
+// 只添加有效的CD（ISO路径不为空的）
+static void append_cd_args(char *cmd, vm_node *p, int slot_start) {
+	if (strcmp(p->vm.cdstatus, "on") == 0) {
+		char t[BUFFERSIZE];
+		int slot_id = 0;  // 实际使用的槽位号
+		for (int n=0; n<atoi(p->vm.cds); n++) {
+			// 跳过 ISO 路径为空的 CD
+			if (strlen(p->vm.cd_iso[n]) == 0) {
+				continue;
+			}
+			sprintf(t, "-s %d:%d,ahci-cd,${vm_cd_iso_%d} ", slot_start, slot_id, n);
+			strcat(cmd, t);
+			slot_id++;
+		}
+	}
+}
+
+// Helper to append HD args 
+static void append_hd_args(char *cmd, vm_node *p, int slot_start) {
+	char t[BUFFERSIZE];
+	int slot = slot_start;
+	int id = 0;
+	for (int n=0; n<atoi(p->vm.disks); n++) {
+		if (strlen(p->vm.storage_interface) == 0)
+			sprintf(t, "-s %d:%d,ahci-hd,${vm_disk%d} ", slot, id, n);
+		else
+			sprintf(t, "-s %d:%d,${vm_storage_interface},${vm_disk%d} ", slot, id, n);
+		strcat(cmd, t);
+		if (++id == 8) slot++;
+	}
+}
+
+// Helper to count valid CDs (ISO path not empty)
+static int count_valid_cds(vm_node *p) {
+	int count = 0;
+	for (int n=0; n<atoi(p->vm.cds); n++) {
+		if (strlen(p->vm.cd_iso[n]) > 0) {
+			count++;
+		}
+	}
+	return count;
+}
+
 // grub启动器
 void grub_booter(vm_node *p)
 {
@@ -96,6 +140,12 @@ void grub_booter(vm_node *p)
 
 	if (boot == 0 && strcmp(p->vm.cdstatus, "off") == 0) {
 		error("can't start the vm from CD\n");
+		exit(1);
+	}
+
+	// 检查从 CD 启动时是否有有效的 ISO 文件
+	if (boot == 0 && count_valid_cds(p) == 0) {
+		error("can't start the vm from CD: no valid ISO file configured\n");
 		exit(1);
 	}
 
@@ -116,21 +166,19 @@ void grub_booter(vm_node *p)
 		strcat(cmd, "-s 0:0,${vm_hostbridge} ");
 		
 		
-		if (strcmp(p->vm.cdstatus, "on") == 0)
-			strcat(cmd, "-s 2:0,ahci-cd,${vm_iso} ");
 
-		int slot = 3;
-		int id = 0;
+		// 固定 slot 分配：HD 始终在 slot 2，CD 始终在 HD 之后
+		// 这样无论从哪里启动，设备路径保持一致，UEFI vars 中的启动项不会失效
+		int disk_count = atoi(p->vm.disks);
+		int hd_slots_needed = (disk_count + 7) / 8;
+		if (hd_slots_needed == 0) hd_slots_needed = 1;
+		int hd_slot_start = 2;
+		int cd_slot = 2 + hd_slots_needed;
 
-		for (int n=0; n<atoi(p->vm.disks); n++) {
-			if (strlen(p->vm.storage_interface) == 0)
-				sprintf(t, "-s %d:%d,ahci-hd,${vm_disk%d} ", slot, id, n);
-			else
-				sprintf(t, "-s %d:%d,${vm_storage_interface},${vm_disk%d} ", slot, id, n);
-			strcat(cmd, t);
-			if (++id == 8) slot++;
-		}
-		
+		// 按固定顺序追加参数：先 HD 后 CD
+		append_hd_args(cmd, p, hd_slot_start);
+		append_cd_args(cmd, p, cd_slot);
+
 		
 		for (int n=0; n<atoi(p->vm.nics); n++) {
 			if (host_version() >= EM0_VER)
@@ -196,6 +244,12 @@ void uefi_booter(vm_node *p)
 		exit(1);
 	}
 
+	// 检查从 CD 启动时是否有有效的 ISO 文件
+	if (boot == 0 && count_valid_cds(p) == 0) {
+		error("can't start the vm from CD: no valid ISO file configured\n");
+		exit(1);
+	}
+
 	// 自动迁移逻辑：如果 VM 使用 UEFI 但没有 vars 文件
 	if (strcmp(p->vm.boot_type, "grub") != 0 && strlen(p->vm.uefi_vars) == 0) {
 		// 尝试创建 vars 文件
@@ -220,12 +274,20 @@ void uefi_booter(vm_node *p)
 	// 这是一个必要的变通方案，因为无法直接修改 nvram 二进制文件中的启动顺序
 	if (boot == 0 && strcmp(p->vm.boot_type, "grub") != 0 && strlen(p->vm.uefi_vars) > 0) {
 		char template_vars[] = "/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd";
+		char backup_vars[512];
+		sprintf(backup_vars, "%s.orig", p->vm.uefi_vars);
 		
 		if (access(template_vars, R_OK) == 0 && access(p->vm.uefi_vars, F_OK) == 0) {
-			// 备份现有 vars
-			char backup_cmd[512];
-			sprintf(backup_cmd, "cp %s %s.orig", p->vm.uefi_vars, p->vm.uefi_vars);
-			system(backup_cmd);
+			// 只有当 .orig 不存在时才创建备份
+			// 如果 .orig 已存在，说明之前的有效备份还在，不要覆盖它
+			if (access(backup_vars, F_OK) != 0) {
+				char backup_cmd[512];
+				sprintf(backup_cmd, "cp %s %s", p->vm.uefi_vars, backup_vars);
+				system(backup_cmd);
+				write_log("Backed up UEFI vars for VM %s before CD boot", p->vm.name);
+			} else {
+				write_log("UEFI vars backup already exists for VM %s, keeping it", p->vm.name);
+			}
 
 			// 重置 vars
 			char reset_cmd[512];
@@ -236,23 +298,22 @@ void uefi_booter(vm_node *p)
 		}
 	}
 
-	// 如果设置为从硬盘启动(boot=1)，且存在备份的 vars 文件，则恢复它
-	// 这通常意味着之前为了 CD 启动而重置了 vars，现在需要恢复原有的引导记录
+	// 如果设置为从硬盘启动(boot=1)，恢复之前备份的 .orig 文件
+	// .orig 保存的是切换到 CD 启动之前的 vars 文件（包含正确的 HD 启动项）
+	// 因为 CD 启动时用空模板覆盖了 vars，所以现在需要恢复
 	if (boot == 1 && strcmp(p->vm.boot_type, "grub") != 0 && strlen(p->vm.uefi_vars) > 0) {
 		char backup_vars[512];
 		sprintf(backup_vars, "%s.orig", p->vm.uefi_vars);
 
 		if (access(backup_vars, F_OK) == 0) {
+			// 恢复备份到 vars
 			char restore_cmd[512];
-			// 使用 move 恢复，确保只恢复一次
-			sprintf(restore_cmd, "mv -f %s %s", backup_vars, p->vm.uefi_vars);
+			sprintf(restore_cmd, "mv %s %s", backup_vars, p->vm.uefi_vars);
 			system(restore_cmd);
 			
-			write_log("Restored UEFI vars for VM %s from backup", p->vm.name);
+			write_log("Restored UEFI vars backup for VM %s (contains HD boot entries)", p->vm.name);
 		}
 	}
-
-	char cmd[BUFFERSIZE];
 
 	// TPM 启动逻辑
 	if (strcmp(p->vm.tpmstatus, "on") == 0) {
@@ -375,6 +436,7 @@ void uefi_booter(vm_node *p)
 	}
 
 
+	char cmd[BUFFERSIZE];
 	while (1) {
 		
 		//bhyve
@@ -384,21 +446,18 @@ void uefi_booter(vm_node *p)
 		strcat(cmd, "-s 0:0,${vm_hostbridge} ");
 		
 		
-		if (strcmp(p->vm.cdstatus, "on") == 0) {
-			strcat(cmd, "-s 2:0,ahci-cd,${vm_iso} ");
-		}
+		// 固定 slot 分配：HD 始终在 slot 2，CD 始终在 HD 之后
+		// 这样无论从哪里启动，设备路径保持一致，UEFI vars 中的启动项不会失效
+		int disk_count = atoi(p->vm.disks);
+		int hd_slots_needed = (disk_count + 7) / 8;
+		if (hd_slots_needed == 0) hd_slots_needed = 1;
+		int hd_slot_start = 2;
+		int cd_slot = 2 + hd_slots_needed;
 		
 		
-		int slot = 3;
-		int id = 0;
-		for (int n=0; n<atoi(p->vm.disks); n++) {
-			if (strlen(p->vm.storage_interface) == 0)
-				sprintf(t, "-s %d:%d,ahci-hd,${vm_disk%d} ", slot, id, n);
-			else
-				sprintf(t, "-s %d:%d,${vm_storage_interface},${vm_disk%d} ", slot, id, n);
-			strcat(cmd, t);
-			if (++id == 8) slot++;
-		}
+		// 按固定顺序追加参数：先 HD 后 CD
+		append_hd_args(cmd, p, hd_slot_start);
+		append_cd_args(cmd, p, cd_slot);
 		
 		
 		for (int n=0; n<atoi(p->vm.nics); n++) {
@@ -485,7 +544,20 @@ void uefi_booter(vm_node *p)
 		run(cmd, p);
 	}
 
+	// 清理 .orig 备份文件
+	// 如果从 HD 启动后正常结束，删除 .orig 备份
+	// 这样下次从 CD 启动时，会正确备份当前的 efivars（包含 HD 启动项）
+	if (boot == 1 && strcmp(p->vm.boot_type, "grub") != 0 && strlen(p->vm.uefi_vars) > 0) {
+		char backup_vars[512];
+		sprintf(backup_vars, "%s.orig", p->vm.uefi_vars);
+		if (access(backup_vars, F_OK) == 0) {
+			unlink(backup_vars);
+			write_log("Cleaned up UEFI vars backup for VM %s after HD boot", p->vm.name);
+		}
+	}
+
 	// TPM 停止逻辑
+
 	if (strcmp(p->vm.tpmstatus, "on") == 0) {
 		char stop_swtpm[512];
 		sprintf(stop_swtpm, 
@@ -570,6 +642,13 @@ void convert(char *code, vm_node *p)
                 char buf[32];
                 sprintf(buf, "${vm_disk%d}", n);
    		str_replace(str, buf, p->vm.vdisk[n].path);
+        }
+
+	// 多 CD ISO 路径替换
+        for (int n=0; n<atoi(p->vm.cds); n++) {
+                char buf[32];
+                sprintf(buf, "${vm_cd_iso_%d}", n);
+   		str_replace(str, buf, p->vm.cd_iso[n]);
         }
 
 }
