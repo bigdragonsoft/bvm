@@ -52,6 +52,7 @@ int  exist_snapshot(char *zvol);
 int  exist_parent_snapshot(char *zvol, char *ssname);
 int  exist_clone_vm(char *ssname);
 void create_zfs_disk(vm_stru *vm, int disk_ord);
+void resize_zfs_disk(vm_stru *vm, char *size, int disk_ord);
 void link_to_zvol(vm_stru *vm, int disk_ord, char *zvol);
 void remove_zvol(vm_stru *vm, int disk_ord);
 void rename_zvol(vm_stru *vm, char *oldname, char *newname);

@@ -82,6 +82,10 @@ void edit_disk_config()
 	vm_node *p;
 	if ((p = find_vm_list(new_vm.name)) != NULL) {
 		set_disk_edit(DISKETTE, 0);
+		// 重新开启磁盘大小编辑权限
+		for (int i=1; i<=DISK_NUM; i++) {
+			diskmenu[i].edit = 1;
+		}
 		set_disk_edit(DISKFUNC, 1);
 	}
 	else {

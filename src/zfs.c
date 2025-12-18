@@ -229,6 +229,30 @@ void create_zfs_disk(vm_stru *vm, int disk_ord)
 	}
 }
 
+// 调整 ZFS 卷大小
+// vm:虚拟机
+// size:调整后的磁盘空间大小
+// disk_ord:盘号
+void resize_zfs_disk(vm_stru *vm, char *size, int disk_ord)
+{
+	char zvol[FN_MAX_LEN];
+	char cmd[BUFFERSIZE];
+	char disk[32];
+
+	int n = disk_ord;
+	if (n == 0)
+		strcpy(disk, "disk");
+	else
+		sprintf(disk, "disk%d", n);
+	sprintf(zvol, "%s/bvm_%s_%s", vm->zpool, vm->name, disk);
+
+	if (exist_zvol(zvol)) {
+		// zfs set volsize=SIZE poolname/dataset
+		sprintf(cmd, "zfs set volsize=%s %s", size, zvol);
+		run_cmd(cmd);
+	}
+}
+
 // 磁盘文件链接到卷
 void link_to_zvol(vm_stru *vm, int disk_ord, char *zvol)
 {

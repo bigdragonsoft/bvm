@@ -1578,10 +1578,11 @@ void adjust_vm_disk_all(vm_stru *vm)
 	//int offset = &vm->img1size - &vm->imgsize;
 	for (int n=0; n<atoi(vm->disks); n++) {
 		//adjust_vm_disk(vm, (char*)(&new_vm.imgsize + n * offset), n);
-		adjust_vm_disk(vm, vm->vdisk[n].size, n);
+		adjust_vm_disk(vm, new_vm.vdisk[n].size, n);
 	}
 	
 }
+
 
 // 调整vm磁盘大小
 // vm:虚拟机
@@ -1601,6 +1602,43 @@ void adjust_vm_disk(vm_stru *vm, char *size, int disk_ord)
 	offset = imgsize_cmp(size, p);//vm->imgsize);	
 	if (offset == 0) return;
 
+	// 如果是 ZFS 磁盘，使用 ZFS 命令调整
+	if (support_zfs() && strcmp(vm->zfs, "on") == 0) {
+		if (offset > 0) {
+			// ZFS 扩容确认
+			warn("NOTE: After expanding, you need to extend the partition inside the VM to use the new space.\n");
+			WARN("Enter 'YES' to confirm expanding disk(%d) from %s to %s: ", n, p, newp);
+			
+			char confirm[16];
+			fgets(confirm, sizeof(confirm), stdin);
+			confirm[strlen(confirm)-1] = '\0';
+			
+			if (strcmp(confirm, "YES") != 0) {
+				warn("Disk expand cancelled\n");
+				strcpy(newp, p);  // 恢复原始大小
+				return;
+			}
+		}
+		if (offset < 0) {
+			// ZFS 压缩需要警告
+			warn("WARNING: Reducing ZFS volume size may cause data loss!\n");
+			warn("Make sure you have shrunk the partition inside the VM first.\n");
+			WARN("Enter 'YES' to confirm shrinking disk(%d) from %s to %s: ", n, p, newp);
+			
+			char confirm[16];
+			fgets(confirm, sizeof(confirm), stdin);
+			confirm[strlen(confirm)-1] = '\0';
+			
+			if (strcmp(confirm, "YES") != 0) {
+				warn("Disk shrink cancelled\n");
+				strcpy(newp, p);  // 恢复原始大小
+				return;
+			}
+		}
+		resize_zfs_disk(vm, newp, n);
+		return;
+	}
+
 	char disk[32];
 	if (n == 0)
 		strcpy(disk, "/disk.img");
@@ -1615,20 +1653,49 @@ void adjust_vm_disk(vm_stru *vm, char *size, int disk_ord)
 	if (access(fn, 0) == 0) {
 		char cmd[BUFFERSIZE];
 		if (offset > 0) {
-			sprintf(cmd, "truncate -s %s%ld%s %s", "+", offset, "K", fn);
-			run_cmd(cmd);
+			// 磁盘扩容 - 确认
+			warn("\n");
+			warn("NOTE: After expanding, you need to extend the partition inside the VM to use the new space.\n");
+			WARN("Enter 'YES' to confirm expanding disk(%d) from %s to %s: ", n, p, newp);
+			
+			char confirm[16];
+			fgets(confirm, sizeof(confirm), stdin);
+			confirm[strlen(confirm)-1] = '\0';
+			
+			if (strcmp(confirm, "YES") == 0) {
+				sprintf(cmd, "truncate -s %s%ld%s %s", "+", offset, "K", fn);
+				run_cmd(cmd);
+			} else {
+				warn("Disk expand cancelled\n");
+				strcpy(newp, p);  // 恢复原始大小
+			}
 		}
 		if (offset < 0) {
-			//对磁盘容量减少暂不处理
-			//sprintf(cmd, "truncate -s %ld%s %s", offset, "K", fn);
-			//run_cmd(cmd);
-			strcpy(newp, p);
-			//strcpy(new_vm.imgsize, vm->imgsize);
+			// 磁盘压缩 - 需要确认
+			warn("\n");
+			warn("WARNING: Reducing disk size may cause data loss!\n");
+			warn("Make sure you have shrunk the partition inside the VM first.\n");
+			WARN("Enter 'YES' to confirm shrinking disk(%d) from %s to %s: ", n, p, newp);
+			
+			char confirm[16];
+			fgets(confirm, sizeof(confirm), stdin);
+			confirm[strlen(confirm)-1] = '\0';
+			
+			if (strcmp(confirm, "YES") == 0) {
+				// 使用绝对大小
+				sprintf(cmd, "truncate -s %s %s", newp, fn);
+				run_cmd(cmd);
+			} else {
+				warn("Disk shrink cancelled\n");
+				strcpy(newp, p);  // 恢复原始大小
+			}
 		}
 	}
 
 
 }
+
+
 
 // 比较两个磁盘文件的大小
 // 以k为计算单位
@@ -2012,8 +2079,9 @@ void vm_killsession(char *vm_name)
 {
 	vm_node *p;
 	if ((p = find_vm_list(vm_name)) == NULL) {
-		error("%s does not exist\n", vm_name);
-		show_vm_name(VM_ON);
+		// 静默返回，因为 vm_poweroff 已经输出过错误信息了
+		//error("%s does not exist\n", vm_name);
+		//show_vm_name(VM_ON);
 		return;
 	}
 

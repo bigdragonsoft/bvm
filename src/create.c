@@ -744,6 +744,9 @@ void enter_vm_boot_type(int not_use)
 	else
 		opts = opts_grub_and_uefi;
 
+	// 提示用户推荐使用 UEFI 启动模式
+	printf("\033[33m[Tips] UEFI boot is recommended for better stability.\033[0m\n");
+
 	enter_options(msg, opts, NULL, (char*)&new_vm.boot_type);
 
 	// 自动调整 VNC wait 选项
