@@ -3446,6 +3446,11 @@ void load_vm_config_from_path(char *filename, vm_stru *vm)
 	else
 		strcpy(vm->vncbind, "0.0.0.0");
 
+	if ((value = get_value_by_name("vm_vga_mode")) != NULL)
+		strcpy(vm->vga_mode, value);
+	else
+		strcpy(vm->vga_mode, "auto");  // 默认自动选择
+
 	if ((value = get_value_by_name("vm_autoboot")) != NULL)
 		strcpy(vm->autoboot, value);
 	else
@@ -3712,6 +3717,8 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	sprintf(str, "vm_vncwait=%s\n", vm->vncwait);
 	fputs(str, fp);
 	sprintf(str, "vm_vncbind=%s\n", vm->vncbind);
+	fputs(str, fp);
+	sprintf(str, "vm_vga_mode=%s\n", vm->vga_mode);
 	fputs(str, fp);
 	sprintf(str, "vm_audiostatus=%s\n", vm->audiostatus);
 	fputs(str, fp);

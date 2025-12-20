@@ -232,6 +232,7 @@ struct _vm_stru {
 	char vncpassword[32];		//vnc 密码 (optional)
 	char vncwait[8];		//vnc wait选项 (on/off)
 	char vncbind[32];		//vnc 绑定地址 (default: 0.0.0.0)
+	char vga_mode[16];		//VGA 模式 (auto/io/on/off)
 
 	char audiostatus[8];		//是否开启音频 (on/off)
 

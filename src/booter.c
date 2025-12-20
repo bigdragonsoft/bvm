@@ -104,16 +104,28 @@ const char* get_bhyve_exit_desc(int status)
 
 // 添加 CD 参数
 // 只添加有效的 CD（ISO 路径不为空的）
-static void append_cd_args(char *cmd, vm_node *p, int slot_start) {
+// bootindex_start: CD 设备的起始 bootindex 值
+static void append_cd_args(char *cmd, vm_node *p, int slot_start, int bootindex_start) {
 	if (strcmp(p->vm.cdstatus, "on") == 0) {
 		char t[BUFFERSIZE];
 		int slot_id = 0;  // 实际使用的槽位号
+		int bootindex = bootindex_start;
+		
 		for (int n=0; n<atoi(p->vm.cds); n++) {
 			// 跳过 ISO 路径为空的 CD
 			if (strlen(p->vm.cd_iso[n]) == 0) {
 				continue;
 			}
-			sprintf(t, "-s %d:%d,ahci-cd,${vm_cd_iso_%d} ", slot_start, slot_id, n);
+			
+			// 如果配置为从 CD 启动且是第一个 CD，给它最高优先级 (bootindex=0)
+			if (strcmp(p->vm.bootfrom, "cd0") == 0 && n == 0) {
+				sprintf(t, "-s %d:%d,ahci-cd,${vm_cd_iso_%d},bootindex=0 ", 
+						slot_start, slot_id, n);
+			} else {
+				sprintf(t, "-s %d:%d,ahci-cd,${vm_cd_iso_%d},bootindex=%d ", 
+						slot_start, slot_id, n, bootindex);
+				bootindex++;
+			}
 			strcat(cmd, t);
 			slot_id++;
 		}
@@ -121,16 +133,22 @@ static void append_cd_args(char *cmd, vm_node *p, int slot_start) {
 }
 
 // 添加 HD 参数
+// 从 bootindex=1 开始（如果从 CD 启动，CD 使用 bootindex=0）
 static void append_hd_args(char *cmd, vm_node *p, int slot_start) {
 	char t[BUFFERSIZE];
 	int slot = slot_start;
 	int id = 0;
+	int bootindex = 1;  // 硬盘启动优先级从 1 开始
+	
 	for (int n=0; n<atoi(p->vm.disks); n++) {
 		if (strlen(p->vm.storage_interface) == 0)
-			sprintf(t, "-s %d:%d,ahci-hd,${vm_disk%d} ", slot, id, n);
+			sprintf(t, "-s %d:%d,ahci-hd,${vm_disk%d},bootindex=%d ", 
+					slot, id, n, bootindex);
 		else
-			sprintf(t, "-s %d:%d,${vm_storage_interface},${vm_disk%d} ", slot, id, n);
+			sprintf(t, "-s %d:%d,${vm_storage_interface},${vm_disk%d},bootindex=%d ", 
+					slot, id, n, bootindex);
 		strcat(cmd, t);
+		bootindex++;
 		if (++id == 8) slot++;
 	}
 }
@@ -197,9 +215,19 @@ void grub_booter(vm_node *p)
 		int hd_slot_start = 2;
 		int cd_slot = 2 + hd_slots_needed;
 
+		// 计算 CD 的 bootindex 起始值
+		// 如果从 CD 启动，第一个 CD 使用 bootindex=0，其他 CD 从 disk_count+1 开始
+		// 如果从 HD 启动，CD 从 disk_count+1 开始
+		int cd_bootindex_start;
+		if (strcmp(p->vm.bootfrom, "cd0") == 0) {
+			cd_bootindex_start = disk_count + 1;  // 第一个CD会用0，其他从这里开始
+		} else {
+			cd_bootindex_start = disk_count + 1;
+		}
+
 		// 按固定顺序追加参数：先 HD 后 CD
 		append_hd_args(cmd, p, hd_slot_start);
-		append_cd_args(cmd, p, cd_slot);
+		append_cd_args(cmd, p, cd_slot, cd_bootindex_start);
 
 		
 		for (int n=0; n<atoi(p->vm.nics); n++) {
@@ -228,19 +256,23 @@ void grub_booter(vm_node *p)
 		// PCI 直通设备
 		if (strcmp(p->vm.ppt_status, "on") == 0) {
 			int ppt_slot = 0;
+			// PCI 直通设备的 bootindex 从 disk_count + valid_cds + 1 开始
+			int ppt_bootindex = disk_count + count_valid_cds(p) + 1;
+			
 			for (int n=0; n<atoi(p->vm.ppts); n++) {
 				// 跳过空的 ppt 设备配置
 				if (strlen(p->vm.ppt[n].device) == 0) continue;
 				
 				char ppt_cmd[256];
 				if (strlen(p->vm.ppt[n].rom) > 0)
-					sprintf(ppt_cmd, "-s 21:%d,passthru,%s,rom=%s ", 
-						ppt_slot, p->vm.ppt[n].device, p->vm.ppt[n].rom);
+					sprintf(ppt_cmd, "-s 21:%d,passthru,%s,rom=%s,bootindex=%d ", 
+						ppt_slot, p->vm.ppt[n].device, p->vm.ppt[n].rom, ppt_bootindex);
 				else
-					sprintf(ppt_cmd, "-s 21:%d,passthru,%s ", 
-						ppt_slot, p->vm.ppt[n].device);
+					sprintf(ppt_cmd, "-s 21:%d,passthru,%s,bootindex=%d ", 
+						ppt_slot, p->vm.ppt[n].device, ppt_bootindex);
 				strcat(cmd, ppt_cmd);
 				ppt_slot++;
+				ppt_bootindex++;
 			}
 		}
 
@@ -502,10 +534,17 @@ void uefi_booter(vm_node *p)
 		int hd_slot_start = 2;
 		int cd_slot = 2 + hd_slots_needed;
 		
+		// 计算 CD 的 bootindex 起始值
+		int cd_bootindex_start;
+		if (strcmp(p->vm.bootfrom, "cd0") == 0) {
+			cd_bootindex_start = disk_count + 1;
+		} else {
+			cd_bootindex_start = disk_count + 1;
+		}
 		
 		// 按固定顺序追加参数：先 HD 后 CD
 		append_hd_args(cmd, p, hd_slot_start);
-		append_cd_args(cmd, p, cd_slot);
+		append_cd_args(cmd, p, cd_slot, cd_bootindex_start);
 		
 		
 		for (int n=0; n<atoi(p->vm.nics); n++) {
@@ -521,12 +560,30 @@ void uefi_booter(vm_node *p)
 			char vnc_cmd[256];
 			sprintf(vnc_cmd, "-s 29,fbuf,tcp=${vm_vncbind}:${vm_vncport},w=${vm_vncwidth},h=${vm_vncheight}");
 			
-			// Add password if set
+			// 添加 VGA 模式
+			char vga_mode[16];
+			if (strlen(p->vm.vga_mode) == 0 || strcmp(p->vm.vga_mode, "auto") == 0) {
+				// 自动选择 VGA 模式
+				if (strcmp(p->vm.boot_type, "grub") == 0)
+					strcpy(vga_mode, "io");       // GRUB 需要 I/O 端口
+				else if (strcmp(p->vm.boot_type, "uefi_csm") == 0)
+					strcpy(vga_mode, "on");       // CSM 需要完整 VGA
+				else  // uefi
+					strcpy(vga_mode, "off");      // 纯 UEFI 不需要 VGA
+			} else {
+				strcpy(vga_mode, p->vm.vga_mode);   // 使用用户指定的模式
+			}
+			
+			char vga_param[32];
+			sprintf(vga_param, ",vga=%s", vga_mode);
+			strcat(vnc_cmd, vga_param);
+			
+			// 增加密码
 			if (strlen(p->vm.vncpassword) > 0) {
 				strcat(vnc_cmd, ",password=${vm_vncpassword}");
 			}
 			
-			// Add wait option
+			// 增加等待选项
 			if (boot == 0 || strcmp(p->vm.vncwait, "on") == 0) {
 				strcat(vnc_cmd, ",wait");
 			}
@@ -553,19 +610,23 @@ void uefi_booter(vm_node *p)
 		// PCI 直通设备
 		if (strcmp(p->vm.ppt_status, "on") == 0) {
 			int ppt_slot = 0;
+			// PCI 直通设备的 bootindex 从 disk_count + valid_cds + 1 开始
+			int ppt_bootindex = disk_count + count_valid_cds(p) + 1;
+			
 			for (int n=0; n<atoi(p->vm.ppts); n++) {
 				// 跳过空的 ppt 设备配置
 				if (strlen(p->vm.ppt[n].device) == 0) continue;
 				
 				char ppt_cmd[256];
 				if (strlen(p->vm.ppt[n].rom) > 0)
-					sprintf(ppt_cmd, "-s 21:%d,passthru,%s,rom=%s ", 
-						ppt_slot, p->vm.ppt[n].device, p->vm.ppt[n].rom);
+					sprintf(ppt_cmd, "-s 21:%d,passthru,%s,rom=%s,bootindex=%d ", 
+						ppt_slot, p->vm.ppt[n].device, p->vm.ppt[n].rom, ppt_bootindex);
 				else
-					sprintf(ppt_cmd, "-s 21:%d,passthru,%s ", 
-						ppt_slot, p->vm.ppt[n].device);
+					sprintf(ppt_cmd, "-s 21:%d,passthru,%s,bootindex=%d ", 
+						ppt_slot, p->vm.ppt[n].device, ppt_bootindex);
 				strcat(cmd, ppt_cmd);
 				ppt_slot++;
+				ppt_bootindex++;
 			}
 		}
 
