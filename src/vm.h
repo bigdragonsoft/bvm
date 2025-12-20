@@ -64,6 +64,8 @@
 #define DISK_NUM	8		//最大磁盘数量
 #define CD_NUM		4		//最大CD数量
 #define NIC_NUM		8		//最大网卡数量
+#define PPT_NUM		8		//最大PCI直通设备数量
+#define AVAILABLE_PPT_MAX	32		//可用PPT设备最大数量
 #define PORT_NUM	16		//最大端口转发数量
 #define MAX_BOOT_NUM	32		//最大自动启动数量
 #define NAT_ORDER	1029		//防火墙规则中nat的序列号
@@ -170,6 +172,20 @@ struct _nic_stru {
 };
 typedef struct _nic_stru nic_stru;
 
+struct _ppt_stru {
+	char device[64];		//设备标识 (ppt0 或 bus/slot/function)
+	char rom[256];			//可选ROM文件路径
+};
+typedef struct _ppt_stru ppt_stru;
+
+// PPT设备信息结构 (用于选择列表)
+struct _available_ppt_stru {
+	char device[64];		// 设备标识 (ppt0, ppt1, ...)
+	char bdf[32];			// bus/slot/function 格式
+	char desc[256];			// 设备描述
+};
+typedef struct _available_ppt_stru available_ppt_stru;
+
 struct _disk_stru {
 	char name[32];		//磁盘名称
 	char size[32];		//磁盘大小
@@ -239,6 +255,10 @@ struct _vm_stru {
 	char share_name[64];		//共享名称 (guest中使用的标识)
 	char share_path[256];		//主机共享目录路径
 	char share_ro[8];		//只读模式 (on/off)
+
+	char ppt_status[8];		//PCI直通状态 (on/off)
+	char ppts[8];			//PCI直通设备数量
+	ppt_stru ppt[PPT_NUM];		//PCI直通设备信息
 };
 typedef struct _vm_stru vm_stru;
 
@@ -337,6 +357,10 @@ int  write_vm_device_map(vm_stru *vm);
 int  copy_vm_disk(copy_stru *name);
 
 void show_dhcp_pool();
+void show_passthru_devices();
+void show_pci_devices();
+int  get_available_ppt_devices(available_ppt_stru *devs, const char *current_vm_name);
+int  get_ppt_device_desc(const char *bdf, char *desc, size_t desc_size);
 
 void create_vm_list();
 void destroy_vm_list();

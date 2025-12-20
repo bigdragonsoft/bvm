@@ -1,4 +1,4 @@
-.Dd December 14, 2025
+.Dd December 19, 2025
 .Dt BVM 8
 .Os
 .Sh NAME
@@ -134,6 +134,11 @@
 .Ar name
 .Nm
 .Cm --showsnapall
+.Pp
+.Nm
+.Cm --pci
+.Nm
+.Cm --passthru
 .Pp
 .Nm
 .Cm --netstat
@@ -306,6 +311,16 @@ and read-only mode. Linux guests can mount the share using:
 mount -t 9p -o trans=virtio sharename /mnt/point
 .Ed
 Note: FreeBSD 14 guests lack virtio_p9fs support; FreeBSD 15+ has full support.
+.It passthru
+PCI passthrough. This option allows passing physical PCI devices directly
+to the virtual machine for exclusive use (e.g., GPU, network cards).
+Prerequisites: CPU must support Intel VT-d or AMD-Vi. Device must support
+MSI/MSI-x interrupts and be reserved in /boot/loader.conf (pptdevs="bus/slot/func").
+When enabled, BVM automatically detects available passthrough devices and
+displays them in a selection list. Only devices bound to the ppt driver and
+not allocated to other VMs will appear. Configuration options: passthru (on/off),
+ppt devices (1-8), ppt(N) device (select from list). When enabled, bhyve uses
+-S flag to wire guest memory. Use 'bvm --pci' to find device addresses.
 .It network config
 This option allows you to configure the networking of virtual machines.
 Supports Bridge, NAT, and Switch network modes with built-in DHCP server.
@@ -461,6 +476,15 @@ and TAP device, etc.
 .It Cm --os
 Show a list of operating systems supported by 
 .Nm .
+.It Cm --passthru
+Show PCI passthrough device list. Displays all PCI devices that are bound
+to the ppt driver and ready for passthrough to virtual machines. Devices
+shown as "Passthru Ready" can be assigned to VMs, while "Allocated" devices
+are currently in use by a running VM.
+.It Cm --pci
+Show all host PCI devices. Displays a complete list of PCI devices on the
+host system, including their bus/slot/function addresses, driver, vendor,
+device name, and class information.
 .It Cm --poweroff Ar name
 Force the virtual machine to power off. When there are some special reasons 
 that prevent the virtual machine from shutting down properly, you need to use 

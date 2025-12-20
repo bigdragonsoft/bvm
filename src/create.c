@@ -112,6 +112,14 @@ void create_init()
 	add_item(tbl, "share path",   (char*)&new_vm.share_path, 	enter_vm_sharepath,	0,	1,	0);
 	add_item(tbl, "share ro",     (char*)&new_vm.share_ro, 		enter_vm_sharero,	0,	1,	0);
 
+	add_item(tbl, "passthru",     (char*)&new_vm.ppt_status, 	enter_vm_pptstatus,	0,	1,	0);
+	add_item(tbl, "ppt devices",  (char*)&new_vm.ppts, 		enter_vm_ppts,		0,	1,	0);
+	for (int n=0; n<PPT_NUM; n++) {
+		char desc[32];
+		sprintf(desc, "ppt(%d) device", n);
+		add_item(tbl, desc, (char*)&new_vm.ppt[n].device, enter_vm_ppt_device, n, 1, 0);
+	}
+
 	add_item(tbl, "VNC", 	      (char*)&new_vm.vncstatus,  	enter_vm_vncstatus,	0,	1,	0);
 	add_item(tbl, "VNC bind",     (char*)&new_vm.vncbind,		enter_vm_vncbind,	0,	1,	0);
 	add_item(tbl, "VNC port",     (char*)&new_vm.vncport,  		enter_vm_vncport,	0,	1,	0);
@@ -321,6 +329,21 @@ int check_enter_valid()
 			return -1;
 		}
 	}
+
+	if (strcmp(new_vm.ppt_status, "on") == 0) {
+		if (atoi(new_vm.ppts) < 1) {
+			warn("ppt device numbers invalid\n");
+			return -1;
+		}
+		// 检查所有声明的 PPT 设备都必须配置
+		for (int i = 0; i < atoi(new_vm.ppts); i++) {
+			if (strlen(new_vm.ppt[i].device) == 0) {
+				warn("ppt(%d) device invalid\n", i);
+				return -1;
+			}
+		}
+	}
+
 	if (check_vm_disks(&new_vm) == -1) {
 		warn("disk config invalid\n");
 		return -1;
@@ -410,7 +433,10 @@ int is_non_show_item(int item)
 	 (tbl[n].func == enter_vm_vncheight && 
 		(!support_uefi(new_vm.ostype) || strcmp(new_vm.boot_type, "grub") == 0 || strcmp(new_vm.vncstatus, "off") == 0)) ||
 	 (tbl[n].func == enter_vm_bootindex && strcmp(new_vm.autoboot, "yes") != 0) ||
-	 (tbl[n].func == enter_vm_bootdelay && strcmp(new_vm.autoboot, "yes") != 0));
+	 (tbl[n].func == enter_vm_bootdelay && strcmp(new_vm.autoboot, "yes") != 0) ||
+	 (tbl[n].func == enter_vm_ppts && strcmp(new_vm.ppt_status, "off") == 0) ||
+	 (tbl[n].func == enter_vm_ppt_device && 
+		(strcmp(new_vm.ppt_status, "off") == 0 || tbl[n].arg >= atoi(new_vm.ppts))));
 
 }
 
@@ -441,8 +467,20 @@ void show_all_enter()
 			sel[index] = &tbl[n];
 			printf("[%c]. %-14s", options[index], tbl[n].desc);
 			//printf("[%2d]. %-14s", index, tbl[n].desc);
-			if (tbl[n].value)
-				printf(": %s", tbl[n].value);
+			if (tbl[n].value) {
+				// 对 ppt device 项进行特殊处理，显示设备描述
+				if (tbl[n].func == enter_vm_ppt_device && strlen(tbl[n].value) > 0) {
+					char dev_desc[256] = "";
+					get_ppt_device_desc(tbl[n].value, dev_desc, sizeof(dev_desc));
+					if (strlen(dev_desc) > 0) {
+						printf(": %s - %s", tbl[n].value, dev_desc);
+					} else {
+						printf(": %s", tbl[n].value);
+					}
+				} else {
+					printf(": %s", tbl[n].value);
+				}
+			}
 			printf("\n");
 			++index;
 		}
@@ -1100,6 +1138,150 @@ void enter_vm_sharero(int not_use)
 	};
 	
 	enter_options(msg, opts, NULL, (char*)&new_vm.share_ro);
+}
+
+// vm_pptstatus
+// PCI直通状态输入处理
+void enter_vm_pptstatus(int not_use)
+{
+	char *msg = "Enable PCI passthrough: ";
+	char *opts[] = {
+		"on",
+		"off",
+		NULL,
+	};
+	
+	enter_options(msg, opts, NULL, (char*)&new_vm.ppt_status);
+	
+	// 如果启用直通，检查是否有可用设备
+	if (strcmp(new_vm.ppt_status, "on") == 0) {
+		// 先检查是否有可用的 PPT 设备
+		available_ppt_stru devs[AVAILABLE_PPT_MAX];
+		int count = get_available_ppt_devices(devs, new_vm.name);
+		
+		if (count == 0) {
+			warn("No available passthrough devices found.\n");
+			warn("Please bind devices to ppt driver in /boot/loader.conf first.\n");
+			warn("Example: pptdevs=\"1/0/0 1/0/1\"\n");
+			sleep(3);
+			// 自动禁用 PCI 直通
+			strcpy(new_vm.ppt_status, "off");
+			strcpy(new_vm.ppts, "0");
+			return;
+		}
+		
+		if (strlen(new_vm.ppts) == 0 || atoi(new_vm.ppts) == 0)
+			strcpy(new_vm.ppts, "1");
+		
+		// 显示警告信息和可用设备数量
+		printf("\033[33m[Info] %d available passthrough device(s) found.\033[0m\n", count);
+		printf("\033[33m[Warning] PCI passthrough requires:\033[0m\n");
+		printf("  1. CPU support for Intel VT-d or AMD-Vi\n");
+		printf("  2. Device reserved via pptdevs in /boot/loader.conf\n");
+		printf("  3. Device supports MSI/MSI-x interrupts\n");
+	}
+}
+
+// vm_ppts
+// PCI直通设备数量输入处理
+void enter_vm_ppts(int not_use)
+{
+	if (strcmp(new_vm.ppt_status, "on") != 0) return;
+	
+	while (1) {
+		char *msg = "Enter number of passthrough devices: ";
+		enter_numbers(msg, NULL, (char*)&new_vm.ppts);
+		if (atoi(new_vm.ppts) >= 1 && atoi(new_vm.ppts) <= PPT_NUM) 
+			break;
+		else 
+			warn("input invalid (1-%d)\n", PPT_NUM);
+	}
+}
+
+// vm_ppt_device
+// PCI直通设备标识输入处理 (使用选项列表方式)
+void enter_vm_ppt_device(int ppt_idx)
+{
+	if (strcmp(new_vm.ppt_status, "on") != 0) return;
+	if (ppt_idx >= atoi(new_vm.ppts)) return;
+	
+	// 获取可用设备列表
+	available_ppt_stru devs[AVAILABLE_PPT_MAX];
+	int count = get_available_ppt_devices(devs, new_vm.name);
+	
+	// 过滤掉当前 VM 已使用的设备 (在其他 slot)
+	available_ppt_stru filtered_devs[AVAILABLE_PPT_MAX];
+	int filtered_count = 0;
+	
+	for (int i = 0; i < count; i++) {
+		int already_used = 0;
+		for (int j = 0; j < atoi(new_vm.ppts); j++) {
+			if (j != ppt_idx && 
+			    (strcmp(new_vm.ppt[j].device, devs[i].device) == 0 ||
+			     strcmp(new_vm.ppt[j].device, devs[i].bdf) == 0)) {
+				already_used = 1;
+				break;
+			}
+		}
+		if (!already_used) {
+			filtered_devs[filtered_count++] = devs[i];
+		}
+	}
+	
+	if (filtered_count == 0) {
+		warn("No available passthrough devices found.\n");
+		warn("Please check if devices are bound to ppt driver in /boot/loader.conf\n");
+		// 清空当前设备设置
+		strcpy(new_vm.ppt[ppt_idx].device, "");
+		return;
+	}
+	
+	// 构建选项列表
+	char *opts[AVAILABLE_PPT_MAX + 1] = {0};
+	char *desc[AVAILABLE_PPT_MAX + 1] = {0};
+	
+	for (int i = 0; i < filtered_count; i++) {
+		opts[i] = filtered_devs[i].bdf;  // 使用 BDF 格式作为选项值
+		desc[i] = (char*)malloc(BUFFERSIZE * sizeof(char));
+		if (desc[i]) {
+			// 格式: ppt0 - 0/20/0 - USB 3.0 Host Controller
+			sprintf(desc[i], "%s - %s - %s", filtered_devs[i].device, filtered_devs[i].bdf, filtered_devs[i].desc);
+		}
+	}
+	opts[filtered_count] = NULL;
+	desc[filtered_count] = NULL;
+	
+	// 使用选项列表方式让用户选择
+	char msg[128];
+	sprintf(msg, "Select ppt(%d) device: ", ppt_idx);
+	enter_options(msg, opts, desc, new_vm.ppt[ppt_idx].device);
+	
+	// 释放内存
+	for (int i = 0; i < filtered_count; i++) {
+		if (desc[i]) free(desc[i]);
+	}
+}
+
+// vm_ppt_rom
+// PCI直通ROM文件路径输入处理 (可选)
+void enter_vm_ppt_rom(int ppt_idx)
+{
+	if (strcmp(new_vm.ppt_status, "on") != 0) return;
+	if (ppt_idx >= atoi(new_vm.ppts)) return;
+	
+	char msg[128];
+	sprintf(msg, "Enter ppt(%d) ROM file (optional, press Enter to skip): ", ppt_idx);
+	
+	printf("%s", msg);
+	bvm_gets(new_vm.ppt[ppt_idx].rom, sizeof(new_vm.ppt[ppt_idx].rom), BVM_ECHO);
+	
+	// 如果输入了路径，验证文件存在
+	if (strlen(new_vm.ppt[ppt_idx].rom) > 0) {
+		if (access(new_vm.ppt[ppt_idx].rom, R_OK) != 0) {
+			warn("ROM file not found: %s\n", new_vm.ppt[ppt_idx].rom);
+			strcpy(new_vm.ppt[ppt_idx].rom, "");
+		}
+	}
 }
 
 // 磁盘配置

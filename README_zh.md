@@ -30,6 +30,7 @@ BVM 是一个基于 FreeBSD 的 Bhyve 虚拟机管理工具。它提供了简单
 6. 高级功能：
    - 支持 TPM 2.0 (可信平台模块)，用于 Windows 11
    - VirtIO-9P 共享文件夹（与虚拟机共享宿主机目录）
+   - PCI 直通（将物理 PCI 设备传递给虚拟机）
    - CPU 拓扑控制（sockets、cores、threads）
    - 虚拟机加密保护
    - 自动启动配置（支持启动顺序）
@@ -56,55 +57,82 @@ vmdir=/your/vm/dir/
 
 ## 使用方法
 ```
-Usage:  bvm <options> [args...]
-Options:
-        --abinfo        Display information about auto-boot VMs
-        --addisk        Add a new disk to VM
-        --addnat        Add NAT
-        --addswitch     Add Switch
-        --autoboot      Auto-boot VMs
-        --clone         Clone VM
-        --config        Configure VM
-        --create        Create new VM
-        --deldisk       Delete a disk
-        --delnat        Delete NAT
-        --delswitch     Delete Switch
-        --swinfo        Output Switch info
-        --decrypt       Decrypt VM
-        --encrypt       Encrypt VM
-        --login         Log in to VM
-        --ls            List VMs and status
-        --ll            List VMs and status in long format
-        --netstat       Show VM network status
-        --natinfo       Output NAT info
-        --lock          Lock VM
-        --lockall       Lock all VMs
-        --os            Output OS list
-        --poweroff      Force power off
-        --reload-nat    Reload NAT redirect port
-        --remove        Destroy VM(s)
-        --rename        Rename VM
-        --restart       Restart VM
-        --reboot        Restart VM (alias for --restart)
-        --rollback      Roll back to snapshot point
-        --setnat        Set NAT IP address
-        --setsw         Set Switch IP address
-        --setpr         Set port redirection list
-        --showpr        Show port redirection list
-        --showdev       Show device
-        --showdevall    Show all devices in class mode
-        --showdevuse    Show all devices in simple mode
-        --showdhcp      Show all DHCP clients
-        --showsnap      Show snapshot list of VM
-        --showsnapall   Show snapshot list of all VMs
-        --showstats     Show VM stats
-        --snapshot      Generate snapshot for VM
-        --start         Start VM
-        --stop          Stop VM
-        --unlock        Unlock VM
-        --unlockall     Unlock all VMs
-        --unsetsw       Unset Switch IP address
-        --vminfo        Output VM info
+bvm <options> [args...]
+
+虚拟机管理选项:
+        --create        创建新虚拟机
+
+                        bvm --create <name> [from <template|vm> [options]]
+                        标准模板: freebsd, linux, windows
+                        或使用现有虚拟机名称作为模板
+                        Options: -s(grub), -U=CPU核心数, -m=内存大小, -d=磁盘大小, -n=网络模式, -i=绑定网卡
+
+        --start         启动虚拟机
+        --stop          关闭虚拟机
+        --poweroff      强制关闭虚拟机
+        --restart       重启虚拟机
+        --reboot        重启虚拟机 (与--restart等价)
+        --set-hd-boot   设置虚拟机从硬盘启动
+        --login         登录到虚拟机控制台 (用于grub启动)
+        --config        配置虚拟机设置 (CPU核心数, 内存大小, 磁盘大小, 网络模式, 绑定网卡等等)
+        --clone         克隆虚拟机到新虚拟机
+        --remove        永久删除虚拟机
+        --rename        重命名虚拟机
+        --vminfo        显示详细的虚拟机配置信息
+        --ls            列出虚拟机 (短格式)
+        --ll            列出虚拟机 (长格式)
+        --showstats     显示虚拟机资源使用统计信息
+        --os            列出支持的OS类型
+
+虚拟机操作 & 安全选项:
+        --autoboot      启动所有自动启动的虚拟机
+        --abinfo        显示自动启动配置
+        --lock          锁定虚拟机 (防止意外删除/修改)
+        --unlock        解锁虚拟机
+        --lockall       锁定所有虚拟机
+        --unlockall     解锁所有虚拟机
+        --encrypt       加密虚拟机数据
+        --decrypt       解密虚拟机数据
+
+存储 & 快照选项:
+        --addisk        添加新磁盘到虚拟机
+        --deldisk       从虚拟机删除磁盘
+        --snapshot      创建虚拟机快照
+        --rollback      回滚虚拟机到快照
+        --showsnap      显示虚拟机快照
+        --showsnapall   显示所有虚拟机快照
+
+网络管理 (NAT & Switch):
+        --netstats      显示虚拟机网络状态
+        --natinfo       显示NAT配置信息
+        --addnat        添加新NAT接口
+        --delnat        删除NAT接口
+        --setnat        设置NAT IP地址
+        --reload-nat    重新加载NAT端口重定向规则
+        --swinfo        显示Switch配置信息
+        --addswitch     添加新Switch
+        --delswitch     删除Switch
+        --setsw         设置Switch IP地址
+        --unsetsw       取消设置Switch IP地址
+        --setpr         设置端口重定向 (动态)
+        --showpr        显示活动端口重定向规则
+        --showdhcp      显示DHCP客户端租约
+        --showdev       显示网络设备映射
+        --showdevall    显示所有网络设备 (经典模式)
+        --showdevuse    显示所有网络设备 (简单模式)
+
+主机 & 硬件选项:
+        --passthru      显示PCI直通设备列表
+        --pci           显示所有主机PCI设备
+
+示例:
+        bvm --create vm1 from linux -U=4 -m=4g -d=20g
+        bvm --start vm1
+        bvm --ls
+        bvm --ll online
+        bvm --vminfo vm1
+
+更多详细信息，请阅读 'man bvm'
 ```
 
 ## 常见问题
@@ -166,6 +194,7 @@ Options:
     boot type          启动方式 (grub: 标准引导, uefi: UEFI引导, uefi_csm: UEFI CSM/兼容传统BIOS)
     TPM (UEFI)         启用TPM 2.0支持（需要UEFI，Windows 11必需）
     shared folder      共享文件夹（与虚拟机共享宿主机目录）
+    passthru           PCI直通设备（与虚拟机共享宿主机PCI设备）
     VNC                启用/禁用VNC显示
     VNC bind           VNC服务器绑定地址（默认0.0.0.0）
     VNC port           VNC服务器端口号
@@ -498,4 +527,43 @@ VNC Service    : Disabled
     mount -t 9p -o trans=virtio hostshare /mnt/hostshare
 
 注意：VirtIO-9P 在 Linux 虚拟机中支持良好。FreeBSD 14 虚拟机缺少 virtio_p9fs 模块；FreeBSD 15+ 完整支持。
+```
+
+### 问题 18: 如何使用 PCI 直通？
+```
+答: PCI 直通允许虚拟机直接访问物理 PCI 设备（如 GPU、网卡）。
+
+前置条件：
+    1. CPU 必须支持 Intel VT-d 或 AMD-Vi
+    2. PCI 设备必须支持 MSI/MSI-x 中断
+    3. 设备必须在 /boot/loader.conf 中预留：
+       pptdevs="0/2/0 1/0/0"
+
+配置方式：
+    在虚拟机配置中启用直通后，BVM 会自动检测可用的直通设备并以选择列表形式显示：
+    
+    Select ppt(0) device:
+    [0]. ppt0 - 0/20/0 - USB 3.0 Host Controller
+    [1]. ppt1 - 1/0/0 - AMD Radeon R7 Graphics
+    [2]. ppt2 - 1/0/1 - HD Audio Controller
+    Select ppt(0) device: _
+    
+    只有满足以下条件的设备会出现在选择列表中：
+    - 已绑定到 ppt 驱动（在 loader.conf 中配置）
+    - 未分配给其他虚拟机
+
+配置选项：
+    passthru           启用/禁用 PCI 直通 (on/off)
+    ppt devices        直通设备数量 (1-8)
+    ppt(N) device      从可用设备列表中选择
+
+注意：启用直通时，bhyve 使用 -S 标志锁定虚拟机内存。
+使用 'bvm --pci' 查找设备地址。
+
+查看 PCI 直通设备列表：
+    bvm --passthru
+
+说明：
+- Passthru Ready (绿色): 已绑定 ppt 驱动，可直通
+- Allocated (黄色): 已分配给运行中的虚拟机
 ```

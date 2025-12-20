@@ -30,6 +30,7 @@ BVM is a Bhyve virtual machine management tool based on FreeBSD. It provides a s
 6. Advanced features:
    - TPM 2.0 support (Trusted Platform Module) for Windows 11
    - VirtIO-9P shared folders (share host directories with VMs)
+   - PCI passthrough (pass physical PCI devices to VMs)
    - CPU topology control (sockets, cores, threads)
    - VM encryption protection
    - Autoboot configuration with boot order
@@ -57,54 +58,81 @@ vmdir=/your/vm/dir/
 ## Usage
 ```
 Usage:  bvm <options> [args...]
-Options:
-        --abinfo        Display information about auto-boot VMs
-        --addisk        Add a new disk to VM
-        --addnat        Add NAT
-        --addswitch     Add Switch
-        --autoboot      Auto-boot VMs
-        --clone         Clone VM
-        --config        Configure VM
+
+VM Management Options:
         --create        Create new VM
-        --deldisk       Delete a disk
-        --delnat        Delete NAT
-        --delswitch     Delete Switch
-        --swinfo        Output Switch info
-        --decrypt       Decrypt VM
-        --encrypt       Encrypt VM
-        --login         Log in to VM
-        --ls            List VMs and status
-        --ll            List VMs and status in long format
-        --netstat       Show VM network status
-        --natinfo       Output NAT info
-        --lock          Lock VM
-        --lockall       Lock all VMs
-        --os            Output OS list
-        --poweroff      Force power off
-        --reload-nat    Reload NAT redirect port
-        --remove        Destroy VM(s)
-        --rename        Rename VM
+
+                        Usage: bvm --create <name> [from <template|vm> [options]]
+                        Standard templates: freebsd, linux, windows
+                        Or use an existing VM name as a template
+                        Options: -s(grub), -U=cpus, -m=mem, -d=disk, -n=net, -i=bind_nic
+
+        --start         Start VM
+        --stop          Stop VM (ACPI shutdown)
+        --poweroff      Force power off VM
         --restart       Restart VM
         --reboot        Restart VM (alias for --restart)
-        --rollback      Roll back to snapshot point
-        --setnat        Set NAT IP address
-        --setsw         Set Switch IP address
-        --setpr         Set port redirection list
-        --showpr        Show port redirection list
-        --showdev       Show device
-        --showdevall    Show all devices in class mode
-        --showdevuse    Show all devices in simple mode
-        --showdhcp      Show all DHCP clients
-        --showsnap      Show snapshot list of VM
-        --showsnapall   Show snapshot list of all VMs
-        --showstats     Show VM stats
-        --snapshot      Generate snapshot for VM
-        --start         Start VM
-        --stop          Stop VM
+        --set-hd-boot   Set VM to boot from hard disk
+        --login         Log in to VM console (for grub boot)
+        --config        Configure VM settings (cpus, ram, disk, network, etc.)
+        --clone         Clone VM to a new one
+        --remove        Destroy VM(s) permanently
+        --rename        Rename VM
+        --vminfo        Display detailed VM configuration info
+        --ls            List VMs (short format)
+        --ll            List VMs (long format)
+        --showstats     Show VM resource usage statistics
+        --os            List supported OS types
+
+VM Operation & Security:
+        --autoboot      Start all auto-boot enabled VMs
+        --abinfo        Show auto-boot configuration
+        --lock          Lock VM (prevent accidental deletion/modification)
         --unlock        Unlock VM
+        --lockall       Lock all VMs
         --unlockall     Unlock all VMs
+        --encrypt       Encrypt VM data
+        --decrypt       Decrypt VM data
+
+Storage & Snapshot Options:
+        --addisk        Add a new disk to VM
+        --deldisk       Delete a disk from VM
+        --snapshot      Create a snapshot of VM
+        --rollback      Rollback VM to a snapshot
+        --showsnap      Show snapshots of a VM
+        --showsnapall   Show snapshots of all VMs
+
+Network Management (NAT & Switch):
+        --netstats      Show VM network status
+        --natinfo       Show NAT configuration info
+        --addnat        Add a new NAT interface
+        --delnat        Delete a NAT interface
+        --setnat        Set NAT IP address
+        --reload-nat    Reload NAT port redirection rules
+        --swinfo        Show Switch configuration info
+        --addswitch     Add a new Switch
+        --delswitch     Delete a Switch
+        --setsw         Set Switch IP address
         --unsetsw       Unset Switch IP address
-        --vminfo        Output VM info
+        --setpr         Set port redirection (dynamic)
+        --showpr        Show active port redirection rules
+        --showdhcp      Show DHCP client leases
+        --showdev       Show network device mapping
+        --showdevall    Show all network devices (class mode)
+        --showdevuse    Show all network devices (simple mode)
+
+Host & Hardware Options:
+        --passthru      Show PCI passthrough device list
+        --pci           Show all host PCI devices
+
+Example:
+        bvm --create vm1 from linux -U=4 -m=4g -d=20g
+        bvm --start vm1
+        bvm --ls
+        bvm --ll online
+        bvm --vminfo vm1
+
+For more details, please read 'man bvm'
 ```
 
 ## Q&A
@@ -165,6 +193,7 @@ Some configuration parameters explained:
     boot type          Boot method (grub: Standard, uefi: UEFI, uefi_csm: UEFI CSM/Legacy BIOS)
     TPM (UEFI)         Enable TPM 2.0 support (requires UEFI, needed for Windows 11)
     shared folder      Share host directories with the VM (VirtIO-9P)
+    passthru           PCI passthrough (share host PCI devices with the VM)
     VNC                Enable/disable VNC display
     VNC bind           VNC server bind address (default: 0.0.0.0)
     VNC port           VNC server port number
@@ -497,4 +526,45 @@ Mount in Linux guest:
     mount -t 9p -o trans=virtio hostshare /mnt/hostshare
 
 Note: VirtIO-9P is well supported in Linux guests. FreeBSD 14 guests lack the virtio_p9fs module; FreeBSD 15+ has full support.
+```
+
+### Question 18: How to use PCI passthrough?
+```
+Answer: PCI passthrough allows a VM to directly access a physical PCI device (e.g., GPU, NIC). 
+
+Prerequisites:
+    1. CPU must support Intel VT-d or AMD-Vi
+    2. PCI device must support MSI/MSI-x interrupts
+    3. Device must be reserved in /boot/loader.conf:
+       pptdevs="0/2/0 1/0/0"
+
+Configuration:
+    When you enable passthrough in VM configuration, BVM will automatically
+    detect available passthrough devices and display them in a selection list:
+    
+    Select ppt(0) device:
+    [0]. ppt0 - 0/20/0 - USB 3.0 Host Controller
+    [1]. ppt1 - 1/0/0 - AMD Radeon R7 Graphics
+    [2]. ppt2 - 1/0/1 - HD Audio Controller
+    Select ppt(0) device: _
+    
+    Only devices that are:
+    - Bound to the ppt driver (configured in loader.conf)
+    - Not allocated to other VMs
+    will appear in the selection list.
+
+Configuration options:
+    passthru           Enable/disable PCI passthrough (on/off)
+    ppt devices        Number of passthrough devices (1-8)
+    ppt(N) device      Select from available devices list
+
+Note: When passthrough is enabled, bhyve uses -S flag to wire guest memory. 
+Use 'bvm --pci' to find device addresses.
+
+Show PCI passthrough device list:
+    bvm --passthru
+
+Legend:
+- Passthru Ready (Green): Device bound to ppt driver, ready for passthrough
+- Allocated (Yellow): Device currently assigned to a running VM
 ```

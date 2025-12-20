@@ -2234,6 +2234,26 @@ void vm_info_all(char *vm_name)
 	printf("%-13s = %s\n",	"vm_share_path",p->vm.share_path);
 	printf("%-13s = %s\n",	"vm_share_ro",p->vm.share_ro);
 
+	printf("%-13s = %s\n",	"vm_ppt_status",p->vm.ppt_status);
+	printf("%-13s = %s\n",	"vm_ppts",p->vm.ppts);
+	for (int n=0; n<atoi(p->vm.ppts); n++) {
+		char t[32];
+		char dev_desc[256] = "";
+		sprintf(t, "vm_ppt%d_device", n);
+		if (strlen(p->vm.ppt[n].device) > 0) {
+			get_ppt_device_desc(p->vm.ppt[n].device, dev_desc, sizeof(dev_desc));
+		}
+		if (strlen(dev_desc) > 0) {
+			printf("%-13s = %s - %s\n", t, p->vm.ppt[n].device, dev_desc);
+		} else {
+			printf("%-13s = %s\n", t, p->vm.ppt[n].device);
+		}
+		if (strlen(p->vm.ppt[n].rom) > 0) {
+			sprintf(t, "vm_ppt%d_rom", n);
+			printf("%-13s = %s\n", t, p->vm.ppt[n].rom);
+		}
+	}
+
 	printf("%-13s = %s\n",	"vm_audiostatus",p->vm.audiostatus);
 	printf("%-13s = %s\n",	"vm_disk",	p->vm.disk);
 	printf("%-13s = %s\n",	"vm_devicemap",	p->vm.devicemap);
@@ -2369,6 +2389,29 @@ void vm_info(char *vm_name)
 		printf("|-%-12s : %s\n", "share name", 	p->vm.share_name);
 		printf("|-%-12s : %s\n", "share path", 	p->vm.share_path);
 		printf("|-%-12s : %s\n", "read-only", 	p->vm.share_ro);
+	}
+
+	printf("%-14s : %s\n", "passthrough", 		p->vm.ppt_status);
+	if (strcmp(p->vm.ppt_status, "on") == 0) {
+		printf("|-%-12s : %s\n", "ppt devices", p->vm.ppts);
+		for (int n=0; n<atoi(p->vm.ppts); n++) {
+			char t[32];
+			char dev_desc[256] = "";
+			sprintf(t, "ppt(%d) device", n);
+			// 获取设备描述
+			if (strlen(p->vm.ppt[n].device) > 0) {
+				get_ppt_device_desc(p->vm.ppt[n].device, dev_desc, sizeof(dev_desc));
+			}
+			if (strlen(dev_desc) > 0) {
+				printf("|-%-12s : %s - %s\n", t, p->vm.ppt[n].device, dev_desc);
+			} else {
+				printf("|-%-12s : %s\n", t, p->vm.ppt[n].device);
+			}
+			if (strlen(p->vm.ppt[n].rom) > 0) {
+				sprintf(t, "ppt(%d) rom", n);
+				printf("  |-%-10s : %s\n", t, p->vm.ppt[n].rom);
+			}
+		}
 	}
 
 	printf("%-14s : %s\n", "auto boot",		p->vm.autoboot);
@@ -3480,6 +3523,27 @@ void load_vm_config_from_path(char *filename, vm_stru *vm)
 	else
 		strcpy(vm->share_ro, "off");
 
+	// PCI直通配置
+	if ((value = get_value_by_name("vm_ppt_status")) != NULL)
+		strcpy(vm->ppt_status, value);
+	else
+		strcpy(vm->ppt_status, "off");
+
+	if ((value = get_value_by_name("vm_ppts")) != NULL)
+		strcpy(vm->ppts, value);
+	else
+		strcpy(vm->ppts, "0");
+
+	for (int n=0; n<atoi(vm->ppts); n++) {
+		if (n >= PPT_NUM) break;
+		sprintf(str, "vm_ppt%d_device", n);
+		if ((value = get_value_by_name(str)) != NULL)
+			strcpy(vm->ppt[n].device, value);
+		sprintf(str, "vm_ppt%d_rom", n);
+		if ((value = get_value_by_name(str)) != NULL)
+			strcpy(vm->ppt[n].rom, value);
+	}
+
 	free_config();
 }
 
@@ -3687,6 +3751,19 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 	fputs(str, fp);
 	sprintf(str, "vm_share_ro=%s\n", vm->share_ro);
 	fputs(str, fp);
+	fputs("\n", fp);
+
+	// PCI直通配置
+	sprintf(str, "vm_ppt_status=%s\n", vm->ppt_status);
+	fputs(str, fp);
+	sprintf(str, "vm_ppts=%s\n", vm->ppts);
+	fputs(str, fp);
+	for (int n=0; n<atoi(vm->ppts); n++) {
+		sprintf(str, "vm_ppt%d_device=%s\n", n, vm->ppt[n].device);
+		fputs(str, fp);
+		sprintf(str, "vm_ppt%d_rom=%s\n", n, vm->ppt[n].rom);
+		fputs(str, fp);
+	}
 	fputs("\n", fp);
 
 	fclose(fp);
@@ -4930,7 +5007,512 @@ void show_dhcp_pool()
 	}
 
 	fclose(fp);
+}
 
+// 显示所有PCI设备列表
+void show_pci_devices()
+{
+	// 定义本地结构存储设备信息以便计算列宽
+	typedef struct {
+		char bdf[32];
+		char class[64];
+		char desc[256];
+		char driver[64];
+	} pci_dev;
+	
+	pci_dev devs[256];
+	int dev_count = 0;
+	
+	// 执行 pciconf -lv 获取PCI设备列表
+	FILE *fp = popen("pciconf -lv 2>/dev/null", "r");
+	if (fp == NULL) {
+		error("Cannot execute pciconf\n");
+		return;
+	}
+	
+	char line[BUFFERSIZE];
+	char driver[64] = "";
+	char bdf[32] = "";
+	char class[64] = "";
+	char desc[256] = "";
+	
+	while (fgets(line, sizeof(line), fp)) {
+		line[strcspn(line, "\n")] = '\0';
+		
+		if (line[0] != '\t' && line[0] != ' ' && strlen(line) > 0) {
+			// 保存前一个设备
+			if (strlen(driver) > 0 && dev_count < 256) {
+				strcpy(devs[dev_count].bdf, bdf);
+				strcpy(devs[dev_count].class, class);
+				strcpy(devs[dev_count].desc, desc);
+				strcpy(devs[dev_count].driver, driver);
+				dev_count++;
+			}
+			
+			// 解析新设备: driver@pci0:bus:slot:func
+			char *at = strchr(line, '@');
+			if (at) {
+				*at = '\0';
+				strncpy(driver, line, sizeof(driver) - 1);
+				
+				char *p = at + 1;
+				if (strncmp(p, "pci", 3) == 0) {
+					char *colon1 = strchr(p, ':');
+					if (colon1) {
+						int bus, slot, func;
+						if (sscanf(colon1 + 1, "%d:%d:%d", &bus, &slot, &func) == 3) {
+							sprintf(bdf, "%d/%d/%d", bus, slot, func);
+						}
+					}
+				}
+			} else {
+				strncpy(driver, line, sizeof(driver) - 1);
+			}
+			class[0] = '\0';
+			desc[0] = '\0';
+		}
+		else if (strstr(line, "class") && strstr(line, "=")) {
+			char *eq = strstr(line, "= ");
+			if (eq) {
+				strncpy(class, eq + 2, sizeof(class) - 1);
+			}
+		}
+		else if (strstr(line, "device") && strstr(line, "= '")) {
+			char *eq = strstr(line, "= '");
+			if (eq) {
+				strncpy(desc, eq + 3, sizeof(desc) - 1);
+				char *end = strchr(desc, '\'');
+				if (end) *end = '\0';
+			}
+		}
+	}
+	
+	// 保存最后一个设备
+	if (strlen(driver) > 0 && dev_count < 256) {
+		strcpy(devs[dev_count].bdf, bdf);
+		strcpy(devs[dev_count].class, class);
+		strcpy(devs[dev_count].desc, desc);
+		strcpy(devs[dev_count].driver, driver);
+		dev_count++;
+	}
+	
+	pclose(fp);
+	
+	// 计算列宽
+	struct {
+		int bdf;
+		int class;
+		int desc;
+		int driver;
+	} width = {3, 5, 11, 6}; // 默认标题长度
+	
+	for (int i = 0; i < dev_count; i++) {
+		width.bdf = MAX(width.bdf, strlen(devs[i].bdf));
+		width.class = MAX(width.class, strlen(devs[i].class));
+		width.desc = MAX(width.desc, strlen(devs[i].desc));
+		width.driver = MAX(width.driver, strlen(devs[i].driver));
+	}
+	
+	if (dev_count == 0) {
+		printf("No PCI devices found.\n");
+	} else {
+		// 打印标题
+		printf("\033[1;4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%s\033[0m\n",
+			width.bdf, "BDF",
+			width.class, "CLASS",
+			width.desc, "DESCRIPTION",
+			"DRIVER");
+			
+		// 打印数据
+		for (int i = 0; i < dev_count; i++) {
+			printf("%-*s  %-*s  %-*s  %s\n",
+				width.bdf, devs[i].bdf,
+				width.class, devs[i].class,
+				width.desc, devs[i].desc,
+				devs[i].driver);
+		}
+	}
+}
+
+// 显示PCI直通设备列表
+void show_passthru_devices()
+{
+	// 定义本地结构存储设备信息以便计算列宽
+	typedef struct {
+		char device[64];
+		char bdf[32];
+		char desc[256];
+		char status[128];     // 带颜色的状态
+		char status_raw[64];  // 不带颜色的状态 (用于计算宽度)
+	} ppt_dev;
+	
+	ppt_dev devs[256];
+	int dev_count = 0;
+	
+	// 执行 pciconf -lv 获取PCI设备列表
+	FILE *fp = popen("pciconf -lv 2>/dev/null", "r");
+	if (fp == NULL) {
+		error("Cannot execute pciconf\n");
+		return;
+	}
+	
+	char line[BUFFERSIZE];
+	char device[64] = "";
+	char bdf[32] = "";
+	char desc[256] = "";
+	int is_ppt = 0;
+	
+	// 获取所有VM的ppt配置用于检测设备使用情况
+	vm_init();
+	
+	while (fgets(line, sizeof(line), fp)) {
+		line[strcspn(line, "\n")] = '\0';
+		
+		if (line[0] != '\t' && line[0] != ' ' && strlen(line) > 0) {
+			// 保存前一个设备
+			if (strlen(device) > 0 && dev_count < 256) {
+				strcpy(devs[dev_count].device, device);
+				strcpy(devs[dev_count].bdf, bdf);
+				strcpy(devs[dev_count].desc, desc);
+				
+				// 只处理 ppt 设备，跳过主机使用的设备
+				if (is_ppt) {
+					int used = 0;
+					char vm_name[64] = "";
+					vm_node *p = vms;
+					while (p) {
+						if (strcmp(p->vm.ppt_status, "on") == 0) {
+							for (int n = 0; n < atoi(p->vm.ppts); n++) {
+								if (strcmp(p->vm.ppt[n].device, device) == 0 ||
+								    strcmp(p->vm.ppt[n].device, bdf) == 0) {
+									strcpy(vm_name, p->vm.name);
+									used = 1;
+									break;
+								}
+							}
+						}
+						if (used) break;
+						p = p->next;
+					}
+					if (used) {
+						sprintf(devs[dev_count].status, "\033[93mAllocated (%s)\033[0m", vm_name);
+						sprintf(devs[dev_count].status_raw, "Allocated (%s)", vm_name);
+					} else {
+						strcpy(devs[dev_count].status, "\033[92mPassthru Ready\033[0m");
+						strcpy(devs[dev_count].status_raw, "Passthru Ready");
+					}
+					dev_count++;
+				}
+			}
+			
+			// 解析新设备
+			char *at = strchr(line, '@');
+			if (at) {
+				*at = '\0';
+				strncpy(device, line, sizeof(device) - 1);
+				is_ppt = (strncmp(device, "ppt", 3) == 0);
+				
+				char *p = at + 1;
+				if (strncmp(p, "pci", 3) == 0) {
+					char *colon1 = strchr(p, ':');
+					if (colon1) {
+						int bus, slot, func;
+						if (sscanf(colon1 + 1, "%d:%d:%d", &bus, &slot, &func) == 3) {
+							sprintf(bdf, "%d/%d/%d", bus, slot, func);
+						}
+					}
+				}
+			} else {
+				strncpy(device, line, sizeof(device) - 1);
+				is_ppt = 0; 
+			}
+			desc[0] = '\0';
+		}
+		else if (strstr(line, "device") && strstr(line, "=")) {
+			char *eq = strstr(line, "= '");
+			if (eq) {
+				strncpy(desc, eq + 3, sizeof(desc) - 1);
+				char *end = strchr(desc, '\'');
+				if (end) *end = '\0';
+			}
+		}
+	}
+	
+	// 保存最后一个设备
+	if (strlen(device) > 0 && dev_count < 256) {
+		strcpy(devs[dev_count].device, device);
+		strcpy(devs[dev_count].bdf, bdf);
+		strcpy(devs[dev_count].desc, desc);
+		
+		// 只处理 ppt 设备，跳过主机使用的设备
+		if (is_ppt) {
+			int used = 0;
+			char vm_name[64] = "";
+			vm_node *p = vms;
+			while (p) {
+				if (strcmp(p->vm.ppt_status, "on") == 0) {
+					for (int n = 0; n < atoi(p->vm.ppts); n++) {
+						if (strcmp(p->vm.ppt[n].device, device) == 0 ||
+						    strcmp(p->vm.ppt[n].device, bdf) == 0) {
+							strcpy(vm_name, p->vm.name);
+							used = 1;
+							break;
+						}
+					}
+				}
+				if (used) break;
+				p = p->next;
+			}
+			if (used) {
+				sprintf(devs[dev_count].status, "\033[93mAllocated (%s)\033[0m", vm_name);
+				sprintf(devs[dev_count].status_raw, "Allocated (%s)", vm_name);
+			} else {
+				strcpy(devs[dev_count].status, "\033[92mPassthru Ready\033[0m");
+				strcpy(devs[dev_count].status_raw, "Passthru Ready");
+			}
+			dev_count++;
+		}
+	}
+	
+	pclose(fp);
+	vm_end();
+	
+	// 计算列宽
+	struct {
+		int device;
+		int bdf;
+		int desc;
+		int status;
+	} width = {6, 3, 11, 6}; // 默认标题长度
+	
+	for (int i = 0; i < dev_count; i++) {
+		width.device = MAX(width.device, strlen(devs[i].device));
+		width.bdf = MAX(width.bdf, strlen(devs[i].bdf));
+		width.desc = MAX(width.desc, strlen(devs[i].desc));
+		width.status = MAX(width.status, strlen(devs[i].status_raw));
+	}
+	
+	if (dev_count == 0) {
+		printf("No passthrough devices found. Use 'pptdevs' in loader.conf to bind PCI devices to ppt driver.\n");
+	} else {
+		// 打印标题
+		printf("\033[1;4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%-*s\033[24m  \033[4m%s\033[0m\n",
+			width.device, "DEVICE",
+			width.bdf, "BDF",
+			width.desc, "DESCRIPTION",
+			"STATUS");
+			
+		// 打印数据
+		for (int i = 0; i < dev_count; i++) {
+			printf("%-*s  %-*s  %-*s  %s\n",
+				width.device, devs[i].device,
+				width.bdf, devs[i].bdf,
+				width.desc, devs[i].desc,
+				devs[i].status);
+		}
+		
+		printf("\nLegend: \033[92mPassthru Ready\033[0m (Bound to ppt driver, available), \033[93mAllocated\033[0m (In use by VM)\n");
+	}
+}
+
+// 获取可用的PPT设备列表
+// devs: 输出数组，存储可用设备信息
+// current_vm_name: 当前正在编辑的VM名称（排除自己占用的设备，可为NULL）
+// 返回值: 可用设备数量
+int get_available_ppt_devices(available_ppt_stru *devs, const char *current_vm_name)
+{
+	int dev_count = 0;
+	
+	// 执行 pciconf -lv 获取PCI设备列表
+	FILE *fp = popen("pciconf -lv 2>/dev/null", "r");
+	if (fp == NULL) {
+		return 0;
+	}
+	
+	char line[BUFFERSIZE];
+	char device[64] = "";
+	char bdf[32] = "";
+	char desc[256] = "";
+	int is_ppt = 0;
+	
+	while (fgets(line, sizeof(line), fp)) {
+		line[strcspn(line, "\n")] = '\0';
+		
+		if (line[0] != '\t' && line[0] != ' ' && strlen(line) > 0) {
+			// 保存前一个设备
+			if (strlen(device) > 0 && dev_count < AVAILABLE_PPT_MAX) {
+				// 只处理 ppt 设备
+				if (is_ppt) {
+					int used = 0;
+					vm_node *p = vms;
+					while (p) {
+						// 跳过当前正在编辑的VM
+						if (current_vm_name && strcmp(p->vm.name, current_vm_name) == 0) {
+							p = p->next;
+							continue;
+						}
+						if (strcmp(p->vm.ppt_status, "on") == 0) {
+							for (int n = 0; n < atoi(p->vm.ppts); n++) {
+								if (strcmp(p->vm.ppt[n].device, device) == 0 ||
+								    strcmp(p->vm.ppt[n].device, bdf) == 0) {
+									used = 1;
+									break;
+								}
+							}
+						}
+						if (used) break;
+						p = p->next;
+					}
+					// 只添加未被使用的设备
+					if (!used) {
+						strcpy(devs[dev_count].device, device);
+						strcpy(devs[dev_count].bdf, bdf);
+						strcpy(devs[dev_count].desc, desc);
+						dev_count++;
+					}
+				}
+			}
+			
+			// 解析新设备
+			char *at = strchr(line, '@');
+			if (at) {
+				*at = '\0';
+				strncpy(device, line, sizeof(device) - 1);
+				is_ppt = (strncmp(device, "ppt", 3) == 0);
+				
+				char *p = at + 1;
+				if (strncmp(p, "pci", 3) == 0) {
+					char *colon1 = strchr(p, ':');
+					if (colon1) {
+						int bus, slot, func;
+						if (sscanf(colon1 + 1, "%d:%d:%d", &bus, &slot, &func) == 3) {
+							sprintf(bdf, "%d/%d/%d", bus, slot, func);
+						}
+					}
+				}
+			} else {
+				strncpy(device, line, sizeof(device) - 1);
+				is_ppt = 0; 
+			}
+			desc[0] = '\0';
+		}
+		else if (strstr(line, "device") && strstr(line, "= '")) {
+			char *eq = strstr(line, "= '");
+			if (eq) {
+				strncpy(desc, eq + 3, sizeof(desc) - 1);
+				char *end = strchr(desc, '\'');
+				if (end) *end = '\0';
+			}
+		}
+	}
+	
+	// 保存最后一个设备
+	if (strlen(device) > 0 && dev_count < AVAILABLE_PPT_MAX) {
+		if (is_ppt) {
+			int used = 0;
+			vm_node *p = vms;
+			while (p) {
+				if (current_vm_name && strcmp(p->vm.name, current_vm_name) == 0) {
+					p = p->next;
+					continue;
+				}
+				if (strcmp(p->vm.ppt_status, "on") == 0) {
+					for (int n = 0; n < atoi(p->vm.ppts); n++) {
+						if (strcmp(p->vm.ppt[n].device, device) == 0 ||
+						    strcmp(p->vm.ppt[n].device, bdf) == 0) {
+							used = 1;
+							break;
+						}
+					}
+				}
+				if (used) break;
+				p = p->next;
+			}
+			if (!used) {
+				strcpy(devs[dev_count].device, device);
+				strcpy(devs[dev_count].bdf, bdf);
+				strcpy(devs[dev_count].desc, desc);
+				dev_count++;
+			}
+		}
+	}
+	
+	pclose(fp);
+	return dev_count;
+}
+
+// 根据 BDF 获取 PPT 设备描述
+// bdf: 设备的 bus/slot/function 格式 (如 "0/20/0")
+// desc: 输出缓冲区
+// desc_size: 缓冲区大小
+// 返回值: 0 成功, -1 未找到
+int get_ppt_device_desc(const char *bdf, char *desc, size_t desc_size)
+{
+	if (!bdf || !desc || desc_size == 0) return -1;
+	
+	desc[0] = '\0';
+	
+	FILE *fp = popen("pciconf -lv 2>/dev/null", "r");
+	if (fp == NULL) return -1;
+	
+	char line[BUFFERSIZE];
+	char current_bdf[32] = "";
+	char current_desc[256] = "";
+	int found = 0;
+	
+	while (fgets(line, sizeof(line), fp)) {
+		line[strcspn(line, "\n")] = '\0';
+		
+		if (line[0] != '\t' && line[0] != ' ' && strlen(line) > 0) {
+			// 检查之前的设备是否匹配
+			if (found && strlen(current_desc) > 0) {
+				strncpy(desc, current_desc, desc_size - 1);
+				desc[desc_size - 1] = '\0';
+				pclose(fp);
+				return 0;
+			}
+			
+			found = 0;
+			current_desc[0] = '\0';
+			
+			// 解析新设备
+			char *at = strchr(line, '@');
+			if (at) {
+				char *p = at + 1;
+				if (strncmp(p, "pci", 3) == 0) {
+					char *colon1 = strchr(p, ':');
+					if (colon1) {
+						int bus, slot, func;
+						if (sscanf(colon1 + 1, "%d:%d:%d", &bus, &slot, &func) == 3) {
+							sprintf(current_bdf, "%d/%d/%d", bus, slot, func);
+							if (strcmp(current_bdf, bdf) == 0) {
+								found = 1;
+							}
+						}
+					}
+				}
+			}
+		}
+		else if (found && strstr(line, "device") && strstr(line, "= '")) {
+			char *eq = strstr(line, "= '");
+			if (eq) {
+				strncpy(current_desc, eq + 3, sizeof(current_desc) - 1);
+				char *end = strchr(current_desc, '\'');
+				if (end) *end = '\0';
+			}
+		}
+	}
+	
+	// 检查最后一个设备
+	if (found && strlen(current_desc) > 0) {
+		strncpy(desc, current_desc, desc_size - 1);
+		desc[desc_size - 1] = '\0';
+		pclose(fp);
+		return 0;
+	}
+	
+	pclose(fp);
+	return -1;
 }
 
 // 错误信息（红色高亮）

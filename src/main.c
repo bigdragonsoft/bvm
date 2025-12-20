@@ -29,7 +29,7 @@
 
 pro_stru program = {
 	"bvm", 
-	"1.3.5", 
+	"1.4.0", 
 	"Qiang Guo",
 	"bigdragonsoft@gmail.com",
 	"https://github.com/bigdragonsoft/bvm",
@@ -113,6 +113,10 @@ void usage()
 		"	--showdevall	Show all network devices (class mode)",
 		"	--showdevuse	Show all network devices (simple mode)",
 		"",
+		"Host & Hardware Options:",
+		"	--passthru	Show PCI passthrough device list",
+		"	--pci		Show all host PCI devices",
+		"",
 		"Example:",
 		"	${name} --create vm1 from linux -U=4 -m=4g -d=20g",
 		"	${name} --start vm1",
@@ -150,7 +154,7 @@ int main(int argc, char *argv[])
 
 	//未使用的字母
 	//q, x, y, z
-	//F, G, J, M, P, Q, U, X, Y, Z
+	//G, J, M, Q, U, X, Y, Z
 	struct option long_options[] = {
 		{"help", 			0,	NULL, 	'h'},
 		{"version", 		0, 	NULL, 	'v'},
@@ -206,6 +210,8 @@ int main(int argc, char *argv[])
 		{"destroy-tap", 	0, 	NULL, 	0},
 		{"encrypt", 		1, 	NULL, 	0},
 		{"decrypt", 		1, 	NULL, 	0},
+		{"passthru",		0, 	NULL, 	'F'},
+		{"pci",			0, 	NULL, 	'P'},
 		{NULL, 				0, 	NULL, 	0}
 	};
 
@@ -534,6 +540,14 @@ int main(int argc, char *argv[])
 		
 		case 'g': //showdhcp
 			show_dhcp_pool();
+			break;
+		
+		case 'F': //passthru
+			show_passthru_devices();
+			break;
+		
+		case 'P': //pci
+			show_pci_devices();
 			break;
 		
 		case 'w': //showsnap

@@ -84,8 +84,26 @@ int run(char *cmd, vm_node *p)
 	return WEXITSTATUS(ret);
 }
 
-// Helper to append CD args
-// 只添加有效的CD（ISO路径不为空的）
+// 获取 bhyve 退出码描述
+const char* get_bhyve_exit_desc(int status)
+{
+	switch (status) {
+		case 0:   return "rebooted";
+		case 1:   return "powered off";
+		case 2:   return "halted";
+		case 3:   return "triple fault (guest system crash)";
+		case 4:   return "config or boot error (check device/UEFI settings)";
+		case 70:  return "internal software error (EX_SOFTWARE)";
+		case 71:  return "operating system error (EX_OSERR)";
+		case 100: return "suspended";
+		case 134: return "aborted (SIGABRT), possible hardware config issue";
+		case 137: return "killed (SIGKILL), host out of memory";
+		default:  return "unknown error, see /var/log/bvm.log for details";
+	}
+}
+
+// 添加 CD 参数
+// 只添加有效的 CD（ISO 路径不为空的）
 static void append_cd_args(char *cmd, vm_node *p, int slot_start) {
 	if (strcmp(p->vm.cdstatus, "on") == 0) {
 		char t[BUFFERSIZE];
@@ -102,7 +120,7 @@ static void append_cd_args(char *cmd, vm_node *p, int slot_start) {
 	}
 }
 
-// Helper to append HD args 
+// 添加 HD 参数
 static void append_hd_args(char *cmd, vm_node *p, int slot_start) {
 	char t[BUFFERSIZE];
 	int slot = slot_start;
@@ -117,7 +135,7 @@ static void append_hd_args(char *cmd, vm_node *p, int slot_start) {
 	}
 }
 
-// Helper to count valid CDs (ISO path not empty)
+// 计算有效的 CD（ISO 路径不为空）
 static int count_valid_cds(vm_node *p) {
 	int count = 0;
 	for (int n=0; n<atoi(p->vm.cds); n++) {
@@ -128,7 +146,7 @@ static int count_valid_cds(vm_node *p) {
 	return count;
 }
 
-// grub启动器
+// GRUB 启动器
 void grub_booter(vm_node *p)
 {
 	int ret;
@@ -152,7 +170,7 @@ void grub_booter(vm_node *p)
 	char cmd[BUFFERSIZE];
 	while (1) {
 
-		//grub
+		// GRUB 启动
 		if (boot == 0)
 			strcpy(cmd, "${vm_grubcd}");
 		else
@@ -160,9 +178,13 @@ void grub_booter(vm_node *p)
 
 		run(cmd, p);
 
-		//bhyve
+		// bhyve
 		char t[BUFFERSIZE];
-		strcpy(cmd, "bhyve -c cpus=${vm_cpus},sockets=${vm_sockets},cores=${vm_cores},threads=${vm_threads} -m ${vm_ram} -HAPuw ");
+		// 当启用 PCI 直通时，必须锁定内存 (-S)
+		if (strcmp(p->vm.ppt_status, "on") == 0)
+			strcpy(cmd, "bhyve -c cpus=${vm_cpus},sockets=${vm_sockets},cores=${vm_cores},threads=${vm_threads} -m ${vm_ram} -HAPuwS ");
+		else
+			strcpy(cmd, "bhyve -c cpus=${vm_cpus},sockets=${vm_sockets},cores=${vm_cores},threads=${vm_threads} -m ${vm_ram} -HAPuw ");
 		strcat(cmd, "-s 0:0,${vm_hostbridge} ");
 		
 		
@@ -191,7 +213,7 @@ void grub_booter(vm_node *p)
 			strcat(cmd, t);
 		}
 		
-		// VirtIO-9P file sharing (grub mode)
+		// VirtIO-9P 文件共享（grub 模式）
 		if (strcmp(p->vm.share_status, "on") == 0 && strlen(p->vm.share_path) > 0) {
 			char share_cmd[512];
 			if (strcmp(p->vm.share_ro, "on") == 0)
@@ -201,6 +223,25 @@ void grub_booter(vm_node *p)
 				sprintf(share_cmd, "-s 20,virtio-9p,%s=%s ", 
 					p->vm.share_name, p->vm.share_path);
 			strcat(cmd, share_cmd);
+		}
+
+		// PCI 直通设备
+		if (strcmp(p->vm.ppt_status, "on") == 0) {
+			int ppt_slot = 0;
+			for (int n=0; n<atoi(p->vm.ppts); n++) {
+				// 跳过空的 ppt 设备配置
+				if (strlen(p->vm.ppt[n].device) == 0) continue;
+				
+				char ppt_cmd[256];
+				if (strlen(p->vm.ppt[n].rom) > 0)
+					sprintf(ppt_cmd, "-s 21:%d,passthru,%s,rom=%s ", 
+						ppt_slot, p->vm.ppt[n].device, p->vm.ppt[n].rom);
+				else
+					sprintf(ppt_cmd, "-s 21:%d,passthru,%s ", 
+						ppt_slot, p->vm.ppt[n].device);
+				strcat(cmd, ppt_cmd);
+				ppt_slot++;
+			}
 		}
 
 		strcat(cmd, "-s 31,lpc -l com1,stdio ");
@@ -215,7 +256,10 @@ void grub_booter(vm_node *p)
      	  3	     triple fault
      	  4	     exited due	to an error
 		*******************************************/
-		if (ret > 0 && ret < 4) break;
+		write_log("bhyve exited with status: %d (%s)", ret, get_bhyve_exit_desc(ret));
+	
+		if (ret > 0 && ret <=4) break;
+
 		strcpy(cmd, "/usr/sbin/bhyvectl --destroy --vm=${vm_name}");
 		run(cmd, p);
 		boot = 1;
@@ -441,7 +485,11 @@ void uefi_booter(vm_node *p)
 		
 		//bhyve
 		char t[BUFFERSIZE];
-		strcpy(cmd, "bhyve -c cpus=${vm_cpus},sockets=${vm_sockets},cores=${vm_cores},threads=${vm_threads} -m ${vm_ram} -HAPuw ");
+		// 当启用 PCI 直通时，必须锁定内存 (-S)
+		if (strcmp(p->vm.ppt_status, "on") == 0)
+			strcpy(cmd, "bhyve -c cpus=${vm_cpus},sockets=${vm_sockets},cores=${vm_cores},threads=${vm_threads} -m ${vm_ram} -HAPuwS ");
+		else
+			strcpy(cmd, "bhyve -c cpus=${vm_cpus},sockets=${vm_sockets},cores=${vm_cores},threads=${vm_threads} -m ${vm_ram} -HAPuw ");
 
 		strcat(cmd, "-s 0:0,${vm_hostbridge} ");
 		
@@ -468,7 +516,7 @@ void uefi_booter(vm_node *p)
 				sprintf(t, "-s 10:%d,virtio-net,${vm_tap%d},mac=${vm_mac%d} ", n, n, n);
 			strcat(cmd, t);
 		}
-		// VNC configuration
+		// VNC 配置
 		if (boot == 0 || strcmp(p->vm.vncstatus, "on") == 0) {
 			char vnc_cmd[256];
 			sprintf(vnc_cmd, "-s 29,fbuf,tcp=${vm_vncbind}:${vm_vncport},w=${vm_vncwidth},h=${vm_vncheight}");
@@ -486,11 +534,11 @@ void uefi_booter(vm_node *p)
 			strcat(vnc_cmd, " ");
 			strcat(cmd, vnc_cmd);
 		}
-		// Audio support
+		// Audio 支持
 		if (strcmp(p->vm.audiostatus, "on") == 0)
 			strcat(cmd, "-s 6,hda,play=/dev/dsp0,rec=/dev/dsp0 ");
 
-		// VirtIO-9P file sharing
+		// VirtIO-9P 文件共享
 		if (strcmp(p->vm.share_status, "on") == 0 && strlen(p->vm.share_path) > 0) {
 			char share_cmd[512];
 			if (strcmp(p->vm.share_ro, "on") == 0)
@@ -500,6 +548,25 @@ void uefi_booter(vm_node *p)
 				sprintf(share_cmd, "-s 20,virtio-9p,%s=%s ", 
 					p->vm.share_name, p->vm.share_path);
 			strcat(cmd, share_cmd);
+		}
+
+		// PCI 直通设备
+		if (strcmp(p->vm.ppt_status, "on") == 0) {
+			int ppt_slot = 0;
+			for (int n=0; n<atoi(p->vm.ppts); n++) {
+				// 跳过空的 ppt 设备配置
+				if (strlen(p->vm.ppt[n].device) == 0) continue;
+				
+				char ppt_cmd[256];
+				if (strlen(p->vm.ppt[n].rom) > 0)
+					sprintf(ppt_cmd, "-s 21:%d,passthru,%s,rom=%s ", 
+						ppt_slot, p->vm.ppt[n].device, p->vm.ppt[n].rom);
+				else
+					sprintf(ppt_cmd, "-s 21:%d,passthru,%s ", 
+						ppt_slot, p->vm.ppt[n].device);
+				strcat(cmd, ppt_cmd);
+				ppt_slot++;
+			}
 		}
 
 		strcat(cmd, "-s 30,xhci,tablet ");
@@ -530,8 +597,10 @@ void uefi_booter(vm_node *p)
 		  3	     triple fault
 		  4	     exited due	to an error
 		*******************************************/
-		write_log("bhyve exited with status: %d", ret);
+		write_log("bhyve exited with status: %d (%s)", ret, get_bhyve_exit_desc(ret));
+		
 		if (ret > 0 && ret <= 4) break;
+
 		strcpy(cmd, "/usr/sbin/bhyvectl --destroy --vm=${vm_name}");
 		run(cmd, p);
 		boot = 1;
