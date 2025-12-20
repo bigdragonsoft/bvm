@@ -141,12 +141,25 @@ static void append_hd_args(char *cmd, vm_node *p, int slot_start) {
 	int bootindex = 1;  // 硬盘启动优先级从 1 开始
 	
 	for (int n=0; n<atoi(p->vm.disks); n++) {
-		if (strlen(p->vm.storage_interface) == 0)
-			sprintf(t, "-s %d:%d,ahci-hd,${vm_disk%d},bootindex=%d ", 
-					slot, id, n, bootindex);
-		else
-			sprintf(t, "-s %d:%d,${vm_storage_interface},${vm_disk%d},bootindex=%d ", 
-					slot, id, n, bootindex);
+		if (strlen(p->vm.storage_interface) == 0) {
+			sprintf(t, "-s %d:%d,ahci-hd,${vm_disk%d}", slot, id, n);
+			// 添加序列号参数（AHCI）
+			if (strlen(p->vm.vdisk[n].serial) > 0) {
+				strcat(t, ",ser=");
+				strcat(t, p->vm.vdisk[n].serial);
+			}
+			sprintf(t + strlen(t), ",bootindex=%d ", bootindex);
+		} else {
+			sprintf(t, "-s %d:%d,${vm_storage_interface},${vm_disk%d}", 
+					slot, id, n);
+			// 只为 AHCI 添加序列号
+			if (strcmp(p->vm.storage_interface, "ahci-hd") == 0 &&
+			    strlen(p->vm.vdisk[n].serial) > 0) {
+				strcat(t, ",ser=");
+				strcat(t, p->vm.vdisk[n].serial);
+			}
+			sprintf(t + strlen(t), ",bootindex=%d ", bootindex);
+		}
 		strcat(cmd, t);
 		bootindex++;
 		if (++id == 8) slot++;

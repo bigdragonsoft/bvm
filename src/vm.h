@@ -190,6 +190,7 @@ struct _disk_stru {
 	char name[32];		//磁盘名称
 	char size[32];		//磁盘大小
 	char path[256];		//磁盘路径
+	char serial[24];	//磁盘序列号 (最多20字符 + null)
 };
 typedef struct _disk_stru disk_stru;
 
@@ -370,6 +371,7 @@ void sort_vm_list(int type);
 void load_vm_config_from_path(char *filename, vm_stru *vm);
 void load_vm_info(char *vm_name, vm_stru *vm);
 void save_vm_info(char *vm_name, vm_stru *vm);
+void generate_disk_serial(const char *vm_name, int disk_index, char *serial);
 void show_vm_name(int status);
 void select_vm(char *vm_name, int status);
 void print_vm_list(int list_type, int online_only);

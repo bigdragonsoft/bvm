@@ -2651,6 +2651,13 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 		}
 	}
 
+	// 重新生成所有磁盘的序列号
+	// 避免克隆后的 VM 与源 VM 有相同的序列号
+	for (int i = 0; i < atoi(vm.disks); i++) {
+		generate_disk_serial(dst_vm_name, i, vm.vdisk[i].serial);
+	}
+	write_log("Generated new disk serials for cloned VM %s", dst_vm_name);
+
 	save_vm_info(dst_vm_name, &vm);
 
 	//生成device.map
@@ -3305,6 +3312,15 @@ void load_vm_config_from_path(char *filename, vm_stru *vm)
 		sprintf(str, "vm_disk%d_path", n);
 		if ((value = get_value_by_name(str)) != NULL)
 			strcpy(vm->vdisk[n].path, value);
+		
+		// 加载或生成序列号
+		sprintf(str, "vm_disk%d_serial", n);
+		if ((value = get_value_by_name(str)) != NULL && strlen(value) > 0) {
+			strcpy(vm->vdisk[n].serial, value);
+		} else {
+			// 首次加载或旧配置，自动生成序列号
+			generate_disk_serial(vm->name, n, vm->vdisk[n].serial);
+		}
 	}
 	if ((value = get_value_by_name("vm_zfs")) != NULL)
 		strcpy(vm->zfs, value);
@@ -3560,6 +3576,36 @@ void load_vm_info(char *vm_name, vm_stru *vm)
 	load_vm_config_from_path(filename, vm);
 }
 
+// 生成磁盘序列号（确保一致性）
+// 使用 DJB2 哈希算法，基于 VM 名称和磁盘索引
+void generate_disk_serial(const char *vm_name, int disk_index, char *serial) {
+	unsigned int hash = 5381;  // DJB2 hash 初始值
+	const char *str = vm_name;
+	
+	// 对 VM 名称进行哈希
+	while (*str) {
+		hash = ((hash << 5) + hash) + (unsigned char)*str;
+		str++;
+	}
+	
+	// 混入磁盘索引
+	hash = ((hash << 5) + hash) + disk_index;
+	hash = ((hash << 5) + hash) + (disk_index << 8);
+	
+	// 格式: BVM-<vmname_prefix>-D<index>-<hash>
+	// 确保总长度不超过20字符
+	snprintf(serial, 24, "BVM-%.7s-D%d-%06X", 
+	         vm_name, disk_index, hash & 0xFFFFFF);
+	
+	// 确保符合 AHCI 序列号 20 字符限制
+	serial[20] = '\0';
+	
+	// 转换为大写（AHCI 约定）
+	for (int i = 0; serial[i]; i++) {
+		serial[i] = toupper(serial[i]);
+	}
+}
+
 // 写入vm配置信息
 void save_vm_info(char *vm_name, vm_stru *vm)
 {
@@ -3593,6 +3639,9 @@ void save_vm_info(char *vm_name, vm_stru *vm)
 		else
 			sprintf(disk, "disk%d.img", n);
 		sprintf(str, "vm_disk%d_path=%s%s/%s\n", n, vmdir, vm->name, disk);
+		fputs(str, fp);
+		// 保存序列号
+		sprintf(str, "vm_disk%d_serial=%s\n", n, vm->vdisk[n].serial);
 		fputs(str, fp);
 	}
 	sprintf(str, "vm_zfs=%s\n", vm->zfs);
