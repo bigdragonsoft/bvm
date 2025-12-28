@@ -82,6 +82,7 @@ bvm <options> [args...]
         --ls            列出虚拟机 (短格式)
         --ll            列出虚拟机 (长格式)
         --showstats     显示虚拟机资源使用统计信息
+        --log           显示虚拟机日志
         --os            列出支持的OS类型
 
 虚拟机操作 & 安全选项:
@@ -512,7 +513,24 @@ Boot Time      : 31s (CPU Runtime)
 VNC Service    : Disabled
 ```
 
-### 问题 17: 如何使用共享文件夹？
+### 问题 18: 如何查看虚拟机日志？
+```
+答: 使用 'bvm --log [vmname]' 命令查看指定虚拟机的日志，或者查看所有日志。
+
+选项:
+    vmname      可选。如果省略，显示所有虚拟机的日志。
+    -e          只显示错误日志
+    -n=N        显示最后 N 行
+    -a          显示所有日志（不限制行数）
+
+示例:
+    bvm --log                  # 显示所有日志的最后 50 行
+    bvm --log vm1              # 显示 vm1 的最后 50 行日志
+    bvm --log -e               # 显示所有错误日志
+    bvm --log vm1 -n=100       # 显示 vm1 的最后 100 行日志
+```
+
+### 问题 19: 如何使用共享文件夹？
 ```
 答: 共享文件夹允许您与虚拟机共享宿主机目录。在虚拟机配置中启用 'shared folder'，设置共享名称和宿主机路径。
 
@@ -529,7 +547,7 @@ VNC Service    : Disabled
 注意：VirtIO-9P 在 Linux 虚拟机中支持良好。FreeBSD 14 虚拟机缺少 virtio_p9fs 模块；FreeBSD 15+ 完整支持。
 ```
 
-### 问题 18: 如何使用 PCI 直通？
+### 问题 20: 如何使用 PCI 直通？
 ```
 答: PCI 直通允许虚拟机直接访问物理 PCI 设备（如 GPU、网卡）。
 
@@ -566,4 +584,46 @@ VNC Service    : Disabled
 说明：
 - Passthru Ready (绿色): 已绑定 ppt 驱动，可直通
 - Allocated (黄色): 已分配给运行中的虚拟机
+```
+
+### 问题 21: 如何解决 UEFI 虚拟机控制台登录无显示问题？
+```
+答: 如果在 UEFI 虚拟机上使用 'bvm --login' 时遇到黑屏或卡住，很可能是因为客户机操作系统没有配置串口输出。您需要在客户机中配置内核参数。
+
+Debian/Ubuntu 系列:
+1. 编辑 /etc/default/grub
+2. 修改: GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200"
+3. 执行: update-grub
+4. 重启
+
+RHEL/CentOS/AlmaLinux 系列:
+1. 编辑 /etc/default/grub
+2. 在 GRUB_CMDLINE_LINUX 中添加: "console=tty0 console=ttyS0,115200"
+   建议同时删除 "rhgb quiet" 以便看到完整启动信息
+3. 执行: grub2-mkconfig -o /boot/efi/EFI/centos/grub.cfg (根据发行版调整路径)
+4. 重启
+
+Fedora 系列:
+1. 编辑 /etc/default/grub
+2. 在 GRUB_CMDLINE_LINUX 中添加: "console=tty0 console=ttyS0,115200"
+   建议同时删除 "rhgb quiet" 以便看到完整启动信息
+3. 执行: grub2-mkconfig -o /boot/grub2/grub.cfg
+4. 重启
+
+openSUSE 系列:
+1. 编辑 /etc/default/grub
+2. 在 GRUB_CMDLINE_LINUX_DEFAULT 中添加: "console=tty0 console=ttyS0,115200"
+   建议同时删除 "splash=silent quiet" 以便看到完整启动信息
+3. 执行: grub2-mkconfig -o /boot/grub2/grub.cfg
+4. 重启
+
+OpenBSD:
+1. 修改引导配置 /etc/boot.conf (如果不存在则创建):
+   echo "set tty com0" >> /etc/boot.conf
+   echo "stty com0 115200" >> /etc/boot.conf
+2. 开启登录服务 /etc/ttys:
+   编辑文件，找到 tty00 行，将 off 改为 on，并建议加上 secure (允许root登录)
+   修改前: tty00 "/usr/libexec/getty std.9600" unknown off
+   修改后: tty00 "/usr/libexec/getty std.115200" vt100 on secure
+3. 重启
 ```

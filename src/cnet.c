@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2025, Qiang Guo (bigdragonsoft@gmail.com)
+   BVM Copyright (c) 2018-2026, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -25,6 +25,7 @@
  *---------------------------------------------------------------------------*/
 
 #include "cnet.h"
+#include "vnet.h"
 
 const int nic_menu_item_num = 6;				//每块网卡所需的菜单项数量
 const int nic_enter_items = NIC_NUM * nic_menu_item_num + 2;	//输入菜单数量
@@ -238,7 +239,17 @@ void show_network_config()
 				}
 
 				printf("[%c]. %-14s", options[index], networkmenu[n].desc);
-				if (networkmenu[n].value)
+				
+				// 处理网关项以显示 IP
+				int printed = 0;
+				if (strstr(networkmenu[n].desc, "gateway") && networkmenu[n].value && strlen(networkmenu[n].value) > 0) {
+					if (get_nat_info(networkmenu[n].value) != NULL) {
+						printf(": %s (%s)", networkmenu[n].value, nat.ip);
+						printed = 1;
+					}
+				}
+
+				if (!printed && networkmenu[n].value)
 					printf(": %s", networkmenu[n].value);
 				printf("\n");
 				++index;

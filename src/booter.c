@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2025, Qiang Guo (bigdragonsoft@gmail.com)
+   BVM Copyright (c) 2018-2026, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -79,7 +79,7 @@ int run(char *cmd, vm_node *p)
 	convert(cmd, p);
 	//warn("%s\n", cmd);
 	
-	write_log(cmd);
+	write_vm_log(p->vm.name, "%s", cmd);
 	int ret = system(cmd);
 	return WEXITSTATUS(ret);
 }
@@ -301,7 +301,7 @@ void grub_booter(vm_node *p)
      	  3	     triple fault
      	  4	     exited due	to an error
 		*******************************************/
-		write_log("bhyve exited with status: %d (%s)", ret, get_bhyve_exit_desc(ret));
+		write_vm_log(p->vm.name, "bhyve exited with status: %d (%s)", ret, get_bhyve_exit_desc(ret));
 	
 		if (ret > 0 && ret <=4) break;
 
@@ -354,7 +354,7 @@ void uefi_booter(vm_node *p)
 			if (system(copy_cmd) == 0) {
 				strcpy(p->vm.uefi_vars, vm_vars);
 				save_vm_info(p->vm.name, &p->vm);
-				write_log("Auto-migrated %s to UEFI vars persistence mode", p->vm.name);
+				write_vm_log(p->vm.name, "Auto-migrated to UEFI vars persistence mode");
 			}
 		}
 	}
@@ -373,9 +373,9 @@ void uefi_booter(vm_node *p)
 				char backup_cmd[512];
 				sprintf(backup_cmd, "cp %s %s", p->vm.uefi_vars, backup_vars);
 				system(backup_cmd);
-				write_log("Backed up UEFI vars for VM %s before CD boot", p->vm.name);
+				write_vm_log(p->vm.name, "Backed up UEFI vars before CD boot");
 			} else {
-				write_log("UEFI vars backup already exists for VM %s, keeping it", p->vm.name);
+				write_vm_log(p->vm.name, "UEFI vars backup already exists, keeping it");
 			}
 
 			// 重置 vars
@@ -383,7 +383,7 @@ void uefi_booter(vm_node *p)
 			sprintf(reset_cmd, "cp %s %s", template_vars, p->vm.uefi_vars);
 			system(reset_cmd);
 			
-			write_log("Reset UEFI vars for VM %s to ensure CD boot", p->vm.name);
+			write_vm_log(p->vm.name, "Reset UEFI vars to ensure CD boot");
 		}
 	}
 
@@ -400,7 +400,7 @@ void uefi_booter(vm_node *p)
 			sprintf(restore_cmd, "mv %s %s", backup_vars, p->vm.uefi_vars);
 			system(restore_cmd);
 			
-			write_log("Restored UEFI vars backup for VM %s (contains HD boot entries)", p->vm.name);
+			write_vm_log(p->vm.name, "Restored UEFI vars backup (contains HD boot entries)");
 		}
 	}
 
@@ -442,7 +442,7 @@ void uefi_booter(vm_node *p)
 				chmod(wrapper_path, 0755);
 			}
 
-			write_log("Initializing TPM state for %s...", p->vm.name);
+			write_vm_log(p->vm.name, "Initializing TPM state...");
 			char init_cmd[1024];
 			// 使用 --tpmstate dir:///path 格式更安全
 			sprintf(init_cmd, "mkdir -p %s; /usr/local/bin/swtpm_setup --tpm %s --tpmstate dir://%s --create-ek-cert --create-platform-cert --tpm2", tpm_dir, wrapper_path, tpm_dir);
@@ -452,7 +452,7 @@ void uefi_booter(vm_node *p)
 			unlink(wrapper_path);
 			
 			if (ret != 0) {
-				write_log("Error: swtpm_setup failed with exit code %d", ret);
+				write_vm_log(p->vm.name, "Error: swtpm_setup failed with exit code %d", ret);
 				// 继续进行，可能在没有证书的情况下工作，但 Windows 可能会抱怨
 			}
 		}
@@ -475,18 +475,18 @@ void uefi_booter(vm_node *p)
 			"/usr/local/bin/swtpm socket --tpmstate dir=%s --ctrl type=unixio,path=%s --server type=unixio,path=%s --tpm2 --flags not-need-init,startup-clear -d --pid file=/var/run/swtpm-%s.pid > %s 2>&1",
 			sock_dir, tpm_dir, tpm_sock, tpm_ctrl_sock, tpm_dir, tpm_ctrl_sock, tpm_sock, p->vm.name, swtpm_log);
 		
-		write_log("Starting swtpm: %s", start_swtpm);
+		write_vm_log(p->vm.name, "Starting swtpm: %s", start_swtpm);
 		int ret = system(start_swtpm);
 
 		if (ret != 0) {
-			write_log("Error: swtpm command failed with exit code %d. Check %s for details.", ret, swtpm_log);
+			write_vm_log(p->vm.name, "Error: swtpm command failed with exit code %d. Check %s for details.", ret, swtpm_log);
 			
 			// 将日志内容打印到 bvm 日志
 			char log_content[1024] = {0};
 			FILE *fp = fopen(swtpm_log, "r");
 			if (fp) {
 				size_t n = fread(log_content, 1, sizeof(log_content)-1, fp);
-				if (n > 0) write_log("swtpm log output: %s", log_content);
+				if (n > 0) write_vm_log(p->vm.name, "swtpm log output: %s", log_content);
 				fclose(fp);
 			}
 			exit(1);
@@ -500,14 +500,14 @@ void uefi_booter(vm_node *p)
 		}
 		
 		if (access(tpm_sock, F_OK) != 0) {
-			write_log("Error: swtpm socket %s not found after waiting 10s. Aborting boot. Check %s for details.", tpm_sock, swtpm_log);
+			write_vm_log(p->vm.name, "Error: swtpm socket %s not found after waiting 10s. Aborting boot. Check %s for details.", tpm_sock, swtpm_log);
 			
 			// 将日志内容打印到 bvm 日志
 			char log_content[1024] = {0};
 			FILE *fp = fopen(swtpm_log, "r");
 			if (fp) {
 				size_t n = fread(log_content, 1, sizeof(log_content)-1, fp);
-				if (n > 0) write_log("swtpm log output: %s", log_content);
+				if (n > 0) write_vm_log(p->vm.name, "swtpm log output: %s", log_content);
 				fclose(fp);
 			}
 
@@ -671,7 +671,7 @@ void uefi_booter(vm_node *p)
 		  3	     triple fault
 		  4	     exited due	to an error
 		*******************************************/
-		write_log("bhyve exited with status: %d (%s)", ret, get_bhyve_exit_desc(ret));
+		write_vm_log(p->vm.name, "bhyve exited with status: %d (%s)", ret, get_bhyve_exit_desc(ret));
 		
 		if (ret > 0 && ret <= 4) break;
 
@@ -695,7 +695,7 @@ void uefi_booter(vm_node *p)
 		sprintf(backup_vars, "%s.orig", p->vm.uefi_vars);
 		if (access(backup_vars, F_OK) == 0) {
 			unlink(backup_vars);
-			write_log("Cleaned up UEFI vars backup for VM %s after HD boot", p->vm.name);
+			write_vm_log(p->vm.name, "Cleaned up UEFI vars backup after HD boot");
 		}
 	}
 
@@ -710,7 +710,7 @@ void uefi_booter(vm_node *p)
 			"fi",
 			p->vm.name, p->vm.name, p->vm.name);
 		
-		write_log("Stopping swtpm: %s", stop_swtpm);
+		write_vm_log(p->vm.name, "Stopping swtpm: %s", stop_swtpm);
 		system(stop_swtpm);
 	}
 

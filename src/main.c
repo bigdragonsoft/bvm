@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2025, Qiang Guo (bigdragonsoft@gmail.com)
+   BVM Copyright (c) 2018-2026, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -42,7 +42,7 @@ void version()
 	printf("author: %s\n", program.author);
 	printf("email: %s\n", program.email);
 	printf("%s\n", program.website);
-	printf("Copyright (C) 2017~2025 BigDragonSoft.com, ChinaFreeBSD.cn\n");
+	printf("Copyright (C) 2017~2026 BigDragonSoft.com, ChinaFreeBSD.cn\n");
 }
 
 // 程序用法
@@ -74,6 +74,13 @@ void usage()
 		"	--ls		List VMs (short format)",
 		"	--ll		List VMs (long format)",
 		"	--showstats	Show VM resource usage statistics",
+		"	--log		Show VM log entries",
+		"",
+		"	        	Usage: ${name} --log [vm_name] [-e] [-n=N] [-a]",
+		"	        	-e: Show error logs only",
+		"	        	-n=N: Show last N lines (default: 50)",
+		"	        	-a: Show all logs (no line limit)",
+		"",
 		"	--os		List supported OS types",
 		"",
 		"VM Operation & Security:",
@@ -154,7 +161,7 @@ int main(int argc, char *argv[])
 
 	//未使用的字母
 	//q, x, y, z
-	//G, J, M, Q, U, X, Y, Z
+	//J, M, Q, U, X, Y, Z
 	struct option long_options[] = {
 		{"help", 			0,	NULL, 	'h'},
 		{"version", 		0, 	NULL, 	'v'},
@@ -212,12 +219,19 @@ int main(int argc, char *argv[])
 		{"decrypt", 		1, 	NULL, 	0},
 		{"passthru",		0, 	NULL, 	'F'},
 		{"pci",			0, 	NULL, 	'P'},
+		{"log",			2, 	NULL, 	'G'},
 		{NULL, 				0, 	NULL, 	0}
 	};
 
 	int option_index = 0;
 	while ((opt=getopt_long(argc, argv, short_options, long_options, &option_index))!=-1) {
-		write_log("bvm --%s %s %s", long_options[option_index].name, optarg?optarg:"", argv[optind]?argv[optind]:"");
+		// 不记录只读查询类命令的操作日志，避免污染日志文件
+		if (strcmp(long_options[option_index].name, "log") != 0 &&
+			strcmp(long_options[option_index].name, "ls") != 0 &&
+			strcmp(long_options[option_index].name, "ll") != 0 &&
+			strcmp(long_options[option_index].name, "help") != 0) {
+			write_log("bvm --%s %s %s", long_options[option_index].name, optarg?optarg:"", argv[optind]?argv[optind]:"");
+		}
 		vm_init();
 		switch (opt) {
 		case 0:
@@ -546,8 +560,54 @@ int main(int argc, char *argv[])
 			show_passthru_devices();
 			break;
 		
-		case 'P': //pci
+	case 'P': //pci
 			show_pci_devices();
+			break;
+		
+		case 'G': //log
+		{
+			char *vm_name = optarg;
+			
+			// 如果 vm_name 为空，且下一个参数不是以 - 开头，则将其视为 vm_name
+			if (vm_name == NULL && optind < argc && argv[optind] && argv[optind][0] != '-') {
+				vm_name = argv[optind];
+				optind++;
+			}
+
+			int error_only = 0;
+			int lines = 50;  // 默认显示最后50行
+			
+			// 解析额外参数
+			while (optind < argc && argv[optind] && argv[optind][0] == '-') {
+				char *arg = argv[optind];
+				
+				// -e 只显示错误日志
+				if (strcmp(arg, "-e") == 0) {
+					error_only = 1;
+				}
+				// -n=N 显示行数
+				else if (strncmp(arg, "-n=", 3) == 0) {
+					char *val = arg + 3;
+					int n = atoi(val);
+					if (n <= 0) {
+						error("Invalid line count: %s (must be a positive integer)\n", arg);
+						err_exit();
+					}
+					lines = n;
+				}
+				// -a 显示所有日志（不限制行数）
+				else if (strcmp(arg, "-a") == 0) {
+					lines = 0;
+				}
+				else {
+					error("Unknown option: %s\n", arg);
+					err_exit();
+				}
+				optind++;
+			}
+			
+			vm_show_log(vm_name, error_only, lines);
+		}
 			break;
 		
 		case 'w': //showsnap

@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2025, Qiang Guo (bigdragonsoft@gmail.com)
+   BVM Copyright (c) 2018-2026, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -79,6 +79,90 @@ create_stru tbl[MM_MAX] = {0};
 create_stru *sel[MM_MAX] = {0};
 char *options = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+/* 默认配置 */
+#define DEFAULT_RAM				"1g"
+#define DEFAULT_CPUS			"1"
+#define DEFAULT_CD_STATUS		"on"
+#define DEFAULT_CDS				"1"
+#define DEFAULT_BOOTFROM		"cd0"
+#define DEFAULT_BOOT_TYPE		"uefi"
+#define DEFAULT_AUTOBOOT		"no"
+#define DEFAULT_BOOTINDEX		"1"
+#define DEFAULT_BOOTDELAY		"3"
+#define DEFAULT_VNC_STATUS		"on"
+#define DEFAULT_VNC_PORT		"5900"
+#define DEFAULT_VNC_WIDTH		"800"
+#define DEFAULT_VNC_HEIGHT		"600"
+#define DEFAULT_VNC_BIND		"0.0.0.0"
+#define DEFAULT_VNC_WAIT		"on"
+#define DEFAULT_AUDIO_STATUS	"off"
+#define DEFAULT_HOSTBRIDGE		"hostbridge"
+#define DEFAULT_TPM_STATUS		"off"
+#define DEFAULT_SHARE_STATUS	"off"
+#define DEFAULT_PPT_STATUS		"off"
+#define DEFAULT_PPTS        	"1"
+
+#define DEFAULT_DISKS       	"1"
+#define DEFAULT_DISK_SIZE		"20g"
+#define DEFAULT_DISK_INTERFACE	"achi-hd"
+#define DEFAULT_ZFS				"off"
+
+#define DEFAULT_NICS        		"1"
+#define DEFAULT_NETWORK_INTERFACE	"virtio-net"
+#define DEFAULT_NIC_NETMODE			"NAT"
+#define DEFAULT_NIC_NAT				"nat0"
+#define DEFAULT_NIC_RPSTATUS		"disable"
+#define DEFAULT_NIC_IP				"dhcp"
+
+// 加载默认配置
+void load_default_settings()
+{
+        if (strlen(bvm_os[0].type) > 0)
+                strcpy(new_vm.ostype, bvm_os[0].type);
+
+        strcpy(new_vm.ram, DEFAULT_RAM);
+        strcpy(new_vm.cpus, DEFAULT_CPUS);
+        strcpy(new_vm.disks, DEFAULT_DISKS);
+
+        strcpy(new_vm.cdstatus, DEFAULT_CD_STATUS);
+        strcpy(new_vm.cds, DEFAULT_CDS);
+
+		strcpy(new_vm.bootfrom, DEFAULT_BOOTFROM);
+        strcpy(new_vm.boot_type, DEFAULT_BOOT_TYPE);
+        strcpy(new_vm.autoboot, DEFAULT_AUTOBOOT);
+        strcpy(new_vm.bootindex, DEFAULT_BOOTINDEX);
+        strcpy(new_vm.bootdelay, DEFAULT_BOOTDELAY);
+
+        strcpy(new_vm.vncstatus, DEFAULT_VNC_STATUS);
+        strcpy(new_vm.vncport, DEFAULT_VNC_PORT);
+        strcpy(new_vm.vncwidth, DEFAULT_VNC_WIDTH);
+        strcpy(new_vm.vncheight, DEFAULT_VNC_HEIGHT);
+        strcpy(new_vm.vncbind, DEFAULT_VNC_BIND);
+        strcpy(new_vm.vncwait, DEFAULT_VNC_WAIT);
+
+        strcpy(new_vm.audiostatus, DEFAULT_AUDIO_STATUS);
+        strcpy(new_vm.hostbridge, DEFAULT_HOSTBRIDGE);
+        strcpy(new_vm.tpmstatus, DEFAULT_TPM_STATUS);
+        strcpy(new_vm.share_status, DEFAULT_SHARE_STATUS);
+
+        strcpy(new_vm.ppt_status, DEFAULT_PPT_STATUS);
+        strcpy(new_vm.ppts, DEFAULT_PPTS);
+
+		strcpy(new_vm.storage_interface, DEFAULT_DISK_INTERFACE);
+		strcpy(new_vm.zfs, DEFAULT_ZFS);
+        for(int i=0; i<DISK_NUM; i++) {
+                strcpy(new_vm.vdisk[i].size, DEFAULT_DISK_SIZE);
+        }
+
+		strcpy(new_vm.network_interface, DEFAULT_NETWORK_INTERFACE);
+        for(int i=0; i<strtoint(DEFAULT_NICS); i++) {
+                strcpy(new_vm.nic[i].netmode, DEFAULT_NIC_NETMODE);
+                strcpy(new_vm.nic[i].nat, DEFAULT_NIC_NAT);
+                strcpy(new_vm.nic[i].rpstatus, DEFAULT_NIC_RPSTATUS);
+                strcpy(new_vm.nic[i].ip, DEFAULT_NIC_IP);
+        }
+}
+
 /*
  * 创建菜单
  * create menu
@@ -89,6 +173,8 @@ void create_init()
 	memset(tbl, 0, sizeof(tbl));
 	memset(sel, 0, sizeof(sel));
 	memset(&new_vm, 0, sizeof(new_vm));
+
+	load_default_settings();
 	
 	/*-----table--desc------------value-----------------------------func--------------------arg-----edit----submenu*/
 	add_item(tbl, "name",	      (char*)&new_vm.name,		enter_vm_name, 		0,	0,	0);
@@ -268,7 +354,7 @@ void edit_vm(char *vm_name)
 // 返回 0  输入正确
 int check_enter_valid()
 {
-	if (strcmp(new_vm.ostype, "OpenBSD") == 0)
+	if (strcmp(new_vm.ostype, "OpenBSD") == 0 && strcmp(new_vm.boot_type, "grub") == 0)
 		if (strlen(new_vm.version) == 0) {
 			warn("version is invalid\n");
 			return -1;
@@ -408,7 +494,7 @@ int is_non_show_item(int item)
 {
 	int n = item;
 	return
-	((tbl[n].func == enter_vm_version && strcmp(new_vm.ostype, "OpenBSD") != 0) ||
+	((tbl[n].func == enter_vm_version && (strcmp(new_vm.ostype, "OpenBSD") != 0 || strcmp(new_vm.boot_type, "uefi") == 0)) ||
 	(tbl[n].func == enter_vm_cds && strcmp(new_vm.cdstatus, "off") == 0) ||
 	// 根据 CD 数量决定显示哪些 CD ISO 项
 	(tbl[n].func == enter_vm_cd_iso && (strcmp(new_vm.cdstatus, "off") == 0 || tbl[n].arg >= atoi(new_vm.cds))) ||
@@ -1153,8 +1239,26 @@ void enter_vm_pptstatus(int not_use)
 	
 	enter_options(msg, opts, NULL, (char*)&new_vm.ppt_status);
 	
-	// 如果启用直通，检查是否有可用设备
+	// 如果启用直通，检查硬件兼容性和可用设备
 	if (strcmp(new_vm.ppt_status, "on") == 0) {
+		// 首先检查 IOMMU 硬件支持
+		int hw_status = check_passthru_support();
+		if (hw_status == 1) {
+			warn("\n[Warning] No IOMMU support detected (Intel VT-d)!\n");
+			warn("Please enable VT-d in BIOS settings.\n");
+			warn("VM with passthrough devices will fail to start.\n\n");
+			sleep(2);
+		} else if (hw_status == 2) {
+			warn("\n[Warning] AMD-Vi is not enabled!\n");
+			warn("Add 'hw.vmm.amdvi.enable=\"1\"' to /boot/loader.conf and reboot.\n");
+			warn("VM with passthrough devices will fail to start.\n\n");
+			sleep(2);
+		} else if (hw_status != 0) {
+			warn("\n[Warning] Failed to detect IOMMU hardware status.\n\n");
+			sleep(1);
+		}
+		if (hw_status != 0) return;
+		
 		// 先检查是否有可用的 PPT 设备
 		available_ppt_stru devs[AVAILABLE_PPT_MAX];
 		int count = get_available_ppt_devices(devs, new_vm.name);
@@ -1174,11 +1278,15 @@ void enter_vm_pptstatus(int not_use)
 			strcpy(new_vm.ppts, "1");
 		
 		// 显示警告信息和可用设备数量
-		printf("\033[33m[Info] %d available passthrough device(s) found.\033[0m\n", count);
+		//printf("\033[33m[Info] %d available passthrough device(s) found.\033[0m\n", count);
+		//if (hw_status == 0) {
+		//	printf("\033[32m[OK] IOMMU hardware support detected.\033[0m\n");
+		//}
 		printf("\033[33m[Warning] PCI passthrough requires:\033[0m\n");
 		printf("  1. CPU support for Intel VT-d or AMD-Vi\n");
 		printf("  2. Device reserved via pptdevs in /boot/loader.conf\n");
 		printf("  3. Device supports MSI/MSI-x interrupts\n");
+		sleep(1);
 	}
 }
 
@@ -2046,7 +2154,7 @@ void enter_vm_cd_iso(int cd_idx)
 
 	if (strlen(iso_dir) > 0 && n > 0) {
 		char select_msg[64];
-		sprintf(select_msg, "Enter a iso file for CD(%d): ", cd_idx);
+		sprintf(select_msg, "Enter a iso file for CD(%d)", cd_idx);
 		enter_options(select_msg, dir_opts, dir_desc, (char*)&new_vm.cd_iso[cd_idx]);
 	}
 

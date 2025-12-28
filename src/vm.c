@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2025, Qiang Guo (bigdragonsoft@gmail.com)
+   BVM Copyright (c) 2018-2026, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -122,6 +122,31 @@ int write_log(char *fmt, ...)
 	write_log_time();
 	if (logfp == NULL) return -1;
 
+
+	va_list argptr;
+	int cnt;
+
+	va_start(argptr, fmt);
+	cnt = vfprintf(logfp, fmt, argptr);
+	va_end(argptr);
+	
+	if (lastch(fmt) != '\n') fprintf(logfp, "\n");
+
+	fclose(logfp);
+	return cnt;
+}
+
+// 写入日志文件（带虚拟机名称）
+// vm_name: 虚拟机名称，将作为前缀 [vm_name] 添加到日志中
+int write_vm_log(const char *vm_name, char *fmt, ...)
+{
+	write_log_time();
+	if (logfp == NULL) return -1;
+
+	// 写入虚拟机名称前缀
+	if (vm_name != NULL && strlen(vm_name) > 0) {
+		fprintf(logfp, "[%s] ", vm_name);
+	}
 
 	va_list argptr;
 	int cnt;
@@ -1521,7 +1546,7 @@ void vm_create(char *vm_name, char *template_vm_name, create_opts_stru *opts)
 			if (system(cmd) == 0) {
 				strcpy(new_vm.uefi_vars, vm_vars);
 				save_vm_info(new_vm.name, &new_vm);
-				write_log("Created UEFI vars file for %s", new_vm.name);
+				write_vm_log(new_vm.name, "Created UEFI vars file");
 			} else {
 				warn("Failed to create UEFI vars file, will use legacy mode\n");
 			}
@@ -1926,6 +1951,22 @@ void vm_start(char *vm_name)
 		return;
 	}
 
+	// 检查 PCI 直通硬件兼容性（仅警告，不阻止启动）
+	if (strcmp(p->vm.ppt_status, "on") == 0) {
+		int hw_status = check_passthru_support();
+		if (hw_status == 1) {
+			warn("[Warning] No IOMMU support detected (Intel VT-d)\n");
+			warn("Please enable VT-d in BIOS settings\n");
+			warn("VM may fail to start with passthrough devices\n");
+			warn("Please check /var/log/bvm for details\n\n");
+		} else if (hw_status == 2) {
+			warn("[Warning] AMD-Vi is not enabled\n");
+			warn("Add 'hw.vmm.amdvi.enable=\"1\"' to /boot/loader.conf and reboot\n");
+			warn("VM may fail to start with passthrough devices\n");
+			warn("Please check /var/log/bvm for details\n\n");
+		}
+	}
+
 	int ret = create_networking(vm_name) == RET_SUCCESS && 
 		  gen_vm_start_code(vm_name) == RET_SUCCESS;
 
@@ -1978,6 +2019,7 @@ void vm_login(char *vm_name)
 		else {
 			warn("UEFI mode may not support console login.\n");
 			warn("If login fails, please use VNC or SSH to login.\n");
+			warn("Note: Guest OS kernel must be configured with 'console=ttyS0' for output.\n");
 			sleep(1);
 		}
 	}
@@ -2583,7 +2625,7 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 			sprintf(cp_cmd, "cp %s %s", src_vars, dst_vars);
 			if (system(cp_cmd) == 0) {
 				strcpy(vm.uefi_vars, dst_vars);
-				write_log("Cloned UEFI vars from %s to %s", src_vm_name, dst_vm_name);
+				write_vm_log(dst_vm_name, "Cloned UEFI vars from %s", src_vm_name);
 			} else {
 				// 复制失败，回退到使用空模板
 				char template_vars[] = "/usr/local/share/uefi-firmware/BHYVE_UEFI_VARS.fd";
@@ -2591,7 +2633,7 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 					sprintf(cp_cmd, "cp %s %s", template_vars, dst_vars);
 					if (system(cp_cmd) == 0) {
 						strcpy(vm.uefi_vars, dst_vars);
-						write_log("Created new UEFI vars for cloned VM %s from template (fallback)", dst_vm_name);
+						write_vm_log(dst_vm_name, "Created new UEFI vars from template (fallback)");
 					} else {
 						strcpy(vm.uefi_vars, "");
 					}
@@ -2607,7 +2649,7 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 				sprintf(cp_cmd, "cp %s %s", template_vars, dst_vars);
 				if (system(cp_cmd) == 0) {
 					strcpy(vm.uefi_vars, dst_vars);
-					write_log("Created new UEFI vars for cloned VM %s from template", dst_vm_name);
+					write_vm_log(dst_vm_name, "Created new UEFI vars from template (fallback)");
 				} else {
 					strcpy(vm.uefi_vars, "");
 				}
@@ -2656,7 +2698,7 @@ int vm_clone(char *src_vm_name, char *dst_vm_name)
 	for (int i = 0; i < atoi(vm.disks); i++) {
 		generate_disk_serial(dst_vm_name, i, vm.vdisk[i].serial);
 	}
-	write_log("Generated new disk serials for cloned VM %s", dst_vm_name);
+	write_vm_log(dst_vm_name, "Generated new disk serials");
 
 	save_vm_info(dst_vm_name, &vm);
 
@@ -3908,6 +3950,10 @@ void print_vm_net_stat()
             char ip[32];
             strcpy(ip, p->vm.nic[i].ip);
             
+			// 去掉子网掩码
+            char *p_mask = strchr(ip, '/');
+            if (p_mask) *p_mask = '\0';
+            
             // 如果是 NAT 模式且 VM 运行中，尝试获取动态 IP
             if (strncmp(p->vm.nic[i].netmode, "NAT", 3) == 0 && get_vm_status(p->vm.name) == VM_ON) {
                  char dhcp_ip[32] = {0};
@@ -4007,6 +4053,10 @@ void print_vm_net_stat()
                 //printf("%-*s  ", max_width.ip, p->vm.nic[i].ip);  // 2个空格
                 char ip[32];
                 strcpy(ip, p->vm.nic[i].ip);
+                
+				// 去掉子网掩码
+                char *p_mask = strchr(ip, '/');
+                if (p_mask) *p_mask = '\0';
 
                 // 如果是 NAT 模式且 VM 运行中，尝试获取动态 IP
                 if (strncmp(p->vm.nic[i].netmode, "NAT", 3) == 0 && get_vm_status(p->vm.name) == VM_ON) {
@@ -4092,6 +4142,10 @@ void print_vm_list(int list_type, int online_only)
         if (list_type == VM_LONG_LIST) {
             char ip[32];
             strcpy(ip, p->vm.nic[0].ip);
+            
+			// 去掉子网掩码
+            char *p_mask = strchr(ip, '/');
+            if (p_mask) *p_mask = '\0';
             
             // 如果是 NAT 模式且 VM 运行中，尝试获取动态 IP
             if (strncmp(p->vm.nic[0].netmode, "NAT", 3) == 0 && get_vm_status(p->vm.name) == VM_ON) {
@@ -4197,6 +4251,10 @@ void print_vm_list(int list_type, int online_only)
         if (list_type == VM_LONG_LIST) {
             char ip[32];
             strcpy(ip, p->vm.nic[0].ip);
+            
+			// 去掉子网掩码
+            char *p_mask = strchr(ip, '/');
+            if (p_mask) *p_mask = '\0';
             int is_dynamic = 0;
             
             // 如果是 NAT 模式且 VM 运行中，尝试获取动态 IP
@@ -4914,6 +4972,92 @@ int get_vmx(vm_stru *vm)
 	return value;
 }
 
+// 检测 PCI 直通硬件兼容性
+// 使用 vm-bhyve 项目验证过的方法：
+//   - Intel: 检查 ACPI DMAR 表是否存在
+//   - AMD: 检查 hw.vmm.amdvi.enable 是否为 1
+//   - 附加检查: ppt 设备是否可用
+// 返回值:
+//   0: 直通可用（硬件支持 IOMMU）
+//   1: 硬件不支持 IOMMU（无 DMAR 表且无 AMD-Vi）
+//   2: 需要配置 AMD-Vi（AMD 平台需要启用 hw.vmm.amdvi.enable）
+//  -1: 检测失败
+int check_passthru_support()
+{
+	char buf[256];
+	FILE *fp;
+	int intel_vtd = 0;
+	int amd_vi = 0;
+	int is_amd = 0;
+	int ppt_available = 0;
+	
+	// 1. 检测 CPU 类型
+	fp = popen("sysctl -n hw.model 2>/dev/null", "r");
+	if (fp != NULL) {
+		if (fgets(buf, sizeof(buf), fp)) {
+			if (strstr(buf, "AMD") != NULL) {
+				is_amd = 1;
+			}
+		}
+		pclose(fp);
+	}
+	
+	// 2. Intel VT-d 检测：检查 ACPI DMAR 表是否存在
+	if (!is_amd) {
+		fp = popen("acpidump -t 2>/dev/null | grep -i DMAR", "r");
+		if (fp != NULL) {
+			if (fgets(buf, sizeof(buf), fp)) {
+				if (strlen(buf) > 0) {
+					intel_vtd = 1;  // DMAR 表存在，VT-d 硬件支持
+				}
+			}
+			pclose(fp);
+		}
+	}
+	
+	// 3. AMD-Vi 检测：检查 hw.vmm.amdvi.enable 是否为 1
+	if (is_amd) {
+		fp = popen("sysctl -n hw.vmm.amdvi.enable 2>/dev/null", "r");
+		if (fp != NULL) {
+			if (fgets(buf, sizeof(buf), fp)) {
+				if (atoi(buf) == 1) {
+					amd_vi = 1;  // AMD-Vi 已启用
+				}
+			}
+			pclose(fp);
+		}
+	}
+	
+	// 4. 检查是否有 ppt 设备可用（作为最终验证）
+	fp = popen("pciconf -l 2>/dev/null | grep -c '^ppt'", "r");
+	if (fp != NULL) {
+		if (fgets(buf, sizeof(buf), fp)) {
+			if (atoi(buf) > 0) {
+				ppt_available = 1;
+			}
+		}
+		pclose(fp);
+	}
+	
+	// 判断返回值
+	if (intel_vtd || amd_vi) {
+		return 0;  // 硬件支持 IOMMU，直通可用
+	}
+	
+	// 如果有 ppt 设备，也认为可用（用户已经配置好了）
+	if (ppt_available) {
+		return 0;
+	}
+	
+	// AMD 平台但未启用 AMD-Vi
+	if (is_amd) {
+		return 2;  // 需要在 loader.conf 中添加 hw.vmm.amdvi.enable="1"
+	}
+	
+	// Intel 平台但无 DMAR 表
+	return 1;  // 硬件不支持 IOMMU 或 BIOS 未启用 VT-d
+}
+
 // 获得bvm支持os的启动状态
 void get_bvm_os(os_stru *os)
 {
@@ -5193,6 +5337,23 @@ void show_pci_devices()
 // 显示PCI直通设备列表
 void show_passthru_devices()
 {
+	// 首先显示硬件兼容性检测结果
+	int hw_status = check_passthru_support();
+	switch (hw_status) {
+		case 0:
+			break;
+		case 1:
+			error("No IOMMU support detected (Intel VT-d)\n");
+			warn("Please enable VT-d in BIOS settings\n\n");
+			break;
+		case 2:
+			error("AMD-Vi is not enabled\n");
+			warn("Add 'hw.vmm.amdvi.enable=\"1\"' to /boot/loader.conf and reboot\n\n");
+			break;
+		default:
+			error("IOMMU Detection Failed\n\n");
+	}
+	
 	// 定义本地结构存储设备信息以便计算列宽
 	typedef struct {
 		char device[64];
@@ -6007,5 +6168,225 @@ unsigned long long parse_size(const char *size_str) {
         case 'M': return size * 1024 * 1024;
         case 'K': return size * 1024;
         default: return size;
+    }
+}
+
+// 显示虚拟机日志
+// 显示虚拟机日志
+// vm_name: 虚拟机名称（可选）
+// error_only: 1=只显示错误日志，0=显示所有日志
+// lines: 显示的行数，0表示显示所有匹配的行
+void vm_show_log(const char *vm_name, int error_only, int lines)
+{
+    // 如果提供了虚拟机名称，验证是否存在
+    if (vm_name != NULL && strlen(vm_name) > 0) {
+        vm_node *p = find_vm_list(vm_name);
+        if (p == NULL) {
+            error("%s does not exist\n", vm_name);
+            show_vm_name(VM_OFF);
+            return;
+        }
+    }
+    
+    char *log_path = "/var/log/bvm";
+    FILE *fp = fopen(log_path, "r");
+    
+    if (fp == NULL) {
+        error("Cannot open log file: %s\n", log_path);
+        return;
+    }
+    
+    // 错误关键词列表
+    const char *error_keywords[] = {
+        "error",
+        "Error",
+        "ERROR",
+        "failed",
+        "Failed",
+        "FAILED",
+        "failure",
+        "Failure",
+        "cannot",
+        "Cannot",
+        "unable",
+        "Unable",
+        "denied",
+        "Denied",
+        "warning",
+        "Warning",
+        "WARNING",
+        "exited with status:",
+        NULL
+    };
+    
+    // 统计总行数（用于从末尾开始显示）
+    char line[BUFFERSIZE * 2];
+    int total_lines = 0;
+    long *line_positions = NULL;
+    int capacity = 1000;
+    
+    if (lines > 0) {
+        // 需要从末尾读取，先统计行位置
+        line_positions = (long *)malloc(capacity * sizeof(long));
+        if (line_positions == NULL) {
+            error("Memory allocation failed\n");
+            fclose(fp);
+            return;
+        }
+        
+        line_positions[0] = 0;
+        while (fgets(line, sizeof(line), fp)) {
+            total_lines++;
+            if (total_lines >= capacity) {
+                capacity *= 2;
+                line_positions = (long *)realloc(line_positions, capacity * sizeof(long));
+                if (line_positions == NULL) {
+                    error("Memory allocation failed\n");
+                    fclose(fp);
+                    return;
+                }
+            }
+            line_positions[total_lines] = ftell(fp);
+        }
+        
+        // 回到文件开头
+        fseek(fp, 0, SEEK_SET);
+    }
+    
+    // 缓冲匹配的行（用于从末尾显示）
+    char **matched_lines = NULL;
+    int matched_count = 0;
+    int matched_capacity = 100;
+    
+    if (lines > 0) {
+        matched_lines = (char **)malloc(matched_capacity * sizeof(char *));
+        if (matched_lines == NULL) {
+            error("Memory allocation failed\n");
+            free(line_positions);
+            fclose(fp);
+            return;
+        }
+    }
+    
+    // 显示标题
+    if (vm_name != NULL && strlen(vm_name) > 0) {
+        if (error_only) {
+            title("[ Error Logs for VM: %s ]\n", vm_name);
+        } else {
+            title("[ Logs for VM: %s ]\n", vm_name);
+        }
+    } else {
+        if (error_only) {
+            title("[ Error Logs (All VMs) ]\n");
+        } else {
+            title("[ All Logs ]\n");
+        }
+    }
+    printf("\n");
+    
+    // 读取并过滤日志
+    int displayed = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        int match = 0;
+        
+        // 检查是否匹配虚拟机名称
+        if (vm_name == NULL || strlen(vm_name) == 0) {
+            match = 1;
+        } else {
+            char search_tag[128];
+            snprintf(search_tag, sizeof(search_tag), "[%s]", vm_name);
+            if (strstr(line, search_tag) != NULL) {
+                match = 1;
+            }
+        }
+        
+        // 如果需要只显示错误日志，检查错误关键词
+        if (match && error_only) {
+            match = 0;
+            for (int i = 0; error_keywords[i] != NULL; i++) {
+                if (strstr(line, error_keywords[i]) != NULL) {
+                    match = 1;
+                    break;
+                }
+            }
+        }
+        
+        if (match) {
+            if (lines > 0) {
+                // 缓存匹配的行
+                if (matched_count >= matched_capacity) {
+                    matched_capacity *= 2;
+                    matched_lines = (char **)realloc(matched_lines, matched_capacity * sizeof(char *));
+                    if (matched_lines == NULL) {
+                        error("Memory allocation failed\n");
+                        free(line_positions);
+                        fclose(fp);
+                        return;
+                    }
+                }
+                matched_lines[matched_count] = strdup(line);
+                matched_count++;
+            } else {
+                // 直接输出
+                // 根据日志内容着色
+                int is_error = 0;
+                for (int i = 0; error_keywords[i] != NULL; i++) {
+                    if (strstr(line, error_keywords[i]) != NULL) {
+                        is_error = 1;
+                        break;
+                    }
+                }
+                
+                if (is_error) {
+                    printf("\033[33m%s\033[0m", line);  // 黄色显示错误
+                } else {
+                    printf("%s", line);
+                }
+                displayed++;
+            }
+        }
+    }
+    
+    // 如果指定了显示行数，从缓存中显示最后N行
+    if (lines > 0 && matched_count > 0) {
+        int start = (matched_count > lines) ? (matched_count - lines) : 0;
+        for (int i = start; i < matched_count; i++) {
+            // 根据日志内容着色
+            int is_error = 0;
+            for (int j = 0; error_keywords[j] != NULL; j++) {
+                if (strstr(matched_lines[i], error_keywords[j]) != NULL) {
+                    is_error = 1;
+                    break;
+                }
+            }
+            
+            if (is_error) {
+                printf("\033[33m%s\033[0m", matched_lines[i]);  // 黄色显示错误
+            } else {
+                printf("%s", matched_lines[i]);
+            }
+            displayed++;
+        }
+        
+        // 释放匹配行内存
+        for (int i = 0; i < matched_count; i++) {
+            free(matched_lines[i]);
+        }
+        free(matched_lines);
+    }
+    
+    // 释放内存
+    if (line_positions != NULL) {
+        free(line_positions);
+    }
+    
+    fclose(fp);
+    
+    // 显示统计信息
+    if (displayed == 0) {
+        warn("No matching log entries found\n");
+    } else {
+        printf("\n");
+        success("Displayed %d log entries\n", displayed);
     }
 }

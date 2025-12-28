@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2025, Qiang Guo (bigdragonsoft@gmail.com)
+   BVM Copyright (c) 2018-2026, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -61,6 +61,7 @@ extern create_stru tbl[];
 extern char *options;
 
 void create_init();
+void load_default_settings();
 void set_const_config();
 void enter_vm(char *vm_name);
 void edit_vm(char *vm_name);

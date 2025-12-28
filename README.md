@@ -82,6 +82,7 @@ VM Management Options:
         --ls            List VMs (short format)
         --ll            List VMs (long format)
         --showstats     Show VM resource usage statistics
+        --log           Show VM log entries
         --os            List supported OS types
 
 VM Operation & Security:
@@ -511,7 +512,38 @@ Boot Time      : 31s (CPU Runtime)
 VNC Service    : Disabled
 ```
 
-### Question 17: How to use file sharing (Shared Folder)?
+### Question 18: How to view VM logs?
+```
+Answer: Use 'bvm --log [vmname]' to view the logs for a specific virtual machine or all VMs.
+
+Options:
+    vmname      Optional. If omitted, shows logs for all VMs.
+    -e          Show only error logs
+    -n=N        Show last N lines
+    -a          Show all logs (no line limit)
+
+Examples:
+    bvm --log                  # Show last 50 lines of all logs
+    bvm --log vm1              # Show last 50 lines of logs for vm1
+    bvm --log -e               # Show all error logs
+    bvm --log vm1 -n=100       # Show last 100 lines for vm1
+
+答: 使用 'bvm --log [vmname]' 命令查看指定虚拟机的日志，或者查看所有日志。
+
+选项:
+    vmname      可选。如果省略，显示所有虚拟机的日志。
+    -e          只显示错误日志
+    -n=N        显示最后 N 行
+    -a          显示所有日志（不限制行数）
+
+示例:
+    bvm --log                  # 显示所有日志的最后 50 行
+    bvm --log vm1              # 显示 vm1 的最后 50 行日志
+    bvm --log -e               # 显示所有错误日志
+    bvm --log vm1 -n=100       # 显示 vm1 的最后 100 行日志
+```
+
+### Question 19: How to use file sharing (Shared Folder)?
 ```
 Answer: Shared folders allow you to share host directories with virtual machines. Enable 'shared folder' in the VM configuration, set the share name and host path.
 
@@ -528,7 +560,7 @@ Mount in Linux guest:
 Note: VirtIO-9P is well supported in Linux guests. FreeBSD 14 guests lack the virtio_p9fs module; FreeBSD 15+ has full support.
 ```
 
-### Question 18: How to use PCI passthrough?
+### Question 20: How to use PCI passthrough?
 ```
 Answer: PCI passthrough allows a VM to directly access a physical PCI device (e.g., GPU, NIC). 
 
@@ -567,4 +599,46 @@ Show PCI passthrough device list:
 Legend:
 - Passthru Ready (Green): Device bound to ppt driver, ready for passthrough
 - Allocated (Yellow): Device currently assigned to a running VM
+```
+
+### Question 21: How to fix console login issues on UEFI VMs?
+```
+Answer: If you encounter a blank screen or hang when using 'bvm --login' on a UEFI VM, it's likely because the Guest OS is not outputting to the serial console. You need to configure the kernel parameters in the Guest OS.
+
+For Debian/Ubuntu:
+1. Edit /etc/default/grub
+2. Change: GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200"
+3. Run: update-grub
+4. Reboot
+
+For RHEL/CentOS/AlmaLinux:
+1. Edit /etc/default/grub
+2. Add to GRUB_CMDLINE_LINUX: "console=tty0 console=ttyS0,115200"
+   Also recommend removing "rhgb quiet" to see full boot messages
+3. Run: grub2-mkconfig -o /boot/efi/EFI/centos/grub.cfg (adjust path for your distro)
+4. Reboot
+
+For Fedora:
+1. Edit /etc/default/grub
+2. Add to GRUB_CMDLINE_LINUX: "console=tty0 console=ttyS0,115200"
+   Also recommend removing "rhgb quiet" to see full boot messages
+3. Run: grub2-mkconfig -o /boot/grub2/grub.cfg
+4. Reboot
+
+For openSUSE:
+1. Edit /etc/default/grub
+2. Add to GRUB_CMDLINE_LINUX_DEFAULT: "console=tty0 console=ttyS0,115200"
+   Also recommend removing "splash=silent quiet" to see full boot messages
+3. Run: grub2-mkconfig -o /boot/grub2/grub.cfg
+4. Reboot
+
+For OpenBSD:
+1. Modify boot config /etc/boot.conf (create if missing):
+   echo "set tty com0" >> /etc/boot.conf
+   echo "stty com0 115200" >> /etc/boot.conf
+2. Enable login service /etc/ttys:
+   Edit file, find 'tty00' line, change 'off' to 'on', and recommend adding 'secure' (allow root login)
+   Before: tty00 "/usr/libexec/getty std.9600" unknown off
+   After:  tty00 "/usr/libexec/getty std.115200" vt100 on secure
+3. Reboot
 ```

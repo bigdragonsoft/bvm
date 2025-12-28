@@ -1,5 +1,5 @@
 /*-----------------------------------------------------------------------------
-   BVM Copyright (c) 2018-2025, Qiang Guo (bigdragonsoft@gmail.com)
+   BVM Copyright (c) 2018-2026, Qiang Guo (bigdragonsoft@gmail.com)
    All rights reserved.
 
    Redistribution and use in source and binary forms, with or without
@@ -300,6 +300,7 @@ typedef struct _create_opts_stru create_opts_stru;
 char *bvm_strcpy(char *dst, const char *src);
 int  write_log_time();
 int  write_log(char *fmt, ...);
+int  write_vm_log(const char *vm_name, char *fmt, ...);
 void set_vmdir();
 void set_bvm_os();
 void check_bre();
@@ -361,6 +362,7 @@ int  copy_vm_disk(copy_stru *name);
 void show_dhcp_pool();
 void show_passthru_devices();
 void show_pci_devices();
+int  check_passthru_support();
 int  get_available_ppt_devices(available_ppt_stru *devs, const char *current_vm_name);
 int  get_ppt_device_desc(const char *bdf, char *desc, size_t desc_size);
 
@@ -437,6 +439,7 @@ unsigned long long get_cpu_frequency();
 void format_cpu_time(unsigned long long ticks, char *buf, size_t bufsize, unsigned long long cpu_freq);	
 void format_bytes(unsigned long long bytes, char *buf, size_t bufsize);
 void vm_show_stats(const char *vm_name);
+void vm_show_log(const char *vm_name, int error_only, int lines);
 unsigned long long parse_size(const char *size_str);
 void test();
 #endif	//BVM_VM_H
